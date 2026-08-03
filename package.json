@@ -1,0 +1,36 @@
+{
+  "name": "mira",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MIRA — busca B2B de empresas e profissionais (Aerosuite)",
+  "scripts": {
+    "dev": "next dev -p 4201",
+    "build": "next build",
+    "start": "next start -p 4201",
+    "lint": "next lint",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "ingest:receita": "tsx scripts/ingest-receita.ts",
+    "ingest:receita:download": "tsx scripts/download-receita.ts",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down"
+  },
+  "dependencies": {
+    "next": "^15.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@prisma/client": "^6.5.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "prisma": "^6.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^15.3.0"
+  }
+}

@@ -1,0 +1,11 @@
+.data/
+tmp/
+node_modules/
+.next/
+dist/
+out/
+*.log
+.env
+.env.local
+.env*.local
+/generated/prisma

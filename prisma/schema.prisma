@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Estabelecimento CNPJ (Receita Federal — dados abertos)
+model Establishment {
+  id              String   @id @default(cuid())
+  cnpj            String   @unique
+  cnpjBasico      String
+  razaoSocial     String?
+  nomeFantasia    String?
+  situacaoCadastral String?
+  cnaePrincipal   String?
+  cnaeDescricao   String?
+  municipio       String?
+  uf              String?
+  bairro          String?
+  cep             String?
+  logradouro      String?
+  numero          String?
+  telefone        String?
+  email           String?
+  latitude        Float?
+  longitude       Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([uf, municipio])
+  @@index([cnaePrincipal])
+  @@index([cnpjBasico])
+}
+
+model IngestJob {
+  id          String   @id @default(cuid())
+  source      String
+  status      String
+  message     String?
+  startedAt   DateTime @default(now())
+  finishedAt  DateTime?
+}
