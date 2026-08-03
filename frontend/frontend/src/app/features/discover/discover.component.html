@@ -1,0 +1,375 @@
+<section class="pp-page" [class.pp-page--filters-collapsed]="filtersCollapsed">
+  <header class="pp-page-header">
+    <div>
+      <span class="pp-eyebrow">Etapa 01 · Descoberta</span>
+      <h1 class="pp-title">Descobrir empresas</h1>
+      <p class="pp-subtitle">Busque por UF, CNAE e palavra-chave. Marque &quot;site contatável&quot; para filtrar empresas com presença web verificada.</p>
+    </div>
+    <button
+      type="button"
+      class="pp-btn save-cta"
+      [class.pp-btn--primary]="selected.size > 0"
+      [class.save-cta--idle]="selected.size === 0"
+      [disabled]="selected.size === 0"
+      (click)="storeSelection()"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+        <polyline points="17 21 17 13 7 13 7 21"/>
+      </svg>
+      @if (selected.size > 0) {
+        Salvar {{ selected.size }} e ir para Enriquecer
+      } @else {
+        Salvar selecionadas
+      }
+    </button>
+  </header>
+
+  <form
+    class="pp-glass filters-panel"
+    [class.filters-panel--collapsed]="filtersCollapsed"
+    [formGroup]="filters"
+    (ngSubmit)="search()"
+  >
+    <div class="filters-toolbar">
+      <button
+        type="button"
+        class="filters-toggle"
+        (click)="toggleFiltersCollapsed()"
+        [attr.aria-expanded]="!filtersCollapsed"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          @if (filtersCollapsed) {
+            <path d="M6 9l6 6 6-6"/>
+          } @else {
+            <path d="M18 15l-6-6-6 6"/>
+          }
+        </svg>
+        {{ filtersCollapsed ? 'Expandir filtros' : 'Recolher filtros' }}
+      </button>
+      @if (filtersCollapsed) {
+        <p class="filters-summary" [title]="filtersSummary">{{ filtersSummary }}</p>
+        @if (loading) {
+          <button type="button" class="search-btn search-btn--cancel search-btn--compact" (click)="cancelSearch()">
+            Cancelar
+          </button>
+        } @else {
+          <button type="submit" class="search-btn search-btn--primary search-btn--compact">
+            Buscar
+          </button>
+        }
+      }
+    </div>
+
+    @if (!filtersCollapsed) {
+      <div class="filter-grid filter-grid--primary">
+        <div class="pp-field filter-field">
+          <label for="discover-keyword">Palavra-chave</label>
+          <input
+            id="discover-keyword"
+            class="pp-input"
+            placeholder="Nome, CNPJ ou termo"
+            formControlName="keyword"
+          />
+          <small>Opcional. CNPJ completo encontra a empresa em qualquer UF</small>
+        </div>
+        <div class="pp-field filter-field filter-field--cnae">
+          <label for="discover-cnae">Setor (CNAE)</label>
+          <app-cnae-picker id="discover-cnae" formControlName="cnae" />
+        </div>
+        <div class="pp-field filter-field">
+          <label for="discover-state">UF</label>
+          <select id="discover-state" class="pp-select" formControlName="state" aria-label="UF">
+            <option value="">Todas as UFs importadas</option>
+            @for (option of stateOptions; track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+            }
+          </select>
+          <small>SP, RJ, MG, ES, GO, DF, MT, MS. Vazio = busca nacional (mais lenta)</small>
+        </div>
+        <div class="pp-field filter-field">
+          <label for="discover-city">Cidade</label>
+          <input
+            id="discover-city"
+            class="pp-input"
+            placeholder="Ex.: Cabo Frio"
+            formControlName="city"
+            title="Filtre por nome da cidade"
+          />
+          <small>Opcional. Combine com UF</small>
+        </div>
+        <div class="pp-field filter-field">
+          <label for="discover-revenue">Faturamento</label>
+          <select id="discover-revenue" class="pp-select" formControlName="revenue" aria-label="Faturamento">
+            <option value="">Todos os portes</option>
+            <option value="SMALL">Pequeno</option>
+            <option value="MEDIUM">Médio</option>
+            <option value="LARGE">Grande</option>
+          </select>
+          <small>Opcional. Porte estimado</small>
+        </div>
+      </div>
+
+      <div class="filter-grid filter-grid--secondary">
+        <div class="filter-advanced">
+          <span class="filter-advanced__title">Filtros avançados</span>
+          <div class="filter-advanced__flags">
+            <label class="filter-flag">
+              <input type="checkbox" formControlName="activeOnly" />
+              Somente empresas ativas (RF)
+            </label>
+            <label class="filter-flag">
+              <input type="checkbox" formControlName="contactableOnly" />
+              Somente com site contatável
+            </label>
+          </div>
+        </div>
+
+        <div class="filter-actions-col">
+          @if (loading) {
+            <button
+              type="button"
+              class="search-btn search-btn--cancel"
+              (click)="cancelSearch()"
+              aria-live="polite"
+            >
+              <svg class="search-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+              <span class="search-btn__label">Cancelar busca</span>
+            </button>
+          } @else {
+            <button
+              type="submit"
+              id="discover-search"
+              class="search-btn search-btn--primary"
+              aria-live="polite"
+            >
+              <svg class="search-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                <circle cx="11" cy="11" r="7"/>
+                <path d="M20 20l-3.5-3.5"/>
+              </svg>
+              <span class="search-btn__label">Buscar empresas</span>
+            </button>
+          }
+          <button
+            type="button"
+            class="clear-btn"
+            [disabled]="loading"
+            (click)="clearFilters()"
+          >
+            Limpar filtros
+          </button>
+          <small class="filter-actions-col__hint">A busca permanece ao voltar do enriquecimento</small>
+        </div>
+      </div>
+    }
+  </form>
+
+  @if (searchError) {
+    <div class="search-error" role="alert">
+      <div>
+        <strong>Busca indisponível</strong>
+        <span>{{ searchError }}</span>
+      </div>
+      <button type="button" class="pp-btn pp-btn--secondary" (click)="search()">Tentar novamente</button>
+    </div>
+  }
+
+  @if (selected.size > 0) {
+    <div class="selection-bar pp-banner pp-banner--info">
+      <div class="selection-tags">
+        <span class="selection-tag">{{ selectedCountLabel }}</span>
+        @if (selectedOnMapLabel; as mapLabel) {
+          <span class="selection-tag selection-tag--map">{{ mapLabel }}</span>
+        }
+      </div>
+      <span class="selection-hint">Use o botão roxo no topo ou as ações rápidas em cada card</span>
+    </div>
+  }
+
+  <div class="discover-layout">
+    <div class="pp-glass list-panel">
+      <div class="list-header">
+        <div class="list-header__top">
+          <div>
+            <strong>{{ totalElementsLabel }}</strong>
+            <span>empresas encontradas</span>
+            @if (isNationalSearch && hasSearched) {
+              <small class="list-header__hint">Busca nacional - informe UF ou CNPJ completo para resultado instantâneo</small>
+            }
+          </div>
+          @if (hasSearched && companies.length > 0) {
+            <small class="list-header__map">{{ mappedCompaniesCount }} no mapa nesta página</small>
+          }
+        </div>
+        @if (hasSearched && companies.length > 0) {
+          <div class="list-filter">
+            <svg class="list-filter__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"/>
+              <path d="M20 20l-3.5-3.5"/>
+            </svg>
+            <input
+              type="search"
+              class="list-filter__input pp-input"
+              placeholder="Filtrar por nome, CNPJ ou cidade…"
+              [value]="resultFilter"
+              (input)="updateResultFilter($event)"
+              aria-label="Filtrar empresas nos resultados"
+            />
+            @if (hasResultFilter) {
+              <button type="button" class="list-filter__clear" (click)="clearResultFilter()" aria-label="Limpar filtro da lista">
+                ×
+              </button>
+            }
+          </div>
+          @if (hasResultFilter) {
+            <small class="list-header__filter-count">
+              {{ visibleCompanies.length }} de {{ companies.length }} nesta página
+            </small>
+          }
+        }
+      </div>
+      <div class="list-scroll">
+        @if (loading) {
+          <div class="loading-state">
+            <span class="pp-loading-dots"><span></span><span></span><span></span></span>
+          </div>
+        } @else if (searchError) {
+          <div class="pp-empty pp-empty--error">
+            <strong>Serviço de busca indisponível</strong>
+            <span>{{ searchError }}</span>
+          </div>
+        } @else if (companies.length === 0 && hasSearched) {
+          <div class="pp-empty">
+            <strong>Nenhum resultado</strong>
+            @if (filters.get('contactableOnly')?.value) {
+              <span>Nenhuma empresa com site contatável nestes filtros. Desmarque “Somente com site contatável” para ver todas as ativas, ou execute a varredura web (scripts/probe-web-contactability.ps1).</span>
+            } @else {
+              <span>Ajuste os filtros e busque novamente.</span>
+            }
+          </div>
+        } @else if (visibleCompanies.length === 0 && companies.length > 0) {
+          <div class="pp-empty">
+            <strong>Nenhuma correspondência</strong>
+            <span>Nenhuma empresa nesta página corresponde a “{{ resultFilter.trim() }}”. Limpe o filtro ou refine a busca principal.</span>
+          </div>
+        } @else {
+          @for (company of visibleCompanies; track company.id; let i = $index) {
+            <article
+              class="company-card pp-enter"
+              [attr.data-company-id]="company.id"
+              [class.selected]="selected.has(company.id)"
+              [class.company-card--map-hover]="hoveredCompanyId === company.id"
+              [style.animation-delay.ms]="i * 40"
+              (mouseenter)="setHoveredCompany(company.id)"
+              (mouseleave)="clearHoveredCompany(company.id)"
+            >
+              <input
+                type="checkbox"
+                [checked]="selected.has(company.id)"
+                (change)="toggleSelect(company.id)"
+                [attr.aria-label]="'Selecionar ' + (company.tradeName || company.legalName)"
+              />
+              <div class="company-info">
+                <div class="company-top">
+                  <strong>{{ company.tradeName || company.legalName }}</strong>
+                  <span class="pp-badge" [class]="revenueBadge(company.estimatedRevenue)">{{ company.estimatedRevenue }}</span>
+                </div>
+                <span class="company-cnpj">{{ company.cnpj }}</span>
+                <span class="company-meta">{{ company.cnaeDescription }}</span>
+                <span class="company-location">{{ company.city }}/{{ company.state }}</span>
+              </div>
+              <div class="card-actions">
+                <button
+                  type="button"
+                  class="card-action"
+                  title="Enriquecer esta empresa"
+                  aria-label="Enviar para Enriquecer"
+                  (click)="sendToEnrich(company.id, $event)"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="card-action card-action--outreach"
+                  title="Abordar esta empresa"
+                  aria-label="Enviar para Abordar"
+                  (click)="sendToOutreach(company.id, $event)"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                  </svg>
+                </button>
+              </div>
+            </article>
+          }
+        }
+      </div>
+    </div>
+
+    <div class="map-wrapper pp-glass" [attr.data-map-style]="activeMapStyle">
+      <div class="map-label">
+        <span class="pp-badge pp-badge--cyan">Mapa ao vivo</span>
+        @if (hasSearched) {
+          <span class="map-label__stats">
+            @if (hasResultFilter) {
+              {{ mappedCompaniesCount }} pin(s) filtrados
+            } @else {
+              {{ mappedCompaniesCount }} pin(s)
+            }
+            · passe o mouse no cluster para ver a dica · clique para expandir · pin selecionado pulsa · verde/ciano/roxo = porte
+            @if (refiningLocations) {
+              · indexando endereços...
+            }
+          </span>
+        }
+      </div>
+      <div class="map-layers" role="group" aria-label="Estilo do mapa">
+        @for (option of mapStyleOptions; track option.id) {
+          <button
+            type="button"
+            class="map-layers__btn"
+            [class.map-layers__btn--active]="activeMapStyle === option.id"
+            [title]="option.hint"
+            (click)="setMapStyle(option.id)"
+          >
+            {{ option.label }}
+          </button>
+        }
+      </div>
+      <div #mapContainer class="map"></div>
+    </div>
+  </div>
+</section>
+
+@if (streetViewOpen && streetViewCompany && streetViewEmbedUrl) {
+  <div class="streetview-overlay" (click)="closeStreetViewModal()" role="dialog" aria-modal="true" aria-labelledby="streetview-title">
+    <div class="streetview-modal pp-glass" (click)="$event.stopPropagation()">
+      <header class="streetview-modal__header">
+        <div>
+          <h2 id="streetview-title">{{ streetViewCompany.tradeName || streetViewCompany.legalName }}</h2>
+          <p>{{ streetViewCompany.city }}/{{ streetViewCompany.state }} · {{ streetViewCompany.cnaeDescription || streetViewCompany.cnaeMain }}</p>
+          @if (streetViewApproximate) {
+            <p class="streetview-modal__warning">Localização aproximada pelo CEP - confira o endereço no Google Maps.</p>
+          }
+        </div>
+        <button type="button" class="streetview-modal__close" (click)="closeStreetViewModal()" aria-label="Fechar Street View">×</button>
+      </header>
+      <iframe
+        class="streetview-modal__frame"
+        [src]="streetViewEmbedUrl"
+        title="Street View - {{ streetViewCompany.tradeName || streetViewCompany.legalName }}"
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+        allowfullscreen
+      ></iframe>
+      <footer class="streetview-modal__footer">
+        <button type="button" class="pp-btn pp-btn--secondary" (click)="closeStreetViewModal()">Fechar</button>
+        <button type="button" class="pp-btn pp-btn--primary" (click)="openStreetViewExternal()">Abrir no Google Maps</button>
+      </footer>
+    </div>
+  </div>
+}

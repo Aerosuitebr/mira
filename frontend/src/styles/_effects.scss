@@ -1,0 +1,91 @@
+@keyframes pp-aurora {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+  33% { transform: translate(4%, -3%) scale(1.05); opacity: 0.7; }
+  66% { transform: translate(-3%, 2%) scale(0.98); opacity: 0.55; }
+}
+
+@keyframes pp-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes pp-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pp-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pp-pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+@keyframes pp-gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.pp-ambient {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: 0;
+  animation: pp-aurora 18s ease-in-out infinite;
+}
+
+.pp-ambient--violet {
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.35), transparent 70%);
+  top: -120px;
+  right: -80px;
+  opacity: var(--pp-ambient-strength, 1);
+}
+
+.pp-ambient--cyan {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.2), transparent 70%);
+  bottom: 10%;
+  left: 20%;
+  animation-delay: -6s;
+  opacity: var(--pp-ambient-strength, 1);
+}
+
+.pp-ambient--rose {
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(251, 113, 133, 0.15), transparent 70%);
+  top: 40%;
+  right: 30%;
+  animation-delay: -12s;
+  opacity: var(--pp-ambient-strength, 1);
+}
+
+.pp-enter {
+  animation: pp-fade-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+@for $i from 1 through 12 {
+  .pp-stagger-#{$i} {
+    animation-delay: #{$i * 0.06}s;
+  }
+}
+
+.pp-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: pp-shimmer 1.8s ease-in-out infinite;
+}

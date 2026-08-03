@@ -1,0 +1,217 @@
+.login {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(260px, 34vw) 1fr minmax(320px, 400px);
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      rgba(5, 8, 22, 0.78) 0%,
+      rgba(5, 8, 22, 0.42) 22%,
+      transparent 38%,
+      transparent 62%,
+      rgba(5, 8, 22, 0.35) 78%,
+      rgba(5, 8, 22, 0.88) 100%
+    );
+  }
+}
+
+.login-theme-toggle {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 20;
+}
+
+.login-brand {
+  position: fixed;
+  top: 1.25rem;
+  left: 1.25rem;
+  z-index: 20;
+}
+
+.login-bg {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  z-index: 0;
+  background-color: var(--pp-bg-deep);
+  background-image: var(--pp-bg-image-login);
+  background-position: center center;
+  background-size: auto 100%;
+  background-repeat: no-repeat;
+}
+
+.login-showcase {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 6rem 1.5rem 2rem 2rem;
+  max-width: 100%;
+  grid-column: 1;
+
+  h1 {
+    font-family: var(--pp-font-display);
+    font-size: clamp(2rem, 3.5vw, 3rem);
+    font-weight: 800;
+    line-height: 1.1;
+    margin: 1rem 0;
+    letter-spacing: -0.04em;
+
+    em {
+      font-style: normal;
+      background: var(--pp-gradient-hero);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  }
+
+  > p {
+    color: var(--pp-text-secondary);
+    font-size: 1rem;
+    line-height: 1.65;
+    margin: 0 0 1.75rem;
+  }
+}
+
+.feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.85rem;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 1.25rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--pp-radius-md);
+    color: var(--pp-text-secondary);
+    transition: all var(--pp-transition);
+
+    span {
+      font-family: var(--pp-font-display);
+      font-weight: 700;
+      font-size: 0.75rem;
+      color: var(--pp-cyan);
+      min-width: 1.5rem;
+    }
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(129, 140, 248, 0.2);
+      transform: translateX(6px);
+    }
+  }
+}
+
+.login-panel {
+  position: relative;
+  z-index: 2;
+  margin: 1.25rem 2rem 1.25rem 0.5rem;
+  padding: 2rem;
+  align-self: center;
+  justify-self: end;
+  width: 100%;
+  max-width: 400px;
+  grid-column: 3;
+}
+
+.panel-header {
+  margin-bottom: 2rem;
+
+  h2 {
+    font-family: var(--pp-font-display);
+    font-size: 1.5rem;
+    margin: 0 0 0.35rem;
+  }
+
+  p {
+    margin: 0;
+    color: var(--pp-text-muted);
+    font-size: 0.9rem;
+  }
+}
+
+form {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.login-submit {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.9rem;
+}
+
+.login-error {
+  color: var(--pp-rose);
+  font-size: 0.85rem;
+  margin: 0;
+  padding: 0.75rem;
+  background: rgba(251, 113, 133, 0.1);
+  border-radius: var(--pp-radius-sm);
+  border: 1px solid rgba(251, 113, 133, 0.2);
+}
+
+.demo-hint {
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--pp-text-muted);
+
+  code {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    color: var(--pp-text-secondary);
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .login {
+    grid-template-columns: 1fr;
+    place-items: center;
+
+    &::after {
+      background: linear-gradient(
+        180deg,
+        rgba(5, 8, 22, 0.35) 0%,
+        rgba(5, 8, 22, 0.55) 42%,
+        rgba(5, 8, 22, 0.88) 100%
+      );
+    }
+  }
+
+  .login-showcase {
+    display: none;
+  }
+
+  .login-panel {
+    grid-column: 1;
+    margin: auto 1rem 1.5rem;
+    justify-self: center;
+    max-width: 100%;
+  }
+}

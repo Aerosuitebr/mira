@@ -1,0 +1,63 @@
+<section class="pp-page projects-page">
+  <header class="pp-page-header">
+    <div>
+      <span class="pp-eyebrow">Pós-venda · Operações</span>
+      <h1 class="pp-title">Kanban de Entrega</h1>
+      <p class="pp-subtitle">Acompanhe a execução dos serviços vendidos — arraste entre as colunas.</p>
+    </div>
+    <div class="header-actions">
+      <a routerLink="/proposals" class="pp-btn pp-btn--ghost">Ir para Propostas</a>
+      <button type="button" class="pp-btn pp-btn--secondary" (click)="load()" [disabled]="loading || moving">Atualizar</button>
+    </div>
+  </header>
+
+  @if (loading) {
+    <p class="muted">Carregando projetos...</p>
+  } @else {
+    <div class="board" cdkDropListGroup [class.is-moving]="moving">
+      @for (column of columns; track column.status) {
+        <div class="column" [style.--stage-color]="columnColor(column.status)">
+          <div class="column-header" [style.background]="columnColor(column.status)">
+            <strong>{{ column.label }}</strong>
+            <span class="count">{{ column.projects.length }}</span>
+          </div>
+          <div
+            class="column-body"
+            cdkDropList
+            [cdkDropListData]="column.projects"
+            [id]="column.status"
+            (cdkDropListDropped)="drop($event, column.status)"
+          >
+            @for (project of column.projects; track project.id) {
+              <article class="project-card" cdkDrag [cdkDragDisabled]="moving">
+                <div class="card-top">
+                  <strong class="client-name">{{ project.clientName }}</strong>
+                  @if (project.dueAt) {
+                    <span class="due-tag" [class.due-tag--late]="isOverdue(project)">
+                      Prazo {{ project.dueAt | date:'dd/MM/yyyy':'':'pt-BR' }}
+                    </span>
+                  }
+                </div>
+                <span class="project-name">{{ project.name }}</span>
+                <div class="progress" aria-hidden="true">
+                  <div class="progress-bar" [style.width.%]="project.progressPercent"></div>
+                </div>
+                <small>{{ project.progressPercent }}% das etapas concluídas</small>
+              </article>
+            }
+            @if (column.projects.length === 0) {
+              @if (isBoardEmpty && column.status === 'NOT_STARTED') {
+                <div class="empty-col empty-col--guide">
+                  <p>Projetos aparecem aqui quando uma proposta é aprovada ou um negócio é fechado no CRM.</p>
+                  <a routerLink="/proposals" class="pp-btn pp-btn--secondary">Ver Propostas Pendentes</a>
+                </div>
+              } @else {
+                <div class="empty-col">Solte projetos aqui</div>
+              }
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</section>

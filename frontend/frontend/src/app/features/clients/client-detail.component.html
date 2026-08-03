@@ -1,0 +1,70 @@
+<section class="pp-page">
+  @if (loading) {
+    <p>Carregando ficha 360°...</p>
+  } @else if (client) {
+    <header class="pp-page-header">
+      <div>
+        <a routerLink="/clients" class="back">← Carteira</a>
+        <h1 class="pp-title">{{ client.displayName }}</h1>
+        <p class="pp-subtitle">{{ client.document }} · {{ client.city }}/{{ client.state }}</p>
+      </div>
+      <div class="summary pp-glass">
+        <div><small>LTV</small><strong>{{ client.lifetimeValue | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</strong></div>
+        <div><small>Tempo de casa</small><strong>{{ client.tenureDays }} dias</strong></div>
+        <div><small>Serviço</small><strong>{{ client.serviceStatus }}</strong></div>
+      </div>
+    </header>
+
+    <div class="layout">
+      <article class="panel pp-glass">
+        <h2>Dados cadastrais</h2>
+        <p><strong>E-mail:</strong> {{ client.email || '—' }}</p>
+        <p><strong>Telefone:</strong> {{ client.phone || '—' }}</p>
+        <p><strong>Responsável:</strong> {{ client.ownerName || '—' }}</p>
+        <p><strong>Cliente desde:</strong> {{ client.contractedAt | date:'dd/MM/yyyy' }}</p>
+      </article>
+
+      <article class="panel pp-glass">
+        <h2>Histórico de contato</h2>
+        @if (client.contactHistory.length === 0) {
+          <p class="muted">Sem mensagens registradas.</p>
+        } @else {
+          <ul>
+            @for (item of client.contactHistory; track item.id) {
+              <li>
+                <strong>{{ item.channel }}</strong> — {{ item.subject || 'Sem assunto' }}
+                <small>{{ item.status }}</small>
+              </li>
+            }
+          </ul>
+        }
+      </article>
+
+      <article class="panel pp-glass">
+        <h2>Propostas</h2>
+        @if (client.proposals.length === 0) {
+          <p class="muted">Nenhuma proposta vinculada.</p>
+        } @else {
+          <ul>
+            @for (p of client.proposals; track p.id) {
+              <li>{{ p.title }} — {{ p.status }} — {{ p.totalAmount | currency:'BRL':'symbol':'1.0-0':'pt-BR' }}</li>
+            }
+          </ul>
+        }
+      </article>
+
+      <article class="panel pp-glass">
+        <h2>Serviços contratados</h2>
+        @if (client.services.length === 0) {
+          <p class="muted">Nenhum projeto iniciado.</p>
+        } @else {
+          <ul>
+            @for (s of client.services; track s.id) {
+              <li>{{ s.name }} — {{ s.status }} ({{ s.progressPercent }}%)</li>
+            }
+          </ul>
+        }
+      </article>
+    </div>
+  }
+</section>

@@ -1,0 +1,79 @@
+<section class="settings-page">
+  <header class="settings-header">
+    <div>
+      <span class="settings-eyebrow">Integrações</span>
+      <h1>Configurações de envio</h1>
+      <p>
+        Defina o nome do remetente e a imagem de marca usados nas mensagens de WhatsApp e nos e-mails
+        (pessoa física ou jurídica).
+      </p>
+    </div>
+    <div class="settings-header__actions">
+      <a routerLink="/whatsapp" class="pp-btn pp-btn--outline">WhatsApp</a>
+      <a routerLink="/outreach" class="pp-btn pp-btn--outline">Ir para Abordar</a>
+    </div>
+  </header>
+
+  @if (loading) {
+    <p class="settings-muted">Carregando…</p>
+  } @else {
+    <div class="settings-grid">
+      <article class="settings-card">
+        <h2>Remetente</h2>
+        <p class="settings-hint">
+          Aparece na assinatura do WhatsApp, no rodapé do e-mail e no nome exibido no From do SMTP.
+        </p>
+        <label class="settings-field">
+          <span>Nome do remetente</span>
+          <input
+            type="text"
+            [(ngModel)]="senderName"
+            maxlength="120"
+            placeholder="Ex.: João Silva ME ou Departamento Comercial · ACME"
+          />
+        </label>
+      </article>
+
+      <article class="settings-card">
+        <h2>Imagem da marca</h2>
+        <p class="settings-hint">
+          Enviada junto com o WhatsApp (mídia) e inserida no cabeçalho do e-mail. PNG, JPEG ou WebP até ~900 KB.
+        </p>
+
+        <div class="settings-preview">
+          @if (previewUrl) {
+            <img [src]="previewUrl" alt="Prévia da imagem de marca" />
+          } @else {
+            <div class="settings-preview__empty">Nenhuma imagem cadastrada</div>
+          }
+        </div>
+
+        <div class="settings-file-row">
+          <label class="pp-btn pp-btn--outline settings-file-btn">
+            Escolher imagem
+            <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onFileSelected($event)" hidden />
+          </label>
+          @if (previewUrl || clearBrandImage) {
+            <button type="button" class="pp-btn pp-btn--ghost" (click)="removeImage()">Remover</button>
+          }
+        </div>
+        @if (brandImageFileName) {
+          <p class="settings-file-name">{{ brandImageFileName }}</p>
+        }
+      </article>
+    </div>
+
+    @if (message) {
+      <p class="settings-ok" role="status">{{ message }}</p>
+    }
+    @if (error) {
+      <p class="settings-error" role="alert">{{ error }}</p>
+    }
+
+    <div class="settings-actions">
+      <button type="button" class="pp-btn pp-btn--primary" (click)="save()" [disabled]="saving">
+        {{ saving ? 'Salvando…' : 'Salvar configurações' }}
+      </button>
+    </div>
+  }
+</section>

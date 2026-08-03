@@ -1,0 +1,29 @@
+---
+description: Proíbe travessão (—) em textos de produto, UI e mensagens
+alwaysApply: true
+---
+
+# Sem travessões em textos
+
+Nunca use o caractere travessão (`—`, U+2014) nem o en dash (`–`, U+2013) em textos voltados ao usuário.
+
+Inclui: copy de WhatsApp, e-mail, UI, pitch, status, assuntos, templates e mensagens da prospecção automática.
+
+## Preferir
+
+- Vírgula: `fluxo da empresa, do comercial ao estoque`
+- Dois-pontos: `Rota PF ativa: capture contatos`
+- Parênteses: `fluxo da empresa (comercial, estoque e operações)`
+- Ponto médio (`·`) só em rótulos curtos de marca: `Comércio · Estoque · MRO`
+
+## Exemplos
+
+```text
+❌ conhecer uma ferramenta poderosa — do comercial ao estoque
+✅ conhecer uma ferramenta poderosa, do comercial ao estoque
+
+❌ Aero Suite — Comércio · Estoque
+✅ Aero Suite · Comércio · Estoque
+```
+
+Comentários de código podem usar `:` ou `-` ASCII; evitar travessão também neles quando for texto legível.

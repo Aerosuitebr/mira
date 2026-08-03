@@ -1,0 +1,453 @@
+<section class="pp-page">
+  <header class="pp-page-header">
+    <div>
+      <span class="pp-eyebrow">Etapa 03 · Abordagem</span>
+      <h1 class="pp-title">Abordar & Enviar</h1>
+      <p class="pp-subtitle">1) Configure · 2) Gere e revise a prévia · 3) Dispare para o lote.</p>
+    </div>
+  </header>
+
+  <div class="outreach-layout">
+    @if (companyIds.length === 0) {
+      <div class="pp-glass form-panel">
+        <h3>Nenhuma empresa para abordar</h3>
+        <p class="channel-hint">Volte ao Enriquecer, marque as empresas e clique em Continuar para Abordar.</p>
+        <a routerLink="/enrich" class="pp-btn pp-btn--primary">Ir para Enriquecer</a>
+      </div>
+    } @else {
+      <form class="pp-glass form-panel" [formGroup]="form">
+        <h3>1. Configurar campanha</h3>
+
+        <div class="pp-field">
+          <label for="campaign-name">Nome da campanha</label>
+          <input id="campaign-name" class="pp-input" formControlName="campaignName" />
+        </div>
+
+        <div class="pp-field">
+          <label for="channel">Canal</label>
+          <div class="channel-row">
+            <select id="channel" class="pp-select" formControlName="channel">
+              <option value="EMAIL">E-mail</option>
+              <option value="WHATSAPP">WhatsApp</option>
+            </select>
+            <span
+              class="channel-status"
+              [class.channel-status--ok]="channelStatus.connected"
+              [class.channel-status--off]="!channelStatus.connected"
+            >
+              <span class="status-dot" aria-hidden="true"></span>
+              {{ channelStatus.label }}
+            </span>
+          </div>
+          @if (!channelStatus.connected) {
+            @if (form.controls.channel.value === 'WHATSAPP') {
+              <a class="channel-connect" routerLink="/whatsapp">Conectar WhatsApp</a>
+            }
+            @if (channelStatus.connectHint) {
+              <small class="channel-hint">{{ channelStatus.connectHint }}</small>
+            }
+          }
+        </div>
+
+        <div class="pp-field">
+          <label for="template">Template</label>
+          <select id="template" class="pp-select" formControlName="templateId">
+            @for (template of templates; track template.id) {
+              <option [value]="template.id">{{ template.name }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="pp-field">
+          <label for="product">Produto / proposta</label>
+          <div class="variable-tags" aria-label="Variáveis disponíveis no template">
+            @for (variable of templateVariables; track variable.token) {
+              <button type="button" class="variable-tag" (click)="insertVariable(variable.token)">
+                {{ variable.label }}
+              </button>
+            }
+          </div>
+          <textarea
+            id="product"
+            class="pp-textarea"
+            rows="4"
+            formControlName="productDescription"
+            placeholder="Descreva sua oferta. Use as tags acima para personalizar o template."
+          ></textarea>
+        </div>
+
+        <div class="actions actions--single">
+          <button
+            type="button"
+            class="pp-btn pp-btn--primary ai-btn"
+            (click)="generateAi()"
+            [disabled]="!canGenerateAi"
+            [attr.title]="!canGenerateAi ? 'Preencha template e proposta para gerar' : null"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7-6.3-4.6L6 21l2.3-7-6-4.6h7.6z"/>
+            </svg>
+            {{ generatingAi ? 'Gerando...' : 'Gerar copy IA' }}
+          </button>
+        </div>
+
+        <details class="smtp-test">
+          <summary>Diagnóstico SMTP (opcional)</summary>
+          <p>
+            Envia um e-mail de teste para o endereço configurado no servidor. Não usa os leads da campanha.
+          </p>
+          <button
+            type="button"
+            class="pp-btn pp-btn--secondary"
+            [disabled]="sendingTestEmail"
+            (click)="sendTestEmail()"
+          >
+            @if (sendingTestEmail) {
+              Enviando teste...
+            } @else {
+              Testar envio de e-mail
+            }
+          </button>
+        </details>
+
+        @if (message) {
+          <div
+            class="pp-banner"
+            [class.pp-banner--success]="!feedbackError"
+            [class.outreach-banner-error]="feedbackError"
+          >{{ message }}</div>
+        }
+      </form>
+
+      <article class="pp-glass preview-panel">
+        <div class="preview-header">
+          <div>
+            <h3>2. Revisar prévia</h3>
+            <p class="preview-step-hint">Edite o texto se precisar. O disparo só libera depois da prévia.</p>
+          </div>
+          <span class="pp-badge pp-badge--violet pp-badge--ai">GPT-powered</span>
+        </div>
+
+        @if (companies.length > 0) {
+          <div class="preview-selector pp-field">
+            <label for="preview-company">Mostrando prévia para</label>
+            <select
+              id="preview-company"
+              class="pp-select"
+              [value]="previewCompanyId"
+              (change)="onPreviewCompanyChange($any($event.target).value)"
+            >
+              @for (company of companies; track company.id) {
+                <option [value]="company.id">{{ company.tradeName || company.legalName }}</option>
+              }
+            </select>
+          </div>
+        }
+
+        <div class="preview-content" [class.has-content]="hasPreviewReady">
+          @if (hasPreviewReady) {
+            @if (hasPreviewTokens) {
+              <p class="preview-token-legend">
+                <span class="preview-token-legend__token">placeholder</span>
+                ainda será substituído no disparo ·
+                <span class="preview-token-legend__dynamic">dado do lead</span>
+                muda por empresa
+              </p>
+            }
+            @if (form.controls.channel.value === 'EMAIL') {
+              <div class="pp-field">
+                <label for="preview-subject">Assunto</label>
+                <div class="preview-highlight-wrap preview-highlight-wrap--subject">
+                  <div class="preview-highlight-backdrop" aria-hidden="true">
+                    @for (seg of previewSubjectSegments; track $index) {
+                      @if (seg.kind === 'token') {
+                        <mark class="preview-chip preview-chip--token">{{ seg.text }}</mark>
+                      } @else if (seg.kind === 'dynamic') {
+                        <mark class="preview-chip preview-chip--dynamic">{{ seg.text }}</mark>
+                      } @else {
+                        {{ seg.text }}
+                      }
+                    }
+                  </div>
+                  <input
+                    id="preview-subject"
+                    class="pp-input preview-editor preview-editor--overlay"
+                    [value]="aiSubject"
+                    (input)="onPreviewSubjectInput($event)"
+                  />
+                </div>
+              </div>
+            }
+            <div class="pp-field">
+              <label for="preview-body">Mensagem ({{ form.controls.channel.value === 'WHATSAPP' ? 'WhatsApp' : 'E-mail' }})</label>
+              <div class="preview-highlight-wrap">
+                <div #bodyHighlight class="preview-highlight-backdrop" aria-hidden="true">
+                  @for (seg of previewBodySegments; track $index) {
+                    @if (seg.kind === 'token') {
+                      <mark class="preview-chip preview-chip--token">{{ seg.text }}</mark>
+                    } @else if (seg.kind === 'dynamic') {
+                      <mark class="preview-chip preview-chip--dynamic">{{ seg.text }}</mark>
+                    } @else {
+                      {{ seg.text }}
+                    }
+                  }
+                </div>
+                <textarea
+                  id="preview-body"
+                  class="pp-textarea preview-editor preview-editor--overlay"
+                  rows="10"
+                  [value]="aiPreview"
+                  (input)="onPreviewBodyInput($event)"
+                  (blur)="onPreviewBodyBlur()"
+                  (scroll)="onPreviewEditorScroll($event, bodyHighlight)"
+                ></textarea>
+              </div>
+            </div>
+          } @else {
+            <div class="preview-placeholder preview-placeholder--rich">
+              <div class="preview-placeholder__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7-6.3-4.6L6 21l2.3-7-6-4.6h7.6z"/>
+                </svg>
+              </div>
+              <strong>Pronto para gerar sua abordagem</strong>
+              <span>
+                Preencha o contexto do produto à esquerda e clique em
+                <em>Gerar copy IA</em>
+                para ver a mensagem personalizada de
+                {{ previewCompany?.tradeName || previewCompany?.legalName || 'cada empresa' }}.
+              </span>
+            </div>
+          }
+        </div>
+
+        <div class="preview-actions">
+          <button
+            type="button"
+            class="pp-btn send-btn"
+            [class.pp-btn--primary]="canSendCampaign"
+            [class.send-btn--active]="canSendCampaign"
+            [class.send-btn--disabled]="!canSendCampaign"
+            (click)="sendCampaign()"
+            [disabled]="!canSendCampaign"
+            [attr.title]="
+              !hasPreviewReady
+                ? 'Gere a prévia IA antes de enviar'
+                : !channelStatus.connected
+                  ? 'Conecte o canal antes de enviar'
+                  : null
+            "
+          >
+            {{ loading ? 'Enviando...' : '3. Enviar para ' + companyIds.length + ' leads' }}
+          </button>
+          @if (!hasPreviewReady) {
+            <small class="send-hint">Disparo bloqueado até gerar e revisar a prévia.</small>
+          } @else if (!channelStatus.connected) {
+            <small class="send-hint">Prévia ok. Conecte o canal para liberar o envio.</small>
+          } @else {
+            <small class="send-hint send-hint--ok">Prévia revisável · canal pronto · pode disparar.</small>
+          }
+        </div>
+
+        <div class="leads-list">
+          <h4>Empresas selecionadas <span class="count">{{ companies.length }}</span></h4>
+          <ul>
+            @for (company of companies; track company.id) {
+              <li [class.active]="company.id === previewCompanyId">
+                {{ company.tradeName || company.legalName }}
+                @if (previewsByCompany[company.id].body) {
+                  <span class="lead-ready">prévia</span>
+                }
+              </li>
+            }
+          </ul>
+        </div>
+      </article>
+    }
+  </div>
+
+  @if (sendProgress.open) {
+    <div
+      class="send-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="send-overlay-title"
+      (click)="closeSendProgress()"
+    >
+      <div
+        class="send-modal"
+        [class.send-modal--email]="sendProgress.activeChannel === 'EMAIL'"
+        [class.send-modal--wa]="sendProgress.activeChannel === 'WHATSAPP'"
+        [class.send-modal--busy]="isSendBusy"
+        [class.send-modal--success]="sendProgress.phase === 'success'"
+        [class.send-modal--partial]="sendProgress.phase === 'partial'"
+        [class.send-modal--error]="sendProgress.phase === 'error'"
+        (click)="$event.stopPropagation()"
+      >
+        <header class="send-modal__header">
+          <div>
+            <p class="send-modal__eyebrow">
+              @if (isSendBusy) {
+                {{ sendProgress.activeChannel === 'WHATSAPP' ? 'Canal WhatsApp' : 'Canal E-mail' }}
+              } @else if (sendProgress.channel === 'WHATSAPP') {
+                Campanha WhatsApp
+                @if (sendProgress.emailSent > 0) {
+                  (com fallback e-mail)
+                }
+              } @else {
+                Campanha E-mail
+              }
+            </p>
+            <h2 id="send-overlay-title">{{ sendPhaseLabel }}</h2>
+          </div>
+          @if (!isSendBusy) {
+            <button type="button" class="send-modal__close" (click)="closeSendProgress()" aria-label="Fechar">
+              ✕
+            </button>
+          }
+        </header>
+
+        <div class="send-stage" aria-hidden="true">
+          @if (isSendBusy && sendProgress.activeChannel === 'EMAIL') {
+            <div class="anim-email">
+              <div class="anim-email__trail"></div>
+              <div class="anim-email__envelope">
+                <span class="anim-email__flap"></span>
+                <span class="anim-email__body"></span>
+                <span class="anim-email__letter"></span>
+              </div>
+              <div class="anim-email__inbox">
+                <span></span>
+              </div>
+            </div>
+          } @else if (isSendBusy && sendProgress.activeChannel === 'WHATSAPP') {
+            <div class="anim-wa">
+              <div class="anim-wa__phone">
+                <div class="anim-wa__screen">
+                  <div class="anim-wa__bubble anim-wa__bubble--out"></div>
+                  <div class="anim-wa__bubble anim-wa__bubble--in"></div>
+                  <div class="anim-wa__typing">
+                    <i></i><i></i><i></i>
+                  </div>
+                </div>
+              </div>
+              <div class="anim-wa__waves">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+          } @else if (sendProgress.phase === 'success') {
+            <div class="anim-result anim-result--success">
+              <svg viewBox="0 0 72 72" class="anim-result__ring">
+                <circle cx="36" cy="36" r="30" />
+              </svg>
+              <svg viewBox="0 0 72 72" class="anim-result__check">
+                <path d="M20 37.5 L31 48.5 L52 24" />
+              </svg>
+              <div class="anim-result__burst">
+                <i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+            </div>
+          } @else if (sendProgress.phase === 'partial') {
+            <div class="anim-result anim-result--partial">
+              <svg viewBox="0 0 72 72" class="anim-result__ring">
+                <circle cx="36" cy="36" r="30" />
+              </svg>
+              <span class="anim-result__warn">!</span>
+            </div>
+          } @else if (sendProgress.phase === 'error') {
+            <div class="anim-result anim-result--error">
+              <svg viewBox="0 0 72 72" class="anim-result__ring">
+                <circle cx="36" cy="36" r="30" />
+              </svg>
+              <svg viewBox="0 0 72 72" class="anim-result__cross">
+                <path d="M24 24 L48 48" />
+                <path d="M48 24 L24 48" />
+              </svg>
+              <div class="anim-result__sparks">
+                <i></i><i></i><i></i>
+              </div>
+            </div>
+          }
+        </div>
+
+        <p class="send-modal__status">{{ sendProgress.statusMessage }}</p>
+
+        @if (isSendBusy) {
+          <div class="send-progress" aria-live="polite">
+            <div class="send-progress__meta">
+              <span>
+                @if (sendProgress.phase === 'preparing') {
+                  Preparando lote
+                } @else {
+                  Lead {{ sendProgress.currentIndex > sendProgress.total ? sendProgress.total : sendProgress.currentIndex }} de {{ sendProgress.total }}
+                }
+              </span>
+              <strong>{{ sendProgress.progress }}%</strong>
+            </div>
+            <div class="send-progress__track">
+              <div class="send-progress__fill" [style.width.%]="sendProgress.progress"></div>
+            </div>
+            @if (sendProgress.phase === 'sending' && sendProgress.currentLeadName) {
+              <p class="send-progress__lead">
+                Destinatário atual:
+                <strong>{{ sendProgress.currentLeadName }}</strong>
+                <span class="send-progress__channel-tag" [attr.data-channel]="sendProgress.activeChannel">
+                  {{ sendProgress.activeChannel === 'WHATSAPP' ? 'WhatsApp' : 'E-mail' }}
+                </span>
+              </p>
+            }
+          </div>
+        } @else {
+          <div class="send-summary">
+            <div class="send-summary__grid send-summary__grid--report">
+              <article>
+                <span>Campanha</span>
+                <strong>{{ sendProgress.campaignName }}</strong>
+              </article>
+              <article class="send-summary__ok">
+                <span>Sucessos</span>
+                <strong>{{ sendProgress.sentCount }}</strong>
+              </article>
+              <article class="send-summary__wa">
+                <span>WhatsApp</span>
+                <strong>{{ sendProgress.waSent }}</strong>
+              </article>
+              <article class="send-summary__email">
+                <span>E-mail</span>
+                <strong>{{ sendProgress.emailSent }}</strong>
+              </article>
+              <article class="send-summary__fail">
+                <span>Falhas</span>
+                <strong>{{ sendProgress.failedCount }}</strong>
+              </article>
+            </div>
+
+            @if (sendProgress.detail) {
+              <p class="send-summary__detail">{{ sendProgress.detail }}</p>
+            }
+
+            @if (sendProgress.failedCount > 0 && sendProgress.failureLines.length > 0) {
+              <div class="send-summary__failures">
+                <h3>Detalhes das falhas</h3>
+                <ul>
+                  @for (line of sendProgress.failureLines; track line) {
+                    <li>{{ line }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
+            <div class="send-summary__actions">
+              <button type="button" class="pp-btn pp-btn--primary" (click)="closeSendProgress()">
+                Entendi
+              </button>
+              @if (sendProgress.phase === 'success' || sendProgress.phase === 'partial') {
+                <a routerLink="/crm" class="pp-btn pp-btn--secondary">Ver CRM</a>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</section>

@@ -1,0 +1,428 @@
+<section class="pp-page clients-page">
+  <header class="pp-page-header">
+    <div>
+      <span class="pp-eyebrow">Pós-venda</span>
+      <h1 class="pp-title">Carteira de Clientes</h1>
+      <p class="pp-subtitle clients-subtitle">
+        Clientes convertidos automaticamente ao fechar negócios no Kanban ou aprovar propostas.
+      </p>
+    </div>
+    <div class="header-actions">
+      <a
+        routerLink="/whatsapp"
+        class="wa-status-chip"
+        [class.wa-status-chip--on]="waConnected"
+        [class.wa-status-chip--off]="!waConnected && !waStatusLoading"
+        [attr.title]="
+          waConnected
+            ? 'WhatsApp conectado — clique para gerenciar'
+            : 'WhatsApp offline — clique para conectar'
+        "
+      >
+        <svg class="wa-status-chip__icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 1.8c4.46 0 8.1 3.64 8.1 8.11 0 4.47-3.64 8.1-8.1 8.1-1.42 0-2.8-.37-4.01-1.06l-.29-.17-3.12.82.83-3.04-.19-.31a8.06 8.06 0 0 1-1.23-4.34c0-4.47 3.64-8.11 8.11-8.11zm4.52 10.41c-.07-.04-1.26-.62-1.45-.69-.2-.07-.34-.04-.48.07-.14.11-.54.68-.66.82-.12.14-.24.15-.45.05-.2-.1-.86-.32-1.64-1.01-.61-.54-1.01-1.21-1.13-1.41-.12-.2-.01-.31.09-.41.09-.09.2-.24.3-.36.1-.12.14-.2.2-.34.07-.14.04-.26-.02-.36-.06-.1-.48-1.15-.66-1.57-.17-.41-.35-.35-.48-.36h-.41c-.14 0-.36.05-.55.26-.19.2-.72.7-.72 1.71s.74 1.98.84 2.12c.1.14 1.45 2.21 3.51 3.1.49.21.87.34 1.17.43.49.16.94.13 1.29.08.39-.06 1.26-.51 1.44-.01.18.5.18.92.13 1.01-.05.09-.19.14-.4.08z"
+          />
+        </svg>
+        <span>{{ waConnected ? 'WA online' : waStatusLoading ? 'WA…' : 'WA offline' }}</span>
+      </a>
+      <button type="button" class="pp-btn pp-btn--ghost manual-add-btn" (click)="openManualForm()">
+        + Adicionar cliente manualmente
+      </button>
+    </div>
+  </header>
+
+  @if (!portfolioEmpty) {
+    <div class="kpi-row" aria-label="Indicadores da carteira">
+      <article class="kpi-card pp-glass">
+        <span class="kpi-card__label">Clientes ativos</span>
+        <strong class="kpi-card__value">{{ kpiActive }}</strong>
+        <span class="kpi-card__hint">de {{ stats?.total ?? clients.length }} na carteira</span>
+      </article>
+      <article class="kpi-card pp-glass">
+        <span class="kpi-card__label">LTV da carteira</span>
+        <strong class="kpi-card__value">{{ kpiTotalLtv | currency:'BRL':'symbol':'1.0-0':'pt-BR' }}</strong>
+        <span class="kpi-card__hint">Soma do valor contratado</span>
+      </article>
+      <article class="kpi-card pp-glass">
+        <span class="kpi-card__label">LTV médio</span>
+        <strong class="kpi-card__value">{{ kpiAvgLtv | currency:'BRL':'symbol':'1.0-0':'pt-BR' }}</strong>
+        <span class="kpi-card__hint">Por conta ativa na base</span>
+      </article>
+      <article class="kpi-card pp-glass">
+        <span class="kpi-card__label">Na lista</span>
+        <strong class="kpi-card__value">{{ clients.length }}</strong>
+        <span class="kpi-card__hint">Após filtros aplicados</span>
+      </article>
+    </div>
+  }
+
+  <div class="toolbar pp-glass" [class.toolbar--disabled]="filtersDisabled">
+    <div class="filters">
+      <select [(ngModel)]="serviceStatus" (ngModelChange)="load()" [disabled]="filtersDisabled">
+        <option value="ALL">Todos os serviços</option>
+        <option value="ACTIVE">Serviço ativo</option>
+        <option value="NONE">Sem serviço</option>
+      </select>
+      <input
+        type="number"
+        [(ngModel)]="minLtv"
+        placeholder="Valor total contratado (R$)"
+        title="Soma de tudo que o cliente já pagou ou contratou com você"
+        (change)="load()"
+        [disabled]="filtersDisabled"
+      />
+      <input
+        type="number"
+        [(ngModel)]="tenureDays"
+        placeholder="Tempo de casa (dias)"
+        (change)="load()"
+        [disabled]="filtersDisabled"
+      />
+      <button type="button" class="pp-btn pp-btn--secondary" (click)="load()" [disabled]="filtersDisabled">
+        Filtrar
+      </button>
+    </div>
+
+    @if (!portfolioEmpty) {
+      <div class="view-toggle" role="group" aria-label="Modo de visualização">
+        <button
+          type="button"
+          class="view-toggle__btn"
+          [class.active]="viewMode === 'grid'"
+          (click)="setViewMode('grid')"
+          title="Grade"
+        >
+          Grade
+        </button>
+        <button
+          type="button"
+          class="view-toggle__btn"
+          [class.active]="viewMode === 'table'"
+          (click)="setViewMode('table')"
+          title="Tabela"
+        >
+          Tabela
+        </button>
+      </div>
+    }
+  </div>
+
+  @if (loading) {
+    <p class="muted">Carregando carteira...</p>
+  } @else if (portfolioEmpty) {
+    <div class="empty pp-glass">
+      <h2>Nenhum cliente ativo ainda</h2>
+      <p>
+        Feche um lead na coluna <strong>Fechado</strong> no CRM, receba a aprovação de uma proposta ou cadastre um
+        cliente manualmente.
+      </p>
+      <div class="empty-actions">
+        <a routerLink="/crm" class="pp-btn pp-btn--primary">Ir para o CRM</a>
+        <button type="button" class="pp-btn pp-btn--secondary" (click)="openManualForm()">
+          + Adicionar cliente manualmente
+        </button>
+      </div>
+    </div>
+  } @else if (clients.length === 0) {
+    <div class="empty pp-glass">
+      <h2>Nenhum cliente corresponde aos filtros</h2>
+      <p>Ajuste os critérios acima ou limpe os campos para ver toda a carteira.</p>
+    </div>
+  } @else if (viewMode === 'grid') {
+    <div class="grid">
+      @for (client of clients; track client.id) {
+        <article class="card pp-glass">
+          <a [routerLink]="['/clients', client.id]" class="card__main">
+            <div class="card__top">
+              <strong class="card__name">{{ client.displayName }}</strong>
+              <span [class]="'badge ' + serviceBadgeClass(client.serviceStatus)">{{ client.serviceStatus }}</span>
+            </div>
+            <span class="card__doc">{{ formatDocument(client.document) }}</span>
+            <span class="card__place">{{ client.city }}/{{ client.state }}</span>
+            @if (client.ownerName) {
+              <span class="card__owner">Responsável: {{ client.ownerName }}</span>
+            }
+            <div class="card__meta">
+              <span>{{ client.tenureDays }} dias de casa</span>
+              <span class="card__ltv">{{ client.lifetimeValue | currency:'BRL':'symbol':'1.0-0':'pt-BR' }}</span>
+            </div>
+          </a>
+
+          <div class="card__actions">
+            <button
+              type="button"
+              class="action-btn action-btn--wa"
+              [disabled]="!hasPhone(client)"
+              [attr.title]="hasPhone(client) ? 'Enviar WhatsApp pelo MIRA' : 'Sem telefone cadastrado'"
+              (click)="openWhatsApp($event, client)"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm4.52 12.21c-.07-.04-1.26-.62-1.45-.69-.2-.07-.34-.04-.48.07-.14.11-.54.68-.66.82-.12.14-.24.15-.45.05-.2-.1-.86-.32-1.64-1.01-.61-.54-1.01-1.21-1.13-1.41-.12-.2-.01-.31.09-.41.09-.09.2-.24.3-.36.1-.12.14-.2.2-.34.07-.14.04-.26-.02-.36-.06-.1-.48-1.15-.66-1.57-.17-.41-.35-.35-.48-.36h-.41c-.14 0-.36.05-.55.26-.19.2-.72.7-.72 1.71s.74 1.98.84 2.12c.1.14 1.45 2.21 3.51 3.1.49.21.87.34 1.17.43.49.16.94.13 1.29.08.39-.06 1.26-.51 1.44-.01.18.5.18.92.13 1.01-.05.09-.19.14-.4.08z"
+                />
+              </svg>
+              <span>WhatsApp</span>
+            </button>
+            <button type="button" class="action-btn action-btn--proposal" title="Nova proposta" (click)="openProposal($event, client)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                <path d="M14 2v6h6M8 13h8M8 17h5" />
+              </svg>
+              <span>Proposta</span>
+            </button>
+            <button type="button" class="action-btn action-btn--agenda" title="Agendar reunião" (click)="openAppointment($event, client)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="16" rx="2" />
+                <path d="M16 3v4M8 3v4M3 10h18M9 15l2 2 4-4" />
+              </svg>
+              <span>Agenda</span>
+            </button>
+            <div class="menu-wrap">
+              <button
+                type="button"
+                class="action-btn action-btn--icon"
+                aria-label="Mais ações"
+                (click)="toggleMenu($event, client.id)"
+              >
+                ⋮
+              </button>
+              @if (openMenuId === client.id) {
+                <div class="menu-pop" (click)="$event.stopPropagation()">
+                  <a [routerLink]="['/clients', client.id]">Abrir perfil 360</a>
+                  <button type="button" (click)="openProposal($event, client)">Criar proposta / aditivo</button>
+                  <button type="button" (click)="openAppointment($event, client)">Agendar alinhamento</button>
+                  <button type="button" [disabled]="!hasPhone(client)" (click)="openWhatsApp($event, client)">
+                    Mensagem no WhatsApp
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+        </article>
+      }
+    </div>
+  } @else {
+    <div class="table-wrap pp-glass">
+      <table class="clients-table">
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>CNPJ</th>
+            <th>Local</th>
+            <th>Responsável</th>
+            <th>Casa</th>
+            <th>LTV</th>
+            <th>Serviço</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (client of clients; track client.id) {
+            <tr>
+              <td>
+                <a [routerLink]="['/clients', client.id]" class="table-name">{{ client.displayName }}</a>
+              </td>
+              <td class="mono">{{ formatDocument(client.document) }}</td>
+              <td>{{ client.city }}/{{ client.state }}</td>
+              <td>{{ client.ownerName || '—' }}</td>
+              <td>{{ client.tenureDays }} d</td>
+              <td class="ltv-cell">{{ client.lifetimeValue | currency:'BRL':'symbol':'1.0-0':'pt-BR' }}</td>
+              <td>
+                <span [class]="'badge ' + serviceBadgeClass(client.serviceStatus)">{{ client.serviceStatus }}</span>
+              </td>
+              <td>
+                <div class="table-actions">
+                  <button
+                    type="button"
+                    class="action-btn action-btn--wa action-btn--compact"
+                    [disabled]="!hasPhone(client)"
+                    title="WhatsApp"
+                    (click)="openWhatsApp($event, client)"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        fill="currentColor"
+                        d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2z"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="action-btn action-btn--proposal action-btn--compact"
+                    title="Proposta"
+                    (click)="openProposal($event, client)"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                      <path d="M14 2v6h6" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="action-btn action-btn--agenda action-btn--compact"
+                    title="Agenda"
+                    (click)="openAppointment($event, client)"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                      <rect x="3" y="5" width="18" height="16" rx="2" />
+                      <path d="M16 3v4M8 3v4M3 10h18" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>
+
+@if (waCompose.open) {
+  <div class="wa-overlay" role="dialog" aria-modal="true" aria-labelledby="wa-compose-title" (click)="closeWaCompose()">
+    <div class="wa-modal" (click)="$event.stopPropagation()">
+      <header class="wa-modal__header">
+        <div class="wa-modal__brand">
+          <span class="wa-modal__glyph" [class.wa-modal__glyph--on]="waConnected" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path
+                fill="currentColor"
+                d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm4.52 12.21c-.07-.04-1.26-.62-1.45-.69-.2-.07-.34-.04-.48.07-.14.11-.54.68-.66.82-.12.14-.24.15-.45.05-.2-.1-.86-.32-1.64-1.01-.61-.54-1.01-1.21-1.13-1.41-.12-.2-.01-.31.09-.41.09-.09.2-.24.3-.36.1-.12.14-.2.2-.34.07-.14.04-.26-.02-.36-.06-.1-.48-1.15-.66-1.57-.17-.41-.35-.35-.48-.36h-.41c-.14 0-.36.05-.55.26-.19.2-.72.7-.72 1.71s.74 1.98.84 2.12c.1.14 1.45 2.21 3.51 3.1.49.21.87.34 1.17.43.49.16.94.13 1.29.08.39-.06 1.26-.51 1.44-.01.18.5.18.92.13 1.01-.05.09-.19.14-.4.08z"
+              />
+            </svg>
+          </span>
+          <div>
+            <p class="wa-modal__eyebrow">Mensagem via sessão MIRA</p>
+            <h2 id="wa-compose-title">{{ waCompose.sent ? 'Mensagem enviada' : 'Enviar WhatsApp' }}</h2>
+          </div>
+        </div>
+        <button type="button" class="close-btn" (click)="closeWaCompose()" aria-label="Fechar" [disabled]="waCompose.sending">
+          ×
+        </button>
+      </header>
+
+      @if (!waConnected) {
+        <div class="wa-modal__warn">
+          <strong>WhatsApp desconectado</strong>
+          <p>
+            Conecte a sessão do workspace para enviar pelo número vinculado ao MIRA. O app do celular não será aberto.
+          </p>
+          <a routerLink="/whatsapp" class="pp-btn pp-btn--primary" (click)="closeWaCompose()">Conectar WhatsApp</a>
+        </div>
+      } @else if (waCompose.sent) {
+        <div class="wa-modal__success">
+          <div class="wa-modal__check" aria-hidden="true">✓</div>
+          <p>Mensagem entregue para <strong>{{ waCompose.client?.displayName }}</strong> em {{ waCompose.phoneDisplay }}.</p>
+          <button type="button" class="pp-btn pp-btn--primary" (click)="closeWaCompose()">Fechar</button>
+        </div>
+      } @else {
+        <div class="wa-modal__meta">
+          <article>
+            <span>Cliente</span>
+            <strong>{{ waCompose.client?.displayName }}</strong>
+          </article>
+          <article>
+            <span>Destino</span>
+            <strong>{{ waCompose.phoneDisplay }}</strong>
+          </article>
+          <article>
+            <span>Sessão</span>
+            <strong class="wa-modal__online">{{ waConnection?.phone || waConnection?.statusLabel || 'Conectado' }}</strong>
+          </article>
+        </div>
+
+        <label class="wa-modal__field">
+          <span>Mensagem</span>
+          <textarea
+            rows="6"
+            [ngModel]="waCompose.message"
+            (ngModelChange)="waCompose.message = $event"
+            name="waMessage"
+            placeholder="Escreva a mensagem que será enviada pela sessão conectada…"
+            [disabled]="waCompose.sending"
+          ></textarea>
+        </label>
+
+        @if (waCompose.error) {
+          <p class="wa-modal__error">{{ waCompose.error }}</p>
+        }
+
+        <div class="wa-modal__actions">
+          <button type="button" class="pp-btn pp-btn--secondary" (click)="closeWaCompose()" [disabled]="waCompose.sending">
+            Cancelar
+          </button>
+          <button type="button" class="pp-btn pp-btn--primary wa-modal__send" (click)="sendWaMessage()" [disabled]="!canSendWa">
+            @if (waCompose.sending) {
+              Enviando…
+            } @else {
+              Enviar agora
+            }
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+@if (showManualForm) {
+  <div class="manual-overlay" (click)="closeManualForm()">
+    <form class="manual-form pp-glass" (click)="$event.stopPropagation()" (ngSubmit)="submitManualForm()">
+      <header class="manual-form__header">
+        <div>
+          <h2>Adicionar cliente manualmente</h2>
+          <p>Inclua um cliente existente na carteira para iniciar o pós-venda sem passar pelo CRM.</p>
+        </div>
+        <button type="button" class="close-btn" (click)="closeManualForm()" aria-label="Fechar">×</button>
+      </header>
+
+      <div class="manual-form__grid">
+        <label>
+          <span>Razão social *</span>
+          <input type="text" [(ngModel)]="manualForm.legalName" name="legalName" required />
+        </label>
+        <label>
+          <span>Nome fantasia</span>
+          <input type="text" [(ngModel)]="manualForm.tradeName" name="tradeName" />
+        </label>
+        <label>
+          <span>CNPJ *</span>
+          <input type="text" [(ngModel)]="manualForm.document" name="document" inputmode="numeric" required />
+        </label>
+        <label>
+          <span>Cidade *</span>
+          <input type="text" [(ngModel)]="manualForm.city" name="city" required />
+        </label>
+        <label>
+          <span>UF *</span>
+          <input type="text" [(ngModel)]="manualForm.state" name="state" maxlength="2" required />
+        </label>
+        <label>
+          <span>E-mail</span>
+          <input type="email" [(ngModel)]="manualForm.email" name="email" />
+        </label>
+        <label>
+          <span>Telefone</span>
+          <input type="tel" [(ngModel)]="manualForm.phone" name="phone" />
+        </label>
+        <label>
+          <span>Valor total contratado (R$)</span>
+          <input type="number" [(ngModel)]="manualForm.initialValue" name="initialValue" min="0" />
+        </label>
+      </div>
+
+      @if (manualError) {
+        <p class="manual-form__error">{{ manualError }}</p>
+      }
+
+      <div class="manual-form__actions">
+        <button type="button" class="pp-btn pp-btn--secondary" (click)="closeManualForm()">Cancelar</button>
+        <button type="submit" class="pp-btn pp-btn--primary" [disabled]="savingManual">
+          {{ savingManual ? 'Salvando...' : 'Salvar cliente' }}
+        </button>
+      </div>
+    </form>
+  </div>
+}

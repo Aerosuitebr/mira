@@ -1,0 +1,255 @@
+<section class="wa-page">
+  @if (toast) {
+    <div class="wa-toast" [attr.data-ok]="toast.ok" role="status" aria-live="polite">
+      <span class="wa-toast__icon" aria-hidden="true">
+        @if (toast.ok) {
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12l5 5L20 7"/></svg>
+        } @else {
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        }
+      </span>
+      <div>
+        <strong>{{ toast.title }}</strong>
+        @if (toast.detail) {
+          <span>{{ toast.detail }}</span>
+        }
+      </div>
+    </div>
+  }
+
+  <header class="wa-header">
+    <div class="wa-header__copy">
+      <span class="wa-eyebrow">Integrações</span>
+      <h1>WhatsApp Business</h1>
+      <p>
+        Conecte a conta do WhatsApp Business da sua empresa para habilitar os disparos automatizados de prospecção.
+      </p>
+    </div>
+    <a routerLink="/outreach" class="pp-btn pp-btn--outline">Ir para Abordar</a>
+  </header>
+
+  <div class="wa-grid" [attr.data-phase]="phase">
+    <!-- Coluna 1: configuração / status -->
+    <article class="wa-panel wa-panel--main" [class.wa-panel--celebrate]="justConnected" [attr.data-phase]="phase">
+      @if (justConnected) {
+        <div class="wa-success-banner" role="status">
+          <span class="wa-success-check" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12l5 5L20 7"/></svg>
+          </span>
+          <div>
+            <strong>WhatsApp conectado com sucesso</strong>
+            <span>{{ phoneReady ? phoneDisplay : (phoneSyncing ? 'Identificando número da sessão…' : 'Número não identificado pela sessão') }}</span>
+          </div>
+        </div>
+      }
+
+      <div class="wa-hero">
+        <div
+          class="wa-icon-ring"
+          [class.wa-icon-ring--ok]="phase === 'connected'"
+          [class.wa-icon-ring--warn]="phase === 'qr'"
+          [class.wa-icon-ring--off]="phase === 'disconnected' || phase === 'offline' || phase === 'error'"
+        >
+          @if (phase === 'connected') {
+            <svg class="wa-glyph" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="M17.5 14.4c-.3-.1-1.6-.8-1.9-.9-.3-.1-.4-.1-.6.1-.2.3-.7.9-.8 1-.2.1-.3.2-.6.1-.3-.1-1.2-.4-2.2-1.4-.8-.7-1.4-1.6-1.5-1.9-.2-.3 0-.4.1-.6.1-.1.3-.3.4-.4.1-.1.2-.3.3-.4.1-.1.1-.3 0-.4-.1-.1-.6-1.4-.8-1.9-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 1.9s.8 2.2.9 2.3c.1.2 1.6 2.5 3.9 3.5.5.2 1 .4 1.3.5.6.2 1.1.1 1.5.1.5-.1 1.6-.6 1.8-1.3.2-.6.2-1.2.2-1.3-.1-.1-.3-.2-.6-.3z"/>
+              <path fill="currentColor" d="M12.1 2C6.6 2 2.1 6.5 2.1 12c0 1.8.5 3.4 1.3 4.9L2 22l5.3-1.4c1.4.8 3 .2 4.7.2 5.5 0 10-4.5 10-10S17.6 2 12.1 2zm0 18.2c-1.5 0-2.9-.4-4.1-1.1l-.3-.2-3.1.8.8-3-.2-.3c-.8-1.3-1.2-2.7-1.2-4.2 0-4.6 3.7-8.3 8.3-8.3s8.3 3.7 8.3 8.3-3.9 8-8.5 8z"/>
+            </svg>
+            <span class="wa-badge wa-badge--ok" title="Conectado">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+            </span>
+          } @else if (phase === 'qr') {
+            <svg class="wa-glyph" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h1v3h-1v-3zm-3 0h1v1h-1v-1zm0 3h3v1h-1v2h-1v-2h-1v-1zm-2 2h1v3h-1v-3zm5 1h1v2h-1v-2z"/>
+            </svg>
+            <span class="wa-badge wa-badge--pulse" title="Aguardando QR"><span class="pulse-dot"></span></span>
+          } @else if (phase === 'loading') {
+            <span class="wa-spinner" aria-hidden="true"></span>
+          } @else {
+            <svg class="wa-glyph wa-glyph--muted" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="M17.5 14.4c-.3-.1-1.6-.8-1.9-.9-.3-.1-.4-.1-.6.1-.2.3-.7.9-.8 1-.2.1-.3.2-.6.1-.3-.1-1.2-.4-2.2-1.4-.8-.7-1.4-1.6-1.5-1.9-.2-.3 0-.4.1-.6.1-.1.3-.3.4-.4.1-.1.2-.3.3-.4.1-.1.1-.3 0-.4-.1-.1-.6-1.4-.8-1.9-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 1.9s.8 2.2.9 2.3c.1.2 1.6 2.5 3.9 3.5.5.2 1 .4 1.3.5.6.2 1.1.1 1.5.1.5-.1 1.6-.6 1.8-1.3.2-.6.2-1.2.2-1.3-.1-.1-.3-.2-.6-.3z"/>
+              <path fill="currentColor" d="M12.1 2C6.6 2 2.1 6.5 2.1 12c0 1.8.5 3.4 1.3 4.9L2 22l5.3-1.4c1.4.8 3 .2 4.7.2 5.5 0 10-4.5 10-10S17.6 2 12.1 2zm0 18.2c-1.5 0-2.9-.4-4.1-1.1l-.3-.2-3.1.8.8-3-.2-.3c-.8-1.3-1.2-2.7-1.2-4.2 0-4.6 3.7-8.3 8.3-8.3s8.3 3.7 8.3 8.3-3.9 8-8.5 8z"/>
+              <path stroke="currentColor" stroke-width="1.8" d="M4 4l16 16"/>
+            </svg>
+            <span class="wa-badge wa-badge--off" title="Desconectado">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </span>
+          }
+        </div>
+
+        <div class="wa-hero__text">
+          <p class="wa-kicker">Estado atual</p>
+          <h2>
+            @switch (phase) {
+              @case ('loading') { Verificando conexão… }
+              @case ('offline') { Provedor indisponível }
+              @case ('connected') { Conectado }
+              @case ('qr') { Aguardando leitura do QR }
+              @case ('error') { Não foi possível consultar }
+              @default { Desconectado }
+            }
+          </h2>
+          <p class="wa-hint">
+            {{ connection?.hint || error || 'Carregando status da sessão WhatsApp deste workspace.' }}
+          </p>
+          @if (phase === 'qr' && pollingLive) {
+            <p class="wa-live">
+              <span class="wa-live__dot" aria-hidden="true"></span>
+              Detectando conexão automaticamente…
+            </p>
+          }
+        </div>
+      </div>
+
+      <dl class="wa-meta">
+        <div>
+          <dt>Status</dt>
+          <dd><span class="wa-pill" [attr.data-phase]="phase">{{ connection?.statusLabel || '—' }}</span></dd>
+        </div>
+        <div>
+          <dt>Número</dt>
+          <dd>
+            @if (phoneReady) {
+              <span class="wa-phone">{{ phoneDisplay }}</span>
+            } @else if (phoneSyncing) {
+              <span class="wa-skeleton" aria-label="Carregando número"></span>
+            } @else if (phase === 'connected') {
+              <span class="wa-meta-muted">Não identificado · use Atualizar status</span>
+            } @else {
+              <span class="wa-meta-muted">Aguardando conexão</span>
+            }
+          </dd>
+        </div>
+        <div>
+          <dt>Sessão</dt>
+          <dd class="mono">{{ connection?.instanceName || 'ainda não provisionada' }}</dd>
+        </div>
+        <div>
+          <dt>Última checagem</dt>
+          <dd>{{ lastCheckedAt ? (lastCheckedAt | date:'HH:mm:ss') : '—' }}</dd>
+        </div>
+      </dl>
+
+      @if (error) {
+        <p class="wa-error" role="alert">{{ error }}</p>
+      }
+
+      <div class="wa-actions">
+        @if (phase === 'disconnected' || phase === 'error' || phase === 'offline') {
+          <button type="button" class="pp-btn wa-cta" (click)="connect()" [disabled]="acting || phase === 'offline'">
+            {{ acting ? 'Conectando…' : 'Conectar WhatsApp' }}
+          </button>
+        }
+        @if (phase === 'qr') {
+          <button type="button" class="pp-btn pp-btn--outline" (click)="refreshQr()" [disabled]="acting">
+            {{ acting ? 'Gerando…' : 'Gerar novo QR' }}
+          </button>
+        }
+        @if (phase === 'connected') {
+          <button type="button" class="pp-btn pp-btn--outline wa-disconnect" (click)="disconnect()" [disabled]="acting">
+            {{ acting ? 'Desconectando…' : 'Desconectar' }}
+          </button>
+        }
+        @if (phase !== 'loading' && phase !== 'qr') {
+          <button type="button" class="pp-btn pp-btn--ghost" (click)="refresh()" [disabled]="acting">Atualizar status</button>
+        }
+      </div>
+
+      <label class="wa-fallback-toggle">
+        <input type="checkbox" [(ngModel)]="emailFallback" (ngModelChange)="onFallbackChange()" />
+        <span>
+          <strong>Tentar e-mail automaticamente se o WhatsApp falhar</strong>
+          <small>Resiliência de canal de prospecção: se o disparo WA falhar ou estiver offline, usa SMTP quando disponível.</small>
+        </span>
+      </label>
+    </article>
+
+    <!-- Coluna 2: QR / analytics / idle -->
+    <aside class="wa-panel wa-panel--stage" [attr.data-phase]="phase">
+      @if (phase === 'qr' && connection?.qrCodeBase64) {
+        <div class="wa-stage-qr">
+          <div class="wa-qr-frame">
+            <img [src]="connection!.qrCodeBase64!" alt="QR Code para conectar WhatsApp" />
+          </div>
+          <div class="wa-stage-copy">
+            <h3>Escaneie com o celular</h3>
+            <ol>
+              <li>Abra o WhatsApp</li>
+              <li>Aparelhos conectados</li>
+              <li>Conectar um aparelho</li>
+              <li>Aponte a câmera neste QR</li>
+            </ol>
+            <p class="wa-stage-note">O código expira. Se parar de funcionar, use <em>Gerar novo QR</em>.</p>
+          </div>
+        </div>
+      } @else if (phase === 'connected') {
+        <div class="wa-analytics">
+          <div class="wa-analytics__head">
+            <p class="wa-kicker">Uso e saúde</p>
+            <h3>Métricas da conexão</h3>
+            <p class="wa-analytics__lead">Valide a sessão e acompanhe o ritmo dos disparos deste workspace.</p>
+          </div>
+
+          <div class="wa-metrics" [attr.data-loading]="metricsLoading || null">
+            <div class="wa-metric">
+              <span class="wa-metric__label">Mensagens hoje</span>
+              @if (metricsLoading) {
+                <span class="wa-skeleton wa-skeleton--value" aria-hidden="true"></span>
+              } @else {
+                <strong class="wa-metric__value">{{ messagesSentToday }}</strong>
+              }
+            </div>
+            <div class="wa-metric">
+              <span class="wa-metric__label">Fila</span>
+              @if (metricsLoading) {
+                <span class="wa-skeleton wa-skeleton--value" aria-hidden="true"></span>
+              } @else {
+                <strong class="wa-metric__value" [attr.data-tone]="queueTone">{{ queueStatus }}</strong>
+              }
+            </div>
+            <div class="wa-metric">
+              <span class="wa-metric__label">Taxa ativa</span>
+              @if (metricsLoading) {
+                <span class="wa-skeleton wa-skeleton--value" aria-hidden="true"></span>
+              } @else {
+                <strong class="wa-metric__value">{{ activeRateLabel }}</strong>
+              }
+            </div>
+          </div>
+
+          <div class="wa-test">
+            <button
+              type="button"
+              class="pp-btn wa-cta wa-test__btn"
+              (click)="testConnection()"
+              [disabled]="testing || acting"
+            >
+              @if (testing) {
+                Verificando…
+              } @else {
+                Testar conexão
+              }
+            </button>
+            @if (testResult) {
+              <p class="wa-test__result" [attr.data-ok]="testResult.ok" role="status">
+                {{ testResult.message }}
+              </p>
+            } @else {
+              <p class="wa-test__hint">Confirma se a sessão Evolution responde e se o número já foi identificado.</p>
+            }
+          </div>
+        </div>
+      } @else {
+        <div class="wa-stage-idle">
+          <h3>Como funciona</h3>
+          <ul>
+            <li>Cada workspace tem sua própria sessão WhatsApp.</li>
+            <li>Após conectar, a Abordar dispara pelo número escaneado.</li>
+            <li>Desconectar encerra a sessão imediatamente.</li>
+            <li>O status desta tela atualiza sozinho enquanto o QR estiver ativo.</li>
+          </ul>
+        </div>
+      }
+    </aside>
+  </div>
+</section>

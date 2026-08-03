@@ -1,0 +1,81 @@
+# Evolution no servidor de produção (mesmo host do Aero Suite)
+#
+# NÃO use este arquivo em produção no Vultr.
+# Em produção a Evolution já sobe com o Aero Suite:
+#   docker compose -f docker-compose.yml -f docker-compose.local-mysql.yml \
+#     -f docker-compose.production.yml -f docker-compose.production-evolution.yml up -d
+#
+# O MIRA consome essa Evolution via:
+#   APP_EVOLUTION_API_BASE_URL=http://127.0.0.1:18082
+#   APP_EVOLUTION_INSTANCE=aerosuite-default
+# (ver .env.production.example)
+#
+# Este overlay é só para desenvolvimento local isolado.
+
+services:
+  evolution-postgres:
+    image: postgres:15-alpine
+    container_name: mira-evolution-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: evolution
+      POSTGRES_DB: evolution
+    volumes:
+      - mira_evolution_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  evolution-redis:
+    image: redis:7-alpine
+    container_name: mira-evolution-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  evolution-api:
+    image: evoapicloud/evolution-api:v2.3.7
+    container_name: mira-evolution-api
+    restart: unless-stopped
+    depends_on:
+      evolution-postgres:
+        condition: service_healthy
+      evolution-redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:18084:8080"
+    environment:
+      SERVER_URL: http://localhost:18084
+      SERVER_PORT: "8080"
+      AUTHENTICATION_TYPE: apikey
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-aerosuite-evolution-api-key-2024}
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "true"
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:evolution@evolution-postgres:5432/evolution?schema=public
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution-redis:6379/1
+      CACHE_REDIS_PREFIX_KEY: mira-evolution
+      CACHE_LOCAL_ENABLED: "false"
+      LOG_LEVEL: ERROR,WARN,INFO
+      DEL_INSTANCE: "false"
+      # Baileys: versao desatualizada faz o QR escanear e nunca emparelhar
+      CONFIG_SESSION_PHONE_VERSION: "2.3000.1044305114"
+    volumes:
+      - mira_evolution_instances:/evolution/instances
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+volumes:
+  mira_evolution_postgres:
+  mira_evolution_instances:

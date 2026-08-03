@@ -1,0 +1,295 @@
+<div class="cnae-picker" [class.cnae-picker--open]="open" [class.cnae-picker--disabled]="disabled" [class.cnae-picker--error]="!!errorMessage">
+  <button
+    type="button"
+    class="cnae-picker__trigger"
+    [attr.aria-expanded]="open"
+    aria-haspopup="listbox"
+    [disabled]="disabled"
+    (click)="togglePanel()"
+  >
+    <span class="cnae-picker__trigger-main">
+      @if (selectedSectionCode) {
+        <span class="cnae-picker__trigger-badge" [class]="'tone-' + sectionTone(selectedSectionCode)">
+          {{ selectedSectionCode }}
+        </span>
+      } @else {
+        <span class="cnae-picker__trigger-badge tone-neutral">∗</span>
+      }
+      <span class="cnae-picker__trigger-text">
+        <strong>{{ loading && open ? 'Carregando setores…' : selectedLabel }}</strong>
+        <small>{{ value ? 'Clique para alterar o setor' : 'Selecione o segmento de atuação' }}</small>
+      </span>
+    </span>
+    <svg class="cnae-picker__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  </button>
+
+  @if (open) {
+    <div
+      class="cnae-picker__panel"
+      role="listbox"
+      aria-label="Setores CNAE"
+      [ngStyle]="panelStyle"
+    >
+      <div class="cnae-picker__panel-head">
+        <div class="cnae-picker__search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/>
+            <line x1="16.5" y1="16.5" x2="21" y2="21"/>
+          </svg>
+          <input
+            type="search"
+            class="cnae-picker__search"
+            placeholder="Buscar setor, divisão ou subclass…"
+            [(ngModel)]="searchQuery"
+            [ngModelOptions]="{ standalone: true }"
+            (input)="onSearchInput()"
+            (click)="$event.stopPropagation()"
+          />
+          @if (searchQuery) {
+            <button type="button" class="cnae-picker__search-clear" aria-label="Limpar busca" (click)="clearSearch()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          }
+        </div>
+        <p class="cnae-picker__panel-tip">MRO aeronaves não aparece como setor A–U: use o atalho <strong>33163</strong>, busque <strong>aeronave</strong> ou expanda <strong>C → 33</strong>.</p>
+      </div>
+
+      <div class="cnae-picker__scroll">
+        @if (loading) {
+          <div class="cnae-picker__loading">
+            <span class="pp-loading-dots"><span></span><span></span><span></span></span>
+            <span>Carregando catálogo CNAE…</span>
+          </div>
+        } @else {
+          <button
+            type="button"
+            class="cnae-picker__option cnae-picker__option--all"
+            [class.cnae-picker__option--active]="!value"
+            (click)="select('')"
+          >
+            <span class="cnae-picker__option-icon tone-neutral">∗</span>
+            <span class="cnae-picker__option-copy">
+              <strong>Todos os setores</strong>
+              <small>Sem filtro por atividade econômica</small>
+            </span>
+            @if (!value) {
+              <svg class="cnae-picker__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            }
+          </button>
+
+          @if (visibleQuickShortcuts.length > 0) {
+            <section class="cnae-picker__shortcuts">
+              <p class="cnae-picker__shortcuts-label">Atalhos de segmento</p>
+              @for (shortcut of visibleQuickShortcuts; track shortcut.id) {
+                <button
+                  type="button"
+                  class="cnae-picker__shortcut"
+                  [ngClass]="['tone-' + shortcut.tone, isSelected(shortcut.filterValue) ? 'cnae-picker__shortcut--active' : '']"
+                  (click)="applyShortcut(shortcut, $event)"
+                >
+                  <span class="cnae-picker__shortcut-code">{{ shortcut.filterValue }}</span>
+                  <span class="cnae-picker__option-copy">
+                    <strong>{{ shortcut.label }}</strong>
+                    <small>{{ shortcut.hint }}</small>
+                  </span>
+                </button>
+              }
+            </section>
+          }
+
+          @if (hasSearchQuery) {
+            <section class="cnae-picker__section tone-cyan">
+              <header class="cnae-picker__section-head">
+                <span class="cnae-picker__section-badge">RF</span>
+                <div class="cnae-picker__section-copy">
+                  <strong>Subclasses encontradas</strong>
+                  <p>Resultados da tabela <code>rf_cnaes</code> para “{{ searchQuery.trim() }}”.</p>
+                </div>
+              </header>
+              <div class="cnae-picker__section-options">
+                @if (searching) {
+                  <div class="cnae-picker__loading cnae-picker__loading--inline">
+                    <span class="pp-loading-dots"><span></span><span></span><span></span></span>
+                  </div>
+                } @else if (searchResults.length === 0) {
+                  <div class="cnae-picker__empty cnae-picker__empty--inline">
+                    <span>Nenhuma subclass encontrada. Expanda um setor na árvore abaixo.</span>
+                  </div>
+                } @else {
+                  @for (activity of searchResults; track activity.filterValue) {
+                    <button
+                      type="button"
+                      class="cnae-picker__option cnae-picker__option--subclass"
+                      [class.cnae-picker__option--active]="isSelected(activity.filterValue)"
+                      (click)="select(activity.filterValue, activity)"
+                    >
+                      <span class="cnae-picker__option-code">{{ activity.code }}</span>
+                      <span class="cnae-picker__option-copy">
+                        <strong>{{ activityTitle(activity) }}</strong>
+                        <small>Subclass {{ activity.code }}</small>
+                      </span>
+                      @if (isSelected(activity.filterValue)) {
+                        <svg class="cnae-picker__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                      }
+                    </button>
+                  }
+                }
+              </div>
+            </section>
+          }
+
+          @if (filteredCatalog.length === 0 && !hasSearchQuery) {
+            <div class="cnae-picker__empty">
+              <strong>Catálogo indisponível</strong>
+              <span>Reinicie o backend para carregar os setores CNAE.</span>
+            </div>
+          } @else if (!hasSearchQuery || filteredCatalog.length > 0) {
+            <div class="cnae-tree">
+              @if (hasSearchQuery) {
+                <p class="cnae-tree__label">Árvore de setores</p>
+              }
+
+              @for (section of filteredCatalog; track section.sectionCode) {
+                <section class="cnae-tree__section" [class]="'tone-' + sectionTone(section.sectionCode)">
+                  <div class="cnae-tree__row cnae-tree__row--section">
+                    <button
+                      type="button"
+                      class="cnae-tree__toggle"
+                      [class.cnae-tree__toggle--expanded]="isSectionExpanded(section.sectionCode)"
+                      [attr.aria-expanded]="isSectionExpanded(section.sectionCode)"
+                      [attr.aria-label]="'Expandir seção ' + section.sectionCode"
+                      (click)="toggleSection(section.sectionCode, $event)"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <polyline points="9 18 15 12 9 6"/>
+                      </svg>
+                    </button>
+
+                    <button
+                      type="button"
+                      class="cnae-tree__select"
+                      (click)="toggleSection(section.sectionCode, $event)"
+                    >
+                      <span class="cnae-tree__badge">{{ section.sectionCode }}</span>
+                      <span class="cnae-tree__copy">
+                        <strong>{{ section.title }}</strong>
+                        <small>{{ section.searchHint }}</small>
+                      </span>
+                    </button>
+                  </div>
+
+                  @if (isSectionExpanded(section.sectionCode)) {
+                    <div class="cnae-tree__children">
+                      @if (sectionActivity(section); as sectionWide) {
+                        <button
+                          type="button"
+                          class="cnae-picker__option cnae-picker__option--section"
+                          [class.cnae-picker__option--active]="isSelected(sectionWide.filterValue)"
+                          (click)="select(sectionWide.filterValue, sectionWide)"
+                        >
+                          <span class="cnae-picker__option-code">{{ section.sectionCode }}</span>
+                          <span class="cnae-picker__option-copy">
+                            <strong>Toda a seção {{ section.sectionCode }}</strong>
+                            <small>Inclui todas as divisões desta seção</small>
+                          </span>
+                          @if (isSelected(sectionWide.filterValue)) {
+                            <svg class="cnae-picker__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          }
+                        </button>
+                      }
+
+                      @for (division of divisionActivities(section); track division.filterValue) {
+                        <div class="cnae-tree__branch">
+                          <div class="cnae-tree__row cnae-tree__row--division">
+                            <button
+                              type="button"
+                              class="cnae-tree__toggle"
+                              [class.cnae-tree__toggle--expanded]="isDivisionExpanded(division.code)"
+                              [attr.aria-expanded]="isDivisionExpanded(division.code)"
+                              [attr.aria-label]="'Expandir divisão ' + division.code"
+                              (click)="toggleDivision(division.code, section.sectionCode, $event)"
+                            >
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6"/>
+                              </svg>
+                            </button>
+
+                            <button
+                              type="button"
+                              class="cnae-tree__select cnae-tree__select--division"
+                              [class.cnae-tree__select--active]="isSelected(division.filterValue)"
+                              (click)="select(division.filterValue, division)"
+                            >
+                              <span class="cnae-picker__option-code">{{ division.code }}</span>
+                              <span class="cnae-tree__copy">
+                                <strong>{{ activityTitle(division) }}</strong>
+                                <small>Divisão CNAE {{ division.code }}</small>
+                              </span>
+                              @if (isSelected(division.filterValue)) {
+                                <svg class="cnae-picker__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                  <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                              }
+                            </button>
+                          </div>
+
+                          @if (isDivisionExpanded(division.code)) {
+                            <div class="cnae-tree__subclasses">
+                              @if (isDivisionLoading(division.code)) {
+                                <div class="cnae-picker__loading cnae-picker__loading--inline">
+                                  <span class="pp-loading-dots"><span></span><span></span><span></span></span>
+                                  <span>Carregando subclasses…</span>
+                                </div>
+                              } @else if (subclassesFor(division.code).length === 0) {
+                                <div class="cnae-picker__empty cnae-picker__empty--inline">
+                                  <span>Nenhuma subclass na RF para esta divisão.</span>
+                                </div>
+                              } @else {
+                                @for (subclass of subclassesFor(division.code); track subclass.filterValue) {
+                                  <button
+                                    type="button"
+                                    class="cnae-picker__option cnae-picker__option--subclass"
+                                    [class.cnae-picker__option--active]="isSelected(subclass.filterValue)"
+                                    (click)="select(subclass.filterValue, subclass)"
+                                  >
+                                    <span class="cnae-picker__option-code">{{ subclass.code }}</span>
+                                    <span class="cnae-picker__option-copy">
+                                      <strong>{{ activityTitle(subclass) }}</strong>
+                                      <small>Subclass {{ subclass.code }}</small>
+                                    </span>
+                                    @if (isSelected(subclass.filterValue)) {
+                                      <svg class="cnae-picker__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                      </svg>
+                                    }
+                                  </button>
+                                }
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
+                  }
+                </section>
+              }
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  <p class="cnae-picker__hint" [class.cnae-picker__hint--error]="!!errorMessage">{{ hint }}</p>
+</div>

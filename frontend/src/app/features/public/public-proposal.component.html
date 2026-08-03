@@ -1,0 +1,43 @@
+<main class="public-page">
+  <header class="public-brand">
+    <app-brand-mark size="compact" [link]="null" />
+  </header>
+  @if (loading) {
+    <p>Carregando proposta...</p>
+  } @else if (error) {
+    <div class="card"><p>{{ error }}</p></div>
+  } @else if (approved) {
+    <div class="card success">
+      <h1>Orçamento aprovado!</h1>
+      <p>Obrigado. Nossa equipe já foi notificada e dará sequência ao serviço.</p>
+    </div>
+  } @else if (proposal) {
+    <div class="card">
+      <small>Proposta comercial</small>
+      <h1>{{ proposal.title }}</h1>
+      <p class="company">{{ proposal.companyName }}</p>
+      <p class="total">{{ proposal.totalAmount | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</p>
+      @if (proposal.paymentTerms) {
+        <p class="terms">{{ proposal.paymentTerms }}</p>
+      }
+      <ul class="items">
+        @for (item of proposal.items; track $index) {
+          <li>
+            <span>{{ item.description }}</span>
+            <span>{{ item.quantity }} × {{ item.unitPrice | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+          </li>
+        }
+      </ul>
+      @if (proposal.status === 'PENDING') {
+        <div class="approve">
+          <h2>Aprovar orçamento</h2>
+          <input [(ngModel)]="signerName" placeholder="Nome completo" />
+          <input [(ngModel)]="signerDocument" placeholder="CPF ou CNPJ" />
+          <button type="button" class="cta" (click)="approve()">Aprovar Orçamento</button>
+        </div>
+      } @else {
+        <p class="status">Status: {{ proposal.status }}</p>
+      }
+    </div>
+  }
+</main>

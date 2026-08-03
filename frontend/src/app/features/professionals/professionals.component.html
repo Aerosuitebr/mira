@@ -1,0 +1,62 @@
+<main class="people-page">
+  <aside>
+    <app-brand-mark size="sidebar" tagline="Profissionais perto de você" link="/escolher-busca" />
+    <nav><a routerLink="/escolher-busca">← Trocar tipo de busca</a><span class="active">◎ Buscar profissionais</span></nav>
+    <div class="promise"><b>Busca privada</b><p>Seu ponto é usado somente para calcular proximidade.</p></div>
+  </aside>
+  <section class="workspace">
+    <header><div><span class="eyebrow">MIRA Profissionais</span><h1>Encontre a pessoa certa, perto do serviço.</h1><p>Resultados ordenados pela distância ao ponto que você escolher.</p></div><span class="free-tag">1 contato gratuito</span></header>
+    <form class="search-panel" (ngSubmit)="search()">
+      <label class="service"><span>Qual serviço você precisa?</span><input name="query" [(ngModel)]="query" placeholder="Ex.: eletricista, fisioterapeuta, advogado…" autocomplete="off" /></label>
+      <fieldset><legend>Onde o serviço será realizado?</legend><div class="mode-tabs"><button type="button" [class.selected]="locationMode === 'device'" (click)="useDeviceLocation()">Minha localização</button><button type="button" [class.selected]="locationMode === 'service'" (click)="locationMode = 'service'">Outro local</button></div>
+        @if (locationMode === 'service') {<label><span>Bairro, cidade ou CEP</span><input name="location" [(ngModel)]="locationText" placeholder="Ex.: Copacabana, Rio de Janeiro - RJ" /></label>}
+        @else {<div class="located" [class.ready]="latitude !== undefined"><span class="pulse"></span>{{ locationLabel || 'Toque em “Minha localização” para autorizar' }}</div>}
+      </fieldset>
+      <label><span>Raio de busca</span><select name="radius" [(ngModel)]="radiusKm"><option [ngValue]="10">10 km · até 10 resultados</option><option [ngValue]="25">25 km · até 20 resultados</option><option [ngValue]="50">50 km · até 20 resultados</option></select></label>
+      <button class="search-button" type="submit" [disabled]="loading">{{ loading ? 'Buscando…' : 'Encontrar profissionais' }} <b>→</b></button>
+      @if (error) {<p class="error" role="alert">{{ error }}</p>}
+    </form>
+    @if (searched) {
+      <div class="results-head"><div><span>{{ results.length }} profissionais encontrados</span><small>Próximos de {{ locationLabel }}</small></div><span>Mais próximos primeiro</span></div>
+      <section class="results" aria-live="polite">
+        @for (professional of results; track professional.id; let index = $index) {
+          <article class="profile-card">
+            <div class="rank">{{ index + 1 }}</div>
+            <div class="avatar">@if (professional.profileImageUrl) {<img [src]="professional.profileImageUrl" [alt]="professional.name" />} @else {<span>{{ professional.name.charAt(0) }}</span>}</div>
+            <div class="profile-main"><div class="profile-title"><div><h2>{{ professional.name }} @if (professional.verified) {<span title="Perfil verificado">✓</span>}</h2><p>{{ professional.occupation }}</p></div><strong class="distance">◎ {{ formatDistance(professional.distanceKm) }}<small>do ponto de busca</small></strong></div>
+              @if (professional.bio) {<p class="bio">{{ professional.bio }}</p>}
+              <div class="facts">@if (professional.rating) {<span>★ {{ professional.rating }} ({{ professional.reviewCount }})</span>} @if (professional.yearsExperience) {<span>{{ professional.yearsExperience }} anos de experiência</span>}<span>{{ professional.neighborhood || professional.city }}, {{ professional.state }}</span></div>
+              @if (professional.specialties) {<p class="specialties">{{ professional.specialties }}</p>}
+              <div class="actions icon-actions">
+                @if (professional.whatsappAvailable) {<button class="contact-icon whatsapp" type="button" (click)="whatsappAction(professional)" title="Enviar mensagem pelo WhatsApp" aria-label="Enviar mensagem pelo WhatsApp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a9.8 9.8 0 0 0-8.4 14.9L2.2 22l5.2-1.4A10 10 0 1 0 12 2Zm0 18.2a8 8 0 0 1-4.1-1.1l-.3-.2-3.1.8.8-3-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1-1.4-.7-2.4-1.3-3.4-2.9-.3-.5.3-.5.8-1.6.1-.2 0-.4 0-.5l-.8-1.9c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3.1 4.9 4.3 1.8.8 2.5.8 3.4.7.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.2-.2-.4-.2-.6-.3Z"/></svg></button>}
+                @if (professional.phoneAvailable) {<button class="contact-icon phone" type="button" (click)="call(professional)" title="Ligar para este profissional" aria-label="Ligar para este profissional"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.5 15.5 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.2 1.2.4 2.5.7 3.8.7.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.8 21 3 13.2 3 3.7c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.7 3.8.1.4 0 .8-.2 1.1l-2.4 2.2Z"/></svg></button>}
+                @if (professional.website) {<a [href]="professional.website" target="_blank" rel="noopener">Ver perfil completo</a>}
+              </div>
+            </div>
+          </article>
+        } @empty {<div class="empty"><b>Nenhum perfil neste raio.</b><p>Aumente o raio ou experimente outro termo para encontrar mais profissionais.</p></div>}
+      </section>
+    }
+  </section>
+</main>
+
+@if (contactModal) {
+  <div class="modal-backdrop" (click)="closeContactModal()">
+    <section class="contact-modal" role="dialog" aria-modal="true" aria-labelledby="contact-title" (click)="$event.stopPropagation()">
+      <button class="modal-close" type="button" (click)="closeContactModal()" aria-label="Fechar">×</button>
+      <span class="modal-eyebrow">Contato pelo WhatsApp</span>
+      <h2 id="contact-title">Falar com {{ contactModal.name }}</h2>
+      <div class="connection-status" [class.connected]="whatsapp?.connected">
+        <span class="connection-light"></span>
+        <div><b>{{ whatsapp?.connected ? 'WhatsApp conectado' : (checkingConnection ? 'Verificando conexão…' : 'WhatsApp desconectado') }}</b><small>{{ whatsapp?.connected ? 'Pronto para enviar com segurança' : 'Conecte para habilitar o envio' }}</small></div>
+      </div>
+      @if (!whatsapp?.connected) {
+        <button class="connect-button" type="button" (click)="connectWhatsApp()" [disabled]="checkingConnection">{{ checkingConnection ? 'Aguarde…' : 'Conectar WhatsApp' }}</button>
+        @if (whatsapp?.qrCodeBase64) {<div class="qr"><img [src]="whatsapp?.qrCodeBase64" alt="QR Code para conectar o WhatsApp" /><span>Leia o QR Code pelo WhatsApp</span></div>}
+      }
+      <label class="message-field"><span>Mensagem de apresentação</span><textarea [(ngModel)]="greeting" rows="5" maxlength="600"></textarea><small>{{ greeting.length }}/600 · você pode editar antes de enviar</small></label>
+      <button class="send-button" type="button" (click)="sendGreeting()" [disabled]="!whatsapp?.connected || !greeting.trim() || sendingMessage"><span class="connection-light"></span>{{ sendingMessage ? 'Enviando…' : 'Enviar mensagem' }}</button>
+      @if (contactFeedback) {<p class="modal-feedback" aria-live="polite">{{ contactFeedback }}</p>}
+    </section>
+  </div>
+}

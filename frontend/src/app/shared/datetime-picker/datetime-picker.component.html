@@ -1,0 +1,94 @@
+<div class="dt-picker" [class.dt-picker--open]="open" [class.dt-picker--disabled]="disabled">
+  <button
+    type="button"
+    class="dt-picker__trigger"
+    (click)="togglePanel()"
+    [attr.aria-expanded]="open"
+    [attr.aria-label]="label"
+  >
+    <span class="dt-picker__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <path d="M16 2v4M8 2v4M3 10h18"/>
+      </svg>
+    </span>
+    <span class="dt-picker__summary">
+      <span class="dt-picker__label">{{ label }}</span>
+      <strong [class.dt-picker__placeholder]="!selectedDate || !selectedTime">{{ summary }}</strong>
+    </span>
+    @if (optional && selectedDate && selectedTime) {
+      <span
+        class="dt-picker__clear"
+        role="button"
+        tabindex="0"
+        aria-label="Limpar"
+        (click)="clearValue($event)"
+        (keydown.enter)="clearValue($event)"
+      >×</span>
+    }
+    <span class="dt-picker__chevron" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M6 9l6 6 6-6"/>
+      </svg>
+    </span>
+  </button>
+
+  @if (open) {
+    <div class="dt-picker__panel">
+      <div class="dt-picker__presets">
+        <button type="button" class="preset-chip" (click)="applyPreset('plus1h')">Daqui 1 h</button>
+        <button type="button" class="preset-chip" (click)="applyPreset('plus2h')">Daqui 2 h</button>
+        <button type="button" class="preset-chip" (click)="applyPreset('tomorrow9')">Amanhã 9:00</button>
+      </div>
+
+      <div class="dt-picker__calendar">
+        <div class="cal-header">
+          <button type="button" class="cal-nav" (click)="prevMonth()" aria-label="Mês anterior">‹</button>
+          <span class="cal-title">{{ monthLabel }}</span>
+          <button type="button" class="cal-nav" (click)="nextMonth()" aria-label="Próximo mês">›</button>
+        </div>
+
+        <div class="cal-weekdays">
+          @for (day of weekDays; track day) {
+            <span>{{ day }}</span>
+          }
+        </div>
+
+        <div class="cal-grid">
+          @for (week of calendarWeeks; track $index) {
+            @for (day of week; track day.date.getTime()) {
+              <button
+                type="button"
+                class="cal-day"
+                [class.cal-day--muted]="!day.inMonth"
+                [class.cal-day--today]="day.isToday"
+                [class.cal-day--selected]="day.isSelected"
+                [class.cal-day--disabled]="day.isPast"
+                [disabled]="day.isPast || !day.inMonth"
+                (click)="selectDay(day)"
+              >
+                {{ day.date.getDate() }}
+              </button>
+            }
+          }
+        </div>
+      </div>
+
+      <div class="dt-picker__time">
+        <span class="time-label">Horário</span>
+        <div class="time-slots" role="listbox" [attr.aria-label]="'Horário do compromisso'">
+          @for (slot of timeSlots; track slot.value) {
+            <button
+              type="button"
+              class="time-slot"
+              [class.time-slot--active]="selectedTime === slot.value"
+              (click)="selectTime(slot.value)"
+            >
+              {{ slot.label }}
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</div>

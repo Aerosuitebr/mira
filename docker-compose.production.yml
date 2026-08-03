@@ -1,0 +1,105 @@
+# Produção no mesmo host do Aero Suite (Vultr).
+#
+# Uso típico (API/frontend no host + proxy tunnel):
+#   1. Copie .env.production.example → .env.production e preencha senhas/API key
+#   2. Carregue .env + .env.production no processo da API (ou use este compose para infra)
+#   3. docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
+#   4. docker compose -f docker-compose.tunnel.yml up -d
+#
+# Evolution: NÃO sobe outra Evolution aqui.
+# Reutiliza aerosuite-evolution-api em 127.0.0.1:18082 (ou rede Docker abaixo).
+
+services:
+  postgres:
+    ports: !override
+      - "127.0.0.1:5433:5432"
+    volumes: !override
+      - ${PROSPECT_DATA_ROOT:-/var/mira}/postgres:/var/lib/postgresql/data
+
+  redis:
+    ports: !override
+      - "127.0.0.1:6380:6379"
+
+  elasticsearch:
+    ports: !override
+      - "127.0.0.1:9201:9200"
+    volumes: !override
+      - ${PROSPECT_DATA_ROOT:-/var/mira}/elasticsearch:/usr/share/elasticsearch/data
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+
+  mira-api:
+    build: ./backend
+    container_name: mira-api
+    restart: unless-stopped
+    env_file:
+      - path: .env.production
+        required: false
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/prospect_portal
+      SPRING_DATASOURCE_USERNAME: prospect
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-prospect}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      CORS_ALLOWED_ORIGINS: https://search.aerosuite.com.br,https://search.aerosuite.app
+      PUBLIC_BASE_URL: https://search.aerosuite.com.br
+      APP_EVOLUTION_ENABLED: ${APP_EVOLUTION_ENABLED:-false}
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
+      APP_EVOLUTION_API_BASE_URL: ${APP_EVOLUTION_API_BASE_URL:-http://host.docker.internal:18082}
+      APP_EVOLUTION_API_KEY: ${APP_EVOLUTION_API_KEY:-}
+      APP_EVOLUTION_INSTANCE: ${APP_EVOLUTION_INSTANCE:-aerosuite-default}
+    ports:
+      - "127.0.0.1:8082:8082"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
+
+  mira-frontend:
+    build: ./frontend
+    container_name: mira-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4201:80"
+    depends_on:
+      - mira-api
+
+  # Opcional: API MIRA em container no mesmo host, falando com Evolution do AeroSuite.
+  # Descomente quando containerizar o backend.
+  # mira-api:
+  #   build: ./backend
+  #   container_name: mira-api
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #     - path: .env.production
+  #       required: false
+  #   environment:
+  #     APP_EVOLUTION_ENABLED: "true"
+  #     # Preferência A — Evolution via porta do host:
+  #     APP_EVOLUTION_API_BASE_URL: http://host.docker.internal:18082
+  #     # Preferência B — mesma rede Docker do AeroSuite (descomente networks):
+  #     # APP_EVOLUTION_API_BASE_URL: http://aerosuite-evolution-api:8080
+  #     APP_EVOLUTION_API_KEY: ${APP_EVOLUTION_API_KEY:?APP_EVOLUTION_API_KEY obrigatório}
+  #     APP_EVOLUTION_INSTANCE: ${APP_EVOLUTION_INSTANCE:-aerosuite-default}
+  #   ports:
+  #     - "127.0.0.1:8082:8082"
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   # networks:
+  #   #   - default
+  #   #   - aerosuite_default
+
+# networks:
+#   aerosuite_default:
+#     external: true
+#     # Nome padrão do Compose no diretório aerosuite. Ajuste se o project name for outro:
+#     # docker network ls | grep aerosuite

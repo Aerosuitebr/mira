@@ -1,0 +1,21 @@
+# Trecho para adicionar ao ingress do tunnel Aero Suite existente
+# (mesmo tunnel ID: 6d599ea8-2354-4c3c-9968-5ded651c92fc)
+#
+# Coloque ANTES da regra catch-all "http_status:404".
+# Origem: nginx MIRA na porta 8083 (docker compose -f docker-compose.tunnel.yml up -d)
+
+  - hostname: search.aerosuite.app
+    service: http://127.0.0.1:8083
+    originRequest:
+      noHappyEyeballs: true
+      keepAliveConnections: 100
+      keepAliveTimeout: 90s
+      httpHostHeader: search.aerosuite.app
+
+  - hostname: search.aerosuite.com.br
+    service: http://127.0.0.1:8083
+    originRequest:
+      noHappyEyeballs: true
+      keepAliveConnections: 100
+      keepAliveTimeout: 90s
+      httpHostHeader: search.aerosuite.com.br

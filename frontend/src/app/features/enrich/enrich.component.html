@@ -1,0 +1,283 @@
+<section class="pp-page enrich-page" [class.enrich-page--drawer-open]="detailCompany">
+  <header class="pp-page-header">
+    <div>
+      <span class="pp-eyebrow">Etapa 02 · Enriquecimento</span>
+      <h1 class="pp-title">Filtrar & Enriquecer</h1>
+      <p class="pp-subtitle">
+        Consulte APIs públicas, revise contatos em lote e escolha quem segue para a abordagem.
+      </p>
+    </div>
+    @if (companyIds.length > 0) {
+      <div class="enrich-actions">
+        <button type="button" class="pp-btn pp-btn--secondary" (click)="goToDiscover()" [disabled]="loading">
+          Voltar à busca
+        </button>
+        <button
+          type="button"
+          class="pp-btn"
+          [class.pp-btn--primary]="!hasAnyEnriched"
+          [class.pp-btn--secondary]="hasAnyEnriched"
+          (click)="enrichAll(false)"
+          [disabled]="loading || selectedCount === 0"
+        >
+          @if (loading && !loadingWeb) {
+            Enriquecendo {{ enrichDone }}/{{ enrichTotal }}
+          } @else {
+            {{ hasAnyEnriched ? 'Reconsultar APIs' : 'Enriquecer selecionadas' }}
+            ({{ selectedCount || companyIds.length }})
+          }
+        </button>
+        <button
+          type="button"
+          class="pp-btn pp-btn--secondary"
+          (click)="enrichAll(true)"
+          [disabled]="loading || selectedCount === 0"
+          title="Varre site e redes para atualizar contatos"
+        >
+          Atualizar na web
+        </button>
+      </div>
+    }
+  </header>
+
+  @if (message && companyIds.length > 0) {
+    <div class="pp-banner pp-banner--info">{{ message }}</div>
+  }
+
+  @if (loading && enrichTotal > 0) {
+    <div class="enrich-loading pp-glass">
+      <span class="pp-loading-dots"><span></span><span></span><span></span></span>
+      <strong>{{ loadingWeb ? 'Varrendo web e redes...' : 'Consultando cadastro e APIs...' }}</strong>
+      <span>{{ enrichDone }}/{{ enrichTotal }} empresas</span>
+    </div>
+  }
+
+  @if (companyIds.length === 0) {
+    <div class="pp-glass enrich-empty">
+      <div class="empty-content">
+        <h2>Nenhuma empresa selecionada</h2>
+        <p>
+          Escolha prospects em <strong>Prospectar</strong> ou <strong>Descobrir</strong>, ou importe uma lista de CNPJs.
+        </p>
+        @if (importFeedback) {
+          <p class="empty-feedback" [class.empty-feedback--error]="importFeedbackError">{{ importFeedback }}</p>
+        }
+        <div class="empty-actions">
+          <button type="button" class="pp-btn pp-btn--primary" (click)="goToDiscover()">Ir para Descoberta</button>
+          <button type="button" class="pp-btn pp-btn--secondary" (click)="csvInput.click()">Importar CNPJs (.csv)</button>
+          <input #csvInput type="file" accept=".csv,.txt" class="csv-input" (change)="importCsv($event)" />
+        </div>
+      </div>
+    </div>
+  } @else {
+    <div class="table-toolbar pp-glass">
+      <div class="table-toolbar__meta">
+        <strong>{{ visibleCompanies.length }}</strong>
+        <span>na tabela</span>
+        <span class="dot">·</span>
+        <strong>{{ selectedCount }}</strong>
+        <span>selecionadas</span>
+        @if (loadingContacts) {
+          <span class="dot">·</span>
+          <span>carregando contatos...</span>
+        }
+      </div>
+      <div class="table-toolbar__filters">
+        <label class="filter-flag">
+          <input type="checkbox" [(ngModel)]="onlyWithWhatsApp" />
+          Só com WhatsApp
+        </label>
+        <button type="button" class="link-btn" (click)="removeUnselected()" [disabled]="loading || selectedCount === 0">
+          Descartar não marcadas
+        </button>
+      </div>
+    </div>
+
+    <div class="table-shell pp-glass">
+      <table class="enrich-table">
+        <thead>
+          <tr>
+            <th class="col-check">
+              <input
+                type="checkbox"
+                [checked]="allVisibleSelected"
+                (change)="toggleSelectAllVisible()"
+                aria-label="Selecionar todas visíveis"
+              />
+            </th>
+            <th>Empresa / CNPJ</th>
+            <th class="col-score">Dados</th>
+            <th>Sócios</th>
+            <th>Contatos</th>
+            <th>Endereço</th>
+            <th class="col-status">Status</th>
+            <th class="col-action">Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (company of visibleCompanies; track company.id) {
+            @let summary = summaryFor(company);
+            <tr [class.is-selected]="selectedIds.has(company.id)" [class.is-running]="rowStatus(company.id) === 'running'">
+              <td class="col-check">
+                <input
+                  type="checkbox"
+                  [checked]="selectedIds.has(company.id)"
+                  (change)="toggleSelect(company.id)"
+                  [attr.aria-label]="'Selecionar ' + (company.tradeName || company.legalName)"
+                />
+              </td>
+              <td>
+                <div class="company-cell">
+                  <strong>{{ company.tradeName || company.legalName }}</strong>
+                  <span class="cnpj">{{ formatCnpj(company.cnpj) }}</span>
+                  <span class="meta">{{ company.city }}/{{ company.state }}</span>
+                </div>
+              </td>
+              <td class="col-score">
+                @if (contacts[company.id]) {
+                  <div
+                    class="score"
+                    [attr.data-level]="confidenceLevel(summary.avgConfidence)"
+                    [attr.title]="summary.completenessHint"
+                    [attr.aria-label]="summary.completenessHint"
+                  >
+                    <span>{{ summary.avgConfidence }}%</span>
+                  </div>
+                } @else {
+                  <span class="muted" title="Ainda sem enriquecimento">-</span>
+                }
+              </td>
+              <td>
+                @if (summary.partners.length > 0) {
+                  <ul class="cell-list">
+                    @for (partner of summary.partners; track partner) {
+                      <li>{{ partner }}</li>
+                    }
+                  </ul>
+                } @else {
+                  <span class="muted">Sem sócio público</span>
+                }
+              </td>
+              <td>
+                @if (summary.phones.length === 0 && summary.emails.length === 0 && summary.whatsapps.length === 0) {
+                  <span class="muted">Sem contato útil</span>
+                } @else {
+                  <div class="contact-stack">
+                    @for (phone of summary.phones; track phone) {
+                      <div class="contact-line">
+                        <span>{{ formatPhone(phone) }}</span>
+                        <button type="button" class="icon-btn" title="Copiar telefone" (click)="copyText(formatPhone(phone), company.id + '-p-' + phone)">
+                          {{ copiedKey === company.id + '-p-' + phone ? 'Copiado!' : 'copiar' }}
+                        </button>
+                      </div>
+                    }
+                    @for (email of summary.emails; track email) {
+                      <div class="contact-line">
+                        <span>{{ email }}</span>
+                        <button type="button" class="icon-btn" title="Copiar e-mail" (click)="copyText(email, company.id + '-e-' + email)">
+                          {{ copiedKey === company.id + '-e-' + email ? 'Copiado!' : 'copiar' }}
+                        </button>
+                      </div>
+                    }
+                    @for (wa of summary.whatsapps; track wa) {
+                      <div class="contact-line contact-line--wa">
+                        <a [href]="whatsappHref(wa)" target="_blank" rel="noopener noreferrer">WA {{ formatPhone(wa) }}</a>
+                        <button type="button" class="icon-btn" title="Copiar WhatsApp" (click)="copyText(formatPhone(wa), company.id + '-w-' + wa)">
+                          {{ copiedKey === company.id + '-w-' + wa ? 'Copiado!' : 'copiar' }}
+                        </button>
+                      </div>
+                    }
+                  </div>
+                }
+              </td>
+              <td>
+                <span class="address">{{ summary.address || 'Sem endereço' }}</span>
+              </td>
+              <td class="col-status">
+                @switch (rowStatus(company.id)) {
+                  @case ('running') {
+                    <span class="status status--run">Enriquecendo</span>
+                  }
+                  @case ('queued') {
+                    <span class="status status--queue">Na fila</span>
+                  }
+                    @case ('done') {
+                    <span class="status status--done">Pronta</span>
+                  }
+                  @default {
+                    <span class="status">Pendente</span>
+                  }
+                }
+              </td>
+              <td class="col-action">
+                <button type="button" class="link-btn" (click)="openDetails(company.id)">Detalhes</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (selectedCount > 0) {
+      <div class="bulk-bar">
+        <span><strong>{{ selectedCount }}</strong> selecionada(s) para a próxima etapa</span>
+        <div class="bulk-bar__actions">
+          <button type="button" class="pp-btn pp-btn--secondary" (click)="removeUnselected()" [disabled]="loading">
+            Descartar não marcadas
+          </button>
+          <button type="button" class="pp-btn pp-btn--primary" (click)="goToOutreach()" [disabled]="loading">
+            Continuar para Abordar ({{ selectedCount }})
+          </button>
+        </div>
+      </div>
+    }
+  }
+</section>
+
+@if (copyToast) {
+  <div class="copy-toast" role="status" aria-live="polite">{{ copyToast }}</div>
+}
+
+@if (detailCompany; as company) {
+  <div class="drawer-backdrop" (click)="closeDetails()"></div>
+  <aside class="enrich-drawer pp-glass" role="dialog" aria-modal="true" aria-labelledby="enrich-drawer-title">
+    <header class="enrich-drawer__header">
+      <div>
+        <h2 id="enrich-drawer-title">{{ company.tradeName || company.legalName }}</h2>
+        <p>{{ formatCnpj(company.cnpj) }} · {{ company.city }}/{{ company.state }}</p>
+      </div>
+      <button type="button" class="drawer-close" (click)="closeDetails()" aria-label="Fechar">×</button>
+    </header>
+    <div class="enrich-drawer__body">
+      @if (detailContacts.length === 0) {
+        <p class="muted">Ainda sem contatos enriquecidos para esta empresa.</p>
+      } @else {
+        @for (contact of detailContacts; track contact.id) {
+          <article class="detail-card">
+            <div class="detail-card__top">
+              <strong>{{ contact.fullName }}</strong>
+              <span class="source-badge" [attr.data-source]="contact.source">{{ sourceLabel(contact.source) }}</span>
+              <span class="score score--sm" [attr.data-level]="confidenceLevel(contact.confidence)">{{ contact.confidence }}%</span>
+            </div>
+            @if (contact.roleTitle) {
+              <p class="detail-role">{{ contact.roleTitle }}</p>
+            }
+            <div class="detail-channels">
+              @if (contact.email) {
+                <button type="button" class="chip" (click)="copyText(contact.email, contact.id + '-email')">{{ contact.email }}</button>
+              }
+              @if (contact.phone) {
+                <button type="button" class="chip" (click)="copyText(formatPhone(contact.phone), contact.id + '-phone')">{{ formatPhone(contact.phone) }}</button>
+              }
+              @if (contact.whatsapp) {
+                <a class="chip chip--link" [href]="whatsappHref(contact.whatsapp)" target="_blank" rel="noopener noreferrer">
+                  WhatsApp {{ formatPhone(contact.whatsapp) }}
+                </a>
+              }
+            </div>
+          </article>
+        }
+      }
+    </div>
+  </aside>
+}

@@ -1,11 +1,42 @@
-.data/
-tmp/
-node_modules/
-.next/
-dist/
-out/
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Java / Maven
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+*.class
 *.log
+*.jar
+*.war
+
+# Node / Angular
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
 .env
 .env.local
-.env*.local
-/generated/prisma
+.env.production
+.env.*.local
+*.env
+
+# secrets / local
+.env
+.env.*
+!.env.example
+!.env.*.example
+node_modules/
+**/node_modules/
+**/target/
+**/dist/
+**/.angular/

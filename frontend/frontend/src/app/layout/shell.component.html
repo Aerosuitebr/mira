@@ -1,0 +1,174 @@
+<div class="shell">
+  <aside class="sidebar" [class.sidebar--open]="mobileMenuOpen">
+    <div class="sidebar-glow"></div>
+
+    <div class="brand pp-enter">
+      <app-brand-mark
+        size="sidebar"
+        tagline="Prospecção B2B"
+        link="/dashboard"
+      />
+    </div>
+
+    <div class="funnel-track pp-enter pp-stagger-1">
+      <span class="funnel-label">Fluxo MIRA</span>
+      <div class="funnel-bar">
+        <div class="funnel-fill"></div>
+      </div>
+    </div>
+
+    <nav class="pp-enter pp-stagger-2" aria-label="Navegação principal" (click)="closeMobileMenu()">
+      <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </span>
+        <span>Dashboard</span>
+      </a>
+      <span class="nav-group-label">Operação comercial</span>
+      <a routerLink="/discover" routerLinkActive="active" class="nav-item">
+        <span class="nav-step">01</span>
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+        </span>
+        <span>Descobrir</span>
+      </a>
+      <a routerLink="/prospecting" routerLinkActive="active" class="nav-item">
+        <span class="nav-step">02</span>
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l18-8-8 18-2-8-8-2z"/><path d="M13 11l5-5"/></svg>
+        </span>
+        <span>Prospectar</span>
+      </a>
+      <a routerLink="/enrich" routerLinkActive="active" class="nav-item">
+        <span class="nav-step">03</span>
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        </span>
+        <span>Enriquecer</span>
+      </a>
+      <a routerLink="/outreach" routerLinkActive="active" class="nav-item">
+        <span class="nav-step">04</span>
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        </span>
+        <span>Abordar</span>
+      </a>
+      <a routerLink="/crm" routerLinkActive="active" class="nav-item">
+        <span class="nav-step">05</span>
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg>
+        </span>
+        <span>CRM</span>
+      </a>
+      <span class="nav-group-label">Relacionamento</span>
+      <a routerLink="/clients" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        </span>
+        <span>Carteira</span>
+      </a>
+      <a routerLink="/agenda" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        </span>
+        <span>Agenda</span>
+      </a>
+      <a routerLink="/proposals" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+        </span>
+        <span>Propostas</span>
+      </a>
+      <a routerLink="/projects" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        </span>
+        <span>Entrega</span>
+      </a>
+      <span class="nav-group-label">Configurações</span>
+      <a routerLink="/whatsapp" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.1 2C6.6 2 2.1 6.5 2.1 12c0 1.8.5 3.4 1.3 4.9L2 22l5.3-1.4c1.4.8 3 .2 4.7.2 5.5 0 10-4.5 10-10S17.6 2 12.1 2zm0 18.2c-1.5 0-2.9-.4-4.1-1.1l-.3-.2-3.1.8.8-3-.2-.3c-.8-1.3-1.2-2.7-1.2-4.2 0-4.6 3.7-8.3 8.3-8.3s8.3 3.7 8.3 8.3-3.9 8-8.5 8z"/></svg>
+        </span>
+        <span>Conexão WhatsApp</span>
+      </a>
+      <a routerLink="/settings/envio" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9c.2.6.8 1 1.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+        </span>
+        <span>Identidade de envio</span>
+      </a>
+    </nav>
+
+    @if (auth.session(); as session) {
+      <div class="sidebar-footer pp-enter pp-stagger-3">
+        <div class="credits-widget">
+          <div class="credits-ring" [attr.aria-label]="'Créditos restantes: ' + session.creditsRemaining + ' de ' + session.monthlyCredits">
+            <svg viewBox="0 0 80 80" class="ring-svg" aria-hidden="true">
+              <defs>
+                <linearGradient id="creditsGrad" x1="0" y1="0" x2="80" y2="80">
+                  <stop stop-color="#818cf8"/>
+                  <stop offset="1" stop-color="#22d3ee"/>
+                </linearGradient>
+              </defs>
+              <circle cx="40" cy="40" r="34" class="ring-bg"/>
+              <circle cx="40" cy="40" r="34" class="ring-track"/>
+              <circle
+                cx="40"
+                cy="40"
+                r="34"
+                class="ring-progress"
+                [style.stroke-dashoffset]="creditOffset(session.creditsRemaining, session.monthlyCredits)"
+              />
+            </svg>
+            <div class="credits-inner">
+              <strong>{{ session.creditsRemaining }}</strong>
+              <span>de {{ session.monthlyCredits }}</span>
+            </div>
+          </div>
+          <span class="credits-pct">{{ creditUsagePercent(session.creditsRemaining, session.monthlyCredits) }}% da franquia</span>
+        </div>
+        <div class="plan-row">
+          <span class="pp-badge pp-badge--violet">{{ session.planCode }}</span>
+          <span class="user-name">{{ session.fullName }}</span>
+        </div>
+        <button type="button" class="pp-btn pp-btn--ghost logout-btn" (click)="auth.logout()">
+          Sair da conta
+        </button>
+      </div>
+    }
+  </aside>
+
+  @if (mobileMenuOpen) {
+    <button type="button" class="sidebar-backdrop" aria-label="Fechar menu" (click)="closeMobileMenu()"></button>
+  }
+
+  <main class="content">
+    <div class="content-topbar">
+      <button type="button" class="mobile-menu-toggle" aria-label="Abrir menu" [attr.aria-expanded]="mobileMenuOpen" (click)="toggleMobileMenu()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <button
+        type="button"
+        class="theme-toggle"
+        (click)="theme.toggle()"
+        [attr.aria-label]="theme.theme() === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'"
+      >
+        @if (theme.theme() === 'dark') {
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+          </svg>
+        } @else {
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+          </svg>
+        }
+      </button>
+    </div>
+    <div class="content-inner">
+      <div class="route-container">
+        <router-outlet />
+      </div>
+    </div>
+  </main>
+</div>

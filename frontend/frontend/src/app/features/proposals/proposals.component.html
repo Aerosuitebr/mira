@@ -1,0 +1,275 @@
+<section class="pp-page proposals-page">
+  <header class="pp-page-header">
+    <div>
+      <span class="pp-eyebrow">Pós-venda</span>
+      <h1 class="pp-title">Propostas & Orçamentos</h1>
+      <p class="pp-subtitle">Monte o orçamento, publique e envie o link de aprovação ao cliente.</p>
+    </div>
+  </header>
+
+  <div class="layout">
+    <form class="builder pp-glass" [formGroup]="form" (ngSubmit)="$event.preventDefault()">
+      <h2>Construtor de proposta</h2>
+
+      <div class="field recipient-field" [class.field--invalid]="formError && !selectedRecipient">
+        <span>Cliente / Lead de destino</span>
+        <div class="recipient-combobox">
+          <input
+            type="text"
+            [(ngModel)]="recipientQuery"
+            [ngModelOptions]="{ standalone: true }"
+            placeholder="Digite pelo menos 2 letras do nome ou CNPJ..."
+            (focus)="onRecipientFocus()"
+            (blur)="onRecipientBlur()"
+            (input)="onRecipientInput()"
+            autocomplete="off"
+          />
+          @if (showRecipientList && filteredRecipients.length > 0) {
+            <ul class="recipient-dropdown">
+              @for (recipient of filteredRecipients; track recipient.key) {
+                <li>
+                  <button type="button" (mousedown)="selectRecipient(recipient)">
+                    <strong>{{ recipient.label }}</strong>
+                    <small>{{ recipient.subtitle }}</small>
+                  </button>
+                </li>
+              }
+            </ul>
+          } @else if (showRecipientList && recipientQuery.trim().length >= 2) {
+            <ul class="recipient-dropdown recipient-dropdown--empty">
+              <li><span>Nenhuma empresa encontrada para “{{ recipientQuery.trim() }}”.</span></li>
+            </ul>
+          } @else if (showRecipientList && recentDiscoveries.length === 0 && recipients.length === 0) {
+            <ul class="recipient-dropdown recipient-dropdown--empty">
+              <li>
+                <span>
+                  Digite o nome da empresa descoberta (mín. 2 letras). Também lista leads do CRM e clientes da carteira.
+                </span>
+              </li>
+            </ul>
+          }
+        </div>
+        @if (selectedRecipient) {
+          <small class="recipient-hint">{{ selectedRecipient.subtitle }}</small>
+        } @else {
+          <small class="recipient-hint">
+            Busca empresas descobertas, leads do CRM e clientes da carteira. Clique no resultado da lista para selecionar.
+          </small>
+        }
+      </div>
+
+      <label class="field">
+        <span>Título da proposta</span>
+        <input formControlName="title" placeholder="Ex: Implantação de CRM + Automação" [class.invalid]="form.controls.title.touched && form.controls.title.invalid" />
+      </label>
+
+      <label class="field">
+        <span>Condições de pagamento</span>
+        <textarea formControlName="paymentTerms" rows="3"></textarea>
+      </label>
+
+      <label class="field field--inline">
+        <span>Validade (dias)</span>
+        <input type="number" formControlName="validityDays" min="1" [class.invalid]="form.controls.validityDays.touched && form.controls.validityDays.invalid" />
+      </label>
+
+      <div class="items-block">
+        <h3>Itens do serviço</h3>
+
+        <div class="items-table" formArrayName="items">
+          <div class="item-row item-row--head">
+            <span>Descrição</span>
+            <span>Qtd.</span>
+            <span>Valor unit. (R$)</span>
+            <span>Subtotal</span>
+            <span></span>
+          </div>
+
+          @for (item of items.controls; track $index) {
+            <div class="item-row" [formGroupName]="$index">
+              <input
+                formControlName="description"
+                placeholder="Descrição do serviço"
+                [class.invalid]="item.get('description')?.touched && item.get('description')?.invalid"
+              />
+              <input
+                type="number"
+                formControlName="quantity"
+                min="1"
+                step="1"
+                inputmode="numeric"
+                placeholder="1"
+                [class.invalid]="item.get('quantity')?.touched && item.get('quantity')?.invalid"
+              />
+              <label class="currency-input" [class.invalid]="item.get('unitPrice')?.touched && item.get('unitPrice')?.invalid">
+                <span>R$</span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  [value]="unitPriceDisplay($index)"
+                  (input)="onUnitPriceInput($index, $event)"
+                  (blur)="onUnitPriceBlur($index)"
+                  placeholder="0,00"
+                />
+              </label>
+              <strong class="line-total">{{ lineTotal($index) | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</strong>
+              <button type="button" class="remove" (click)="removeItem($index)" aria-label="Remover item">×</button>
+            </div>
+          }
+        </div>
+
+        <button type="button" class="pp-btn pp-btn--ghost add-item-btn" (click)="addItem()">+ Adicionar item</button>
+      </div>
+
+      <div class="commercial-bar">
+        <div class="commercial-field">
+          <span>Desconto</span>
+          <div class="commercial-inputs">
+            <select
+              class="mode-select"
+              [(ngModel)]="discountMode"
+              [ngModelOptions]="{ standalone: true }"
+              aria-label="Tipo de desconto"
+            >
+              <option value="percent">%</option>
+              <option value="amount">R$</option>
+            </select>
+            @if (discountMode === 'amount') {
+              <input
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                class="money-mask"
+                [value]="discountAmountDisplay"
+                (input)="onDiscountAmountInput($event)"
+                placeholder="0,00"
+              />
+            } @else {
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                [(ngModel)]="discountValue"
+                [ngModelOptions]="{ standalone: true }"
+                placeholder="0"
+              />
+            }
+          </div>
+        </div>
+        <div class="commercial-field">
+          <span>Impostos / encargos (%)</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            [(ngModel)]="taxPercent"
+            [ngModelOptions]="{ standalone: true }"
+            placeholder="0"
+          />
+        </div>
+        <div class="total-bar">
+          <div class="total-bar__meta">
+            <span class="total-bar__label">Total estimado</span>
+            @if (discountPreview > 0 || taxPreview > 0) {
+              <small>
+                Subtotal {{ subtotalPreview | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
+                @if (discountPreview > 0) {
+                  · desc. -{{ discountPreview | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
+                }
+                @if (taxPreview > 0) {
+                  · imp. +{{ taxPreview | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
+                }
+              </small>
+            }
+          </div>
+          <strong class="total-bar__value">{{ totalPreview | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</strong>
+        </div>
+      </div>
+
+      @if (formError) {
+        <p class="form-error">{{ formError }}</p>
+      } @else if (!canPublish && !saving && !publishing) {
+        <p class="form-hint">
+          @if (form.invalid) {
+            Preencha título, descrição do item e valor unitário (&gt; 0) para continuar.
+          } @else if (!selectedRecipient) {
+            Selecione um cliente ou lead na lista para gerar o link de aprovação.
+          }
+        </p>
+      }
+
+      <div class="form-actions">
+        <button type="button" class="pp-btn pp-btn--outline" (click)="saveDraft()" [disabled]="!canSaveDraft">
+          {{ saving ? 'Salvando...' : 'Salvar rascunho' }}
+        </button>
+        <button type="button" class="pp-btn pp-btn--primary publish-btn" (click)="saveAndPublish()" [disabled]="!canPublish">
+          {{ publishing ? 'Gerando link...' : 'Gerar link de aprovação' }}
+        </button>
+      </div>
+    </form>
+
+    <aside class="list-panel">
+      <div class="list-head pp-glass">
+        <h2>Propostas recentes</h2>
+        @if (copyFeedback) {
+          <span class="copy-feedback">{{ copyFeedback }}</span>
+        }
+      </div>
+
+      @if (loading) {
+        <p class="muted">Carregando...</p>
+      } @else if (proposals.length === 0) {
+        <div class="empty empty--rich pp-glass">
+          <div class="empty-icon" aria-hidden="true">📄</div>
+          <strong>Nenhuma proposta recente</strong>
+          <p>
+            As propostas geradas e seus links de aprovação aparecerão aqui para acompanhamento de status
+            (Enviada, Visualizada, Aprovada).
+          </p>
+        </div>
+      } @else {
+        <div class="proposal-cards">
+          @for (p of proposals; track p.id) {
+            <article class="proposal-card pp-glass">
+              <div class="card-top">
+                <strong>{{ p.title }}</strong>
+                <span class="badge" [class.badge--pending]="p.status === 'PENDING'" [class.badge--approved]="p.status === 'APPROVED'">
+                  {{ statusLabel(p.status) }}
+                </span>
+              </div>
+              <p class="amount">{{ p.totalAmount | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</p>
+              <p class="meta">Validade: {{ p.validityDays }} dias · {{ p.items.length }} item(ns)</p>
+
+              <div class="card-actions">
+                @if (p.status === 'DRAFT') {
+                  <button type="button" class="pp-btn pp-btn--primary" (click)="publish(p)">Publicar link</button>
+                }
+                @if (p.status === 'PENDING' || p.status === 'APPROVED') {
+                  <button type="button" class="pp-btn pp-btn--secondary" (click)="copyLink(p.approvalUrl)">Copiar link</button>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </aside>
+  </div>
+</section>
+
+@if (showLinkModal) {
+  <div class="link-overlay" (click)="closeLinkModal()">
+    <div class="link-modal pp-glass" (click)="$event.stopPropagation()">
+      <h2>Link de aprovação gerado</h2>
+      <p>Envie este link ao cliente para que ele revise e aprove a proposta dentro do prazo de validade.</p>
+      <div class="link-box">
+        <code>{{ publishedLink }}</code>
+      </div>
+      <div class="link-actions">
+        <button type="button" class="pp-btn pp-btn--secondary" (click)="copyLink(publishedLink)">Copiar link</button>
+        <button type="button" class="pp-btn pp-btn--primary" (click)="openWhatsApp()">Enviar no WhatsApp</button>
+      </div>
+      <button type="button" class="close-modal" (click)="closeLinkModal()">Fechar</button>
+    </div>
+  </div>
+}

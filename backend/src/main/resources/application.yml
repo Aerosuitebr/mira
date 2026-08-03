@@ -1,0 +1,139 @@
+spring:
+  application:
+    name: prospect-portal-api
+  profiles:
+    active: dev
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/prospect_portal}
+    username: prospect
+    password: prospect
+    hikari:
+      pool-name: mira-hikari
+      maximum-pool-size: ${HIKARI_MAX_POOL:20}
+      minimum-idle: ${HIKARI_MIN_IDLE:5}
+      connection-timeout: 15000
+      validation-timeout: 5000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      keepalive-time: 300000
+      leak-detection-threshold: 60000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: America/Sao_Paulo
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: localhost
+      port: 6380
+  elasticsearch:
+    uris: http://localhost:9201
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+  cache:
+    type: redis
+    redis:
+      time-to-live: 300000
+  mail:
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:contato@aerosuite.com.br}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+server:
+  port: 8082
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-me-in-production-use-at-least-256-bits-secret-key-here}
+    expiration-ms: 86400000
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4201}
+  ai:
+    mock-enabled: true
+  data:
+    root: ${PROSPECT_DATA_ROOT:C:/prospect-portal-data}
+    rf-extracted: ${app.data.root}/rf/extracted
+    rf-processed: ${app.data.root}/rf/processed
+  elasticsearch:
+    enabled: true
+    index: companies
+  geocoding:
+    enabled: true
+    nominatim-url: https://nominatim.openstreetmap.org/search
+    awesome-cep-url: https://cep.awesomeapi.com.br
+    rate-limit-ms: 1100
+    cep-rate-limit-ms: 25
+    cep-parallelism: 24
+    cep-batch-size: 3000
+  import:
+    chunk-size: 2000
+    default-states: RJ,SP,MG,ES,DF,GO,MT,MS
+  public-base-url: ${PUBLIC_BASE_URL:http://localhost:4201}
+  meetings:
+    jitsi-base-url: ${JITSI_BASE_URL:https://meet.jit.si}
+  enrichment:
+    web-enabled: true
+    registry-enabled: true
+    brasil-api-url: https://brasilapi.com.br/api/cnpj/v1
+    open-cnpj-url: https://kitana.opencnpj.com/cnpj
+    request-timeout-ms: 5000
+    rate-limit-ms: 200
+    max-pages-per-company: 3
+    parallelism: 4
+  mail:
+    from: ${APP_MAIL_FROM:${SPRING_MAIL_FROM:noreply@aerosuite.com.br}}
+    from-name: ${APP_MAIL_FROM_NAME:Aero Suite}
+    support-email: ${APP_MAIL_SUPPORT:contato@aerosuite.com.br}
+  evolution:
+    enabled: ${APP_EVOLUTION_ENABLED:false}
+    api-base-url: ${APP_EVOLUTION_API_BASE_URL:http://localhost:18082}
+    api-key: ${APP_EVOLUTION_API_KEY:aerosuite-evolution-api-key-2024}
+    instance: ${APP_EVOLUTION_INSTANCE:mira-prospect}
+  discovery:
+    test-fixtures-enabled: ${APP_DISCOVERY_TEST_FIXTURES:false}
+  outreach:
+    test-mode: ${APP_OUTREACH_TEST_MODE:false}
+    test-email: ${APP_OUTREACH_TEST_EMAIL:}
+    product-url: ${APP_OUTREACH_PRODUCT_URL:https://aerosuite.com.br}
+    demo-url: ${APP_OUTREACH_DEMO_URL:https://aerosuite.com.br/contato/#agendar-demo}
+    dispatch-interval-ms: 20000
+    whatsapp:
+      enabled: ${APP_OUTREACH_WA_ENABLED:true}
+      business-hours-only: true
+      timezone: America/Sao_Paulo
+      start-hour: 9
+      end-hour: 18
+      min-interval-seconds: 45
+      max-interval-seconds: 120
+      hourly-cap: 5
+      daily-cap: 30
+      warmup-day1-cap: 10
+      warmup-day3-cap: 20
+      warmup-day7-cap: 30
+
+logging:
+  level:
+    com.prospectportal: INFO

@@ -1,0 +1,236 @@
+<section class="pp-page">
+  <header class="pp-page-header">
+    <div>
+      <span class="pp-eyebrow">Visão geral</span>
+      <h1 class="pp-title">Olá, {{ auth.session()?.fullName }}</h1>
+      <p class="pp-subtitle">
+        Resumo do que já está no MIRA: carteira, pipeline, disparos e agenda.
+      </p>
+    </div>
+  </header>
+
+  @if (loading) {
+    <div class="pp-glass dashboard-loading">
+      <span class="pp-loading-dots"><span></span><span></span><span></span></span>
+      <span>Carregando dados do sistema...</span>
+    </div>
+  } @else {
+    @if (loadError) {
+      <div class="pp-banner outreach-banner-error">Não foi possível carregar parte dos dados do dashboard.</div>
+    }
+
+    <div class="pp-stat-grid">
+      <article class="pp-glass pp-stat pp-enter pp-stagger-1">
+        <div class="pp-stat-value">{{ clientTotal }}</div>
+        <div class="pp-stat-label">Clientes na carteira</div>
+        <a routerLink="/clients" class="stat-link">Ver clientes</a>
+      </article>
+      <article class="pp-glass pp-stat pp-enter pp-stagger-2">
+        <div class="pp-stat-value">{{ crmCardTotal }}</div>
+        <div class="pp-stat-label">Oportunidades no CRM</div>
+        <a routerLink="/crm" class="stat-link">Abrir pipeline</a>
+      </article>
+      <article class="pp-glass pp-stat pp-enter pp-stagger-3">
+        <div class="pp-stat-value">{{ messagesSent }}</div>
+        <div class="pp-stat-label">Mensagens disparadas</div>
+        <a routerLink="/outreach" class="stat-link">{{ campaignTotal }} campanha(s)</a>
+      </article>
+      <article class="pp-glass pp-stat pp-enter pp-stagger-4">
+        <div class="pp-stat-value">{{ upcomingAppointments.length }}</div>
+        <div class="pp-stat-label">Próximos compromissos</div>
+        <a routerLink="/agenda" class="stat-link">Ver agenda</a>
+      </article>
+    </div>
+
+    <div class="pp-stat-grid pp-stat-grid--secondary">
+      <article class="pp-glass pp-stat pp-stat--compact">
+        <div class="pp-stat-value">{{ auth.session()?.creditsRemaining ?? 0 }}</div>
+        <div class="pp-stat-label">Créditos disponíveis</div>
+      </article>
+      <article class="pp-glass pp-stat pp-stat--compact">
+        <div class="pp-stat-value">{{ openProposalTotal }}</div>
+        <div class="pp-stat-label">Propostas em aberto</div>
+        <a routerLink="/proposals" class="stat-link">{{ proposalTotal }} no total</a>
+      </article>
+      <article class="pp-glass pp-stat pp-stat--compact">
+        <div class="pp-stat-value">{{ unreadAlerts }}</div>
+        <div class="pp-stat-label">Alertas não lidos</div>
+      </article>
+      <article class="pp-glass pp-stat pp-stat--compact">
+        <div class="pp-stat-value">{{ auth.session()?.planCode }}</div>
+        <div class="pp-stat-label">Plano atual</div>
+      </article>
+    </div>
+
+    @if (!hasOperationalData) {
+      <div class="pp-glass empty-ops">
+        <strong>Ainda sem histórico operacional</strong>
+        <span>
+          Comece pela jornada ao lado: descubra empresas, enriqueça contatos e dispare abordagens.
+          O dashboard passa a refletir clientes, CRM, campanhas e agenda automaticamente.
+        </span>
+        <a routerLink="/discover" class="pp-btn pp-btn--primary">Ir para Descobrir</a>
+      </div>
+    }
+
+    <div class="dashboard-grid">
+      <article class="pp-glass funnel-card pp-enter">
+        <h3>Jornada de prospecção</h3>
+        <p class="funnel-desc">Atalhos para o fluxo principal do MIRA</p>
+        <div class="funnel-steps">
+          @for (step of funnelSteps; track step.route) {
+            <a [routerLink]="step.route" class="funnel-step pp-glass--interactive">
+              <span class="step-num">{{ step.num }}</span>
+              <div>
+                <strong>{{ step.title }}</strong>
+                <small>{{ step.desc }}</small>
+              </div>
+              <svg class="step-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </a>
+          }
+        </div>
+      </article>
+
+      <article class="pp-glass panel-card pp-enter">
+        <div class="panel-header">
+          <h3>Pipeline CRM</h3>
+          <a routerLink="/crm" class="panel-link">Ver board</a>
+        </div>
+
+        @if (pipelineStages.length === 0) {
+          <div class="pp-empty">
+            <strong>Nenhuma oportunidade no CRM</strong>
+            <span>Dispare uma campanha ou mova leads para o Kanban.</span>
+          </div>
+        } @else {
+          <div class="pipeline-bars">
+            @for (stage of pipelineStages; track stage.id) {
+              <div class="pipeline-row">
+                <div class="pipeline-row__meta">
+                  <span class="pipeline-dot" [style.background]="stage.color"></span>
+                  <span class="pipeline-name">{{ stage.name }}</span>
+                  <strong>{{ stage.count }}</strong>
+                </div>
+                <div class="pipeline-track">
+                  <div
+                    class="pipeline-fill"
+                    [style.width.%]="crmCardTotal ? (stage.count / crmCardTotal) * 100 : 0"
+                    [style.background]="stage.color"
+                  ></div>
+                </div>
+              </div>
+            }
+          </div>
+
+          @if (recentCards.length > 0) {
+            <h4 class="panel-subtitle">Oportunidades recentes</h4>
+            <ul class="mini-list">
+              @for (card of recentCards; track card.id) {
+                <li>
+                  <div>
+                    <strong>{{ card.companyName || card.title }}</strong>
+                    <small>{{ card.title }}</small>
+                  </div>
+                  <span class="stage-chip" [style.--chip-color]="card.stageColor">{{ card.stageName }}</span>
+                </li>
+              }
+            </ul>
+          }
+        }
+      </article>
+    </div>
+
+    <div class="dashboard-grid dashboard-grid--bottom">
+      <article class="pp-glass panel-card">
+        <div class="panel-header">
+          <h3>Agenda</h3>
+          <a routerLink="/agenda" class="panel-link">Ver todos</a>
+        </div>
+        @if (upcomingAppointments.length === 0) {
+          <div class="pp-empty">
+            <strong>Nenhum compromisso próximo</strong>
+            <span>Agende demos e follow-ups para acompanhar aqui.</span>
+          </div>
+        } @else {
+          <ul class="mini-list">
+            @for (item of upcomingAppointments; track item.id) {
+              <li>
+                <div>
+                  <strong>{{ item.title }}</strong>
+                  <small>{{ item.clientName }}{{ item.clientCompany ? ' · ' + item.clientCompany : '' }}</small>
+                </div>
+                <time>{{ item.startsAt | date: 'dd/MM HH:mm' }}</time>
+              </li>
+            }
+          </ul>
+        }
+      </article>
+
+      <article class="pp-glass panel-card">
+        <div class="panel-header">
+          <h3>Campanhas recentes</h3>
+          <a routerLink="/outreach" class="panel-link">Abordar</a>
+        </div>
+        @if (recentCampaigns.length === 0) {
+          <div class="pp-empty">
+            <strong>Nenhuma campanha registrada</strong>
+            <span>Os disparos de e-mail e WhatsApp aparecem aqui.</span>
+          </div>
+        } @else {
+          <ul class="mini-list">
+            @for (campaign of recentCampaigns; track campaign.id) {
+              <li>
+                <div>
+                  <strong>{{ campaign.name }}</strong>
+                  <small>{{ campaign.channel }} · {{ campaign.status }}</small>
+                </div>
+                <span class="count-chip">{{ campaign.sentCount }} envio(s)</span>
+              </li>
+            }
+          </ul>
+        }
+      </article>
+
+      <article class="pp-glass panel-card alerts-card">
+        <div class="panel-header">
+          <h3>Alertas</h3>
+          <span class="pp-badge pp-badge--rose">{{ unreadAlerts }} novos</span>
+        </div>
+        @if (alertsLoading) {
+          <div class="loading-state">
+            <span class="pp-loading-dots"><span></span><span></span><span></span></span>
+            <span>Atualizando alertas...</span>
+          </div>
+        } @else if (alerts.length === 0) {
+          <div class="pp-empty">
+            <strong>Nenhum alerta no momento</strong>
+            <span>Quando houver aberturas recentes na base ou lembretes de agenda, eles aparecem aqui.</span>
+          </div>
+        } @else {
+          <ul class="alerts-list">
+            @for (alert of alerts; track alert.id) {
+              <li class="alert-item" [class.read]="alert.read">
+                <div class="alert-icon" [attr.data-type]="alert.alertType"></div>
+                <div class="alert-body">
+                  <strong>{{ alert.title }}</strong>
+                  <p>{{ alert.description }}</p>
+                  <div class="alert-meta">
+                    <span class="pp-badge pp-badge--cyan">{{ alert.alertType }}</span>
+                    <span>{{ alert.companyName }}</span>
+                  </div>
+                </div>
+                @if (!alert.read) {
+                  <button type="button" class="pp-btn pp-btn--secondary alert-action" (click)="markRead(alert)">
+                    Marcar lido
+                  </button>
+                }
+              </li>
+            }
+          </ul>
+        }
+      </article>
+    </div>
+  }
+</section>

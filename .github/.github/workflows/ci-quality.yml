@@ -1,0 +1,111 @@
+name: CI Quality Gate
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+concurrency:
+  group: ci-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Backend compile + Frontend production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Block secret-like files in diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            RANGE='HEAD^..HEAD'
+          else
+            RANGE='HEAD'
+          fi
+          mapfile -t files < <(git diff --name-only $RANGE || true)
+          blocked=0
+          for f in "${files[@]}"; do
+            base=$(basename "$f")
+            case "$base" in
+              .env|.env.*|*.pem|*.p12|credentials.json|id_rsa|id_ed25519)
+                if [[ "$base" != *.example && "$base" != *.sample ]]; then
+                  echo "Bloqueado: $f"
+                  blocked=1
+                fi
+                ;;
+            esac
+            if [[ "$f" =~ (^|/)\.env($|\.) ]] && [[ "$base" != *.example && "$base" != *.sample ]]; then
+              echo "Bloqueado: $f"
+              blocked=1
+            fi
+          done
+          if [[ "$blocked" -eq 1 ]]; then
+            echo "CI bloqueou possiveis segredos no diff."
+            exit 1
+          fi
+          echo "Varredura de segredos OK"
+
+      - name: Block em-dash / en-dash in changed copy
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            mapfile -t files < <(git diff --name-only HEAD^..HEAD -- 'frontend/src' 'backend/src' || true)
+          else
+            mapfile -t files < <(git ls-files 'frontend/src' 'backend/src' || true)
+          fi
+          blocked=0
+          for f in "${files[@]}"; do
+            [[ -f "$f" ]] || continue
+            case "$f" in
+              *.ts|*.html|*.scss|*.java|*.yml|*.yaml|*.md) ;;
+              *) continue ;;
+            esac
+            case "$f" in
+              */db/migration/*) continue ;;
+            esac
+            if grep -n $'[\u2013\u2014]' "$f" >/dev/null 2>&1; then
+              echo "Travessao em: $f"
+              grep -n $'[\u2013\u2014]' "$f" || true
+              blocked=1
+            fi
+          done
+          if [[ "$blocked" -eq 1 ]]; then
+            echo "Remova travessoes (—/–) do copy alterado."
+            exit 1
+          fi
+          echo "Copy sem travessao OK"
+
+
+      - name: Compile backend
+        working-directory: backend
+        run: mvn -s .mvn/settings.xml -B -DskipTests compile
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend (production)
+        working-directory: frontend
+        run: npm run build -- --configuration=production

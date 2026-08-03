@@ -1,0 +1,304 @@
+<section class="pp-page">
+  <header class="pp-page-header">
+    <div>
+      <span class="pp-eyebrow">Organização</span>
+      <h1 class="pp-title">Agenda de compromissos</h1>
+      <p class="pp-subtitle">Cadastre reuniões com clientes e receba avisos antes de cada compromisso.</p>
+    </div>
+    <button type="button" class="pp-btn pp-btn--primary" (click)="openCreate()">
+      + Novo compromisso
+    </button>
+  </header>
+
+  <div class="toolbar pp-glass">
+    <div class="view-toggle">
+      <button
+        type="button"
+        class="toggle-btn"
+        [class.toggle-btn--active]="viewMode === 'upcoming'"
+        (click)="setView('upcoming')"
+      >
+        Próximos
+      </button>
+      <button
+        type="button"
+        class="toggle-btn"
+        [class.toggle-btn--active]="viewMode === 'all'"
+        (click)="setView('all')"
+      >
+        Todos
+      </button>
+    </div>
+    <p class="toolbar-hint">Você será avisado no dashboard e no navegador conforme a antecedência escolhida.</p>
+  </div>
+
+  @if (loading) {
+    <p class="muted">Carregando agenda...</p>
+  } @else if (groups.length === 0) {
+    <div class="empty pp-glass">
+      <h2>Nenhum compromisso @if (viewMode === 'upcoming') { agendado }</h2>
+      <p>Cadastre reuniões, ligações ou visitas e escolha quanto tempo antes deseja ser lembrado.</p>
+      <button type="button" class="pp-btn pp-btn--primary" (click)="openCreate()">+ Novo compromisso</button>
+    </div>
+  } @else {
+    <div class="agenda">
+      @for (group of groups; track group.label) {
+        <section class="day-group">
+          <h2 class="day-label">{{ group.label }}</h2>
+          <div class="cards">
+            @for (item of group.items; track item.id) {
+              <article class="card pp-glass" [class.card--past]="isPast(item)" [class.card--cancelled]="item.status === 'CANCELLED'">
+                <div class="card-time">
+                  <strong>{{ item.startsAt | date:'HH:mm' }}</strong>
+                  @if (item.endsAt) {
+                    <span>– {{ item.endsAt | date:'HH:mm' }}</span>
+                  }
+                </div>
+                <div class="card-body">
+                  <div class="card-head">
+                    <h3>{{ item.title }}</h3>
+                    <span class="status" [class.status--cancelled]="item.status === 'CANCELLED'">{{ statusLabel(item.status) }}</span>
+                  </div>
+                  <p class="client-line">
+                    <strong>{{ item.clientName }}</strong>
+                    @if (item.clientCompany && item.clientCompany !== item.clientName) {
+                      <span> · {{ item.clientCompany }}</span>
+                    }
+                  </p>
+                  @if (item.clientPhone || item.clientEmail) {
+                    <p class="contact-line">
+                      @if (item.clientPhone) { <span>{{ formatPhone(item.clientPhone) }}</span> }
+                      @if (item.clientPhone && item.clientEmail) { <span> · </span> }
+                      @if (item.clientEmail) { <span>{{ item.clientEmail }}</span> }
+                    </p>
+                  }
+                  @if (item.videoConference && item.meetingUrl) {
+                    <div class="meeting-actions">
+                      <a
+                        class="pp-btn pp-btn--primary meeting-join"
+                        [href]="item.meetingUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Entrar na videoconferência
+                      </a>
+                      <button type="button" class="pp-btn pp-btn--ghost" (click)="copyMeetingLink(item.meetingUrl!, $event)">
+                        Copiar link
+                      </button>
+                      @if (item.clientPhone) {
+                        <a
+                          class="pp-btn pp-btn--ghost"
+                          [href]="whatsAppShareUrl(item)"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Enviar ao cliente
+                        </a>
+                      }
+                    </div>
+                  } @else if (item.location) {
+                    <p class="location-line">{{ item.location }}</p>
+                  }
+                  @if (item.description) {
+                    <p class="desc-line">{{ item.description }}</p>
+                  }
+                  <p class="reminder-line">
+                    Aviso: {{ reminderLabel(item.reminderMinutesBefore) }}
+                    @if (item.reminderSent) { <span class="sent-badge">Enviado</span> }
+                  </p>
+                </div>
+                @if (item.status === 'SCHEDULED') {
+                  <div class="card-actions">
+                    <button type="button" class="pp-btn pp-btn--ghost" (click)="openEdit(item)">Editar</button>
+                    <button type="button" class="pp-btn pp-btn--ghost danger" (click)="cancelAppointment(item)">Cancelar</button>
+                  </div>
+                }
+              </article>
+            }
+          </div>
+        </section>
+      }
+    </div>
+  }
+</section>
+
+@if (showForm) {
+  <div class="form-overlay" (click)="closeForm()" role="presentation">
+    <form
+      class="form-panel pp-glass"
+      (click)="$event.stopPropagation()"
+      (ngSubmit)="submitForm()"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="editingId ? 'Editar compromisso' : 'Novo compromisso'"
+    >
+      <header class="form-panel__header">
+        <div>
+          <h2>{{ editingId ? 'Editar compromisso' : 'Novo compromisso' }}</h2>
+          <p>Preencha os dados do cliente e escolha quando deseja ser avisado.</p>
+          @if (prefillSource) {
+            <span class="prefill-chip">Autopreenchido · {{ prefillSource }}</span>
+          }
+        </div>
+        <button type="button" class="close-btn" (click)="closeForm()" aria-label="Fechar (Esc)">×</button>
+      </header>
+
+      <div class="form-panel__body">
+        @if (formError) {
+          <p class="form-error">{{ formError }}</p>
+        }
+
+        <div class="form-grid">
+          <div class="pp-field span-2">
+            <label for="appt-client-select">Cliente da carteira</label>
+            <select id="appt-client-select" class="pp-select" [(ngModel)]="form.clientId" name="clientId" (ngModelChange)="onClientSelected()">
+              <option value="">Novo cliente (preencher abaixo)</option>
+              @for (client of clients; track client.id) {
+                <option [value]="client.id">{{ client.displayName }} — {{ client.city }}/{{ client.state }}</option>
+              }
+            </select>
+            <small>
+              @if (loadingClientDetails) {
+                Buscando e-mail e telefone do cliente...
+              } @else {
+                Se o lead já está na carteira, a seleção preenche nome, empresa, e-mail e telefone.
+              }
+            </small>
+          </div>
+
+          <div class="pp-field">
+            <label for="appt-client-name">Nome do cliente</label>
+            <input id="appt-client-name" class="pp-input" [(ngModel)]="form.clientName" name="clientName" required />
+          </div>
+          <div class="pp-field">
+            <label for="appt-client-company">Empresa</label>
+            <input id="appt-client-company" class="pp-input" [(ngModel)]="form.clientCompany" name="clientCompany" />
+          </div>
+          <div class="pp-field">
+            <label for="appt-client-email">E-mail</label>
+            <input id="appt-client-email" type="email" class="pp-input" [(ngModel)]="form.clientEmail" name="clientEmail" />
+          </div>
+          <div class="pp-field">
+            <label for="appt-client-phone">Telefone</label>
+            <input
+              id="appt-client-phone"
+              type="tel"
+              class="pp-input"
+              [class.pp-input--invalid]="phoneError"
+              [ngModel]="form.clientPhone"
+              (ngModelChange)="onPhoneChange($event)"
+              name="clientPhone"
+              inputmode="numeric"
+              autocomplete="tel"
+              maxlength="16"
+              placeholder="(00) 00000-0000"
+              (keydown)="onPhoneKeydown($event)"
+              (paste)="onPhonePaste($event)"
+              (blur)="onPhoneBlur()"
+            />
+            @if (phoneError) {
+              <small class="field-error">{{ phoneError }}</small>
+            } @else {
+              <small>Celular ou fixo com DDD — opcional</small>
+            }
+          </div>
+
+          <div class="pp-field span-2">
+            <label for="appt-title">Título do compromisso</label>
+            <input id="appt-title" class="pp-input" [(ngModel)]="form.title" name="title" placeholder="Ex.: Reunião comercial, demo do produto" required />
+          </div>
+
+          <div class="pp-field span-2 datetime-field">
+            <app-datetime-picker
+              label="Início do compromisso"
+              name="startsAt"
+              [(ngModel)]="form.startsAt"
+              required
+            />
+          </div>
+
+          <div class="pp-field span-2 datetime-field">
+            <app-datetime-picker
+              label="Término (opcional)"
+              name="endsAt"
+              [(ngModel)]="form.endsAt"
+              [optional]="true"
+              [minIso]="form.startsAt || null"
+            />
+            <small>Opcional — deve ser após o início</small>
+          </div>
+
+          <div class="pp-field span-2">
+            <label class="video-toggle">
+              <input type="checkbox" [(ngModel)]="form.videoConference" name="videoConference" />
+              <span class="video-toggle__box" aria-hidden="true"></span>
+              <span class="video-toggle__text">
+                <strong>Videoconferência</strong>
+                <small>Gera sala Jitsi Meet automaticamente ou use seu link (Meet, Zoom, Teams)</small>
+              </span>
+            </label>
+            <div class="integration-status" [class.integration-status--ready]="true">
+              <span class="integration-pill integration-pill--ok">Jitsi Meet · pronto</span>
+              <span class="integration-pill integration-pill--warn">Google Calendar / Outlook · não conectados</span>
+            </div>
+            @if (form.videoConference) {
+              <p class="integration-hint">
+                Sem OAuth de calendário por enquanto: a reunião usa Jitsi. Você pode colar um link do Meet/Zoom/Teams abaixo se preferir.
+              </p>
+            }
+          </div>
+
+          @if (form.videoConference) {
+            <div class="pp-field span-2 meeting-field">
+              <label for="appt-meeting-url">Link da reunião</label>
+              <input
+                id="appt-meeting-url"
+                class="pp-input"
+                [(ngModel)]="form.meetingUrl"
+                name="meetingUrl"
+                placeholder="Deixe vazio para gerar sala Jitsi automaticamente"
+                inputmode="url"
+              />
+              <small>{{ meetingHint(form.meetingUrl || undefined) }}</small>
+              @if (form.meetingUrl) {
+                <button type="button" class="pp-btn pp-btn--ghost copy-inline" (click)="copyMeetingLink(form.meetingUrl, $event)">
+                  Copiar link
+                </button>
+              }
+            </div>
+          } @else {
+            <div class="pp-field span-2">
+              <label for="appt-location">Local presencial</label>
+              <input id="appt-location" class="pp-input" [(ngModel)]="form.location" name="location" placeholder="Endereço ou referência do encontro" />
+            </div>
+          }
+
+          <div class="pp-field span-2">
+            <label for="appt-desc">Observações</label>
+            <textarea id="appt-desc" class="pp-textarea" rows="3" [(ngModel)]="form.description" name="description"></textarea>
+          </div>
+
+          <div class="pp-field span-2">
+            <label for="appt-reminder">Avisar com antecedência de</label>
+            <select id="appt-reminder" class="pp-select" [(ngModel)]="form.reminderMinutesBefore" name="reminderMinutesBefore">
+              @for (opt of reminderOptions; track opt.value) {
+                <option [ngValue]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+            <small>Padrão: 30 minutos antes. Você verá o aviso no dashboard e no navegador.</small>
+          </div>
+        </div>
+      </div>
+
+      <footer class="form-panel__footer">
+        <span class="footer-hint">Esc fecha · Enter salva</span>
+        <div class="footer-actions">
+          <button type="button" class="pp-btn pp-btn--ghost" (click)="closeForm()">Cancelar</button>
+          <button type="submit" class="pp-btn pp-btn--primary" [disabled]="saving">
+            {{ saving ? 'Salvando…' : (editingId ? 'Salvar alterações' : 'Agendar compromisso') }}
+          </button>
+        </div>
+      </footer>
+    </form>
+  </div>
+}

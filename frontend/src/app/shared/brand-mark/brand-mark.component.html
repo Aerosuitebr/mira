@@ -1,0 +1,30 @@
+@if (link(); as route) {
+  <a
+    class="pp-brand-mark"
+    [class.pp-brand-mark--sidebar]="size() === 'sidebar'"
+    [class.pp-brand-mark--hero]="size() === 'hero'"
+    [class.pp-brand-mark--panel]="size() === 'panel'"
+    [class.pp-brand-mark--compact]="size() === 'compact'"
+    [routerLink]="route"
+    aria-label="MIRA — prospecção B2B"
+  >
+    <img src="/logo-ui.png" alt="MIRA" width="504" height="182" decoding="async" />
+    @if (tagline()) {
+      <span class="pp-brand-mark__tagline">{{ tagline() }}</span>
+    }
+  </a>
+} @else {
+  <div
+    class="pp-brand-mark"
+    [class.pp-brand-mark--sidebar]="size() === 'sidebar'"
+    [class.pp-brand-mark--hero]="size() === 'hero'"
+    [class.pp-brand-mark--panel]="size() === 'panel'"
+    [class.pp-brand-mark--compact]="size() === 'compact'"
+    aria-hidden="true"
+  >
+    <img src="/logo-ui.png" alt="" width="504" height="182" decoding="async" />
+    @if (tagline()) {
+      <span class="pp-brand-mark__tagline">{{ tagline() }}</span>
+    }
+  </div>
+}

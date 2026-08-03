@@ -1,0 +1,236 @@
+[
+  {
+    "code": "A",
+    "title": "Agricultura, pecuária, produção florestal, pesca e aquicultura",
+    "searchHint": "Prospecte produtores rurais, cooperativas agrícolas, aquicultura e serviços do campo.",
+    "divisions": [
+      { "code": "01", "label": "Agricultura, pecuária e serviços relacionados" },
+      { "code": "02", "label": "Produção florestal" },
+      { "code": "03", "label": "Pesca e aquicultura" }
+    ]
+  },
+  {
+    "code": "B",
+    "title": "Indústrias extrativas",
+    "searchHint": "Mineração, extração de petróleo, gás e atividades de apoio à extração mineral.",
+    "divisions": [
+      { "code": "05", "label": "Extração de carvão mineral" },
+      { "code": "06", "label": "Extração de petróleo e gás natural" },
+      { "code": "07", "label": "Extração de minerais metálicos" },
+      { "code": "08", "label": "Extração de minerais não-metálicos" },
+      { "code": "09", "label": "Atividades de apoio à extração de minerais" }
+    ]
+  },
+  {
+    "code": "C",
+    "title": "Indústrias de transformação",
+    "searchHint": "Fábricas e indústrias: alimentos, têxtil, metal, química, eletrônicos e manufatura em geral.",
+    "divisions": [
+      { "code": "10", "label": "Fabricação de produtos alimentícios" },
+      { "code": "11", "label": "Fabricação de bebidas" },
+      { "code": "12", "label": "Fabricação de produtos do fumo" },
+      { "code": "13", "label": "Fabricação de produtos têxteis" },
+      { "code": "14", "label": "Confecção de artigos do vestuário e acessórios" },
+      { "code": "15", "label": "Preparação de couros e fabricação de artefatos" },
+      { "code": "16", "label": "Fabricação de produtos de madeira" },
+      { "code": "17", "label": "Fabricação de celulose, papel e produtos de papel" },
+      { "code": "18", "label": "Impressão e reprodução de gravações" },
+      { "code": "19", "label": "Fabricação de coque, produtos derivados do petróleo e biocombustíveis" },
+      { "code": "20", "label": "Fabricação de produtos químicos" },
+      { "code": "21", "label": "Fabricação de produtos farmoquímicos e farmacêuticos" },
+      { "code": "22", "label": "Fabricação de produtos de borracha e de material plástico" },
+      { "code": "23", "label": "Fabricação de produtos de minerais não-metálicos" },
+      { "code": "24", "label": "Metalurgia" },
+      { "code": "25", "label": "Fabricação de produtos de metal" },
+      { "code": "26", "label": "Fabricação de equipamentos de informática e eletrônicos" },
+      { "code": "27", "label": "Fabricação de máquinas, aparelhos e materiais elétricos" },
+      { "code": "28", "label": "Fabricação de máquinas e equipamentos" },
+      { "code": "29", "label": "Fabricação de veículos automotores e reboques" },
+      { "code": "30", "label": "Fabricação de outros equipamentos de transporte" },
+      { "code": "31", "label": "Fabricação de móveis" },
+      { "code": "32", "label": "Fabricação de produtos diversos" },
+      { "code": "33", "label": "Manutenção, reparação e instalação de máquinas e equipamentos" }
+    ]
+  },
+  {
+    "code": "D",
+    "title": "Eletricidade e gás",
+    "searchHint": "Distribuidoras de energia, geração elétrica e distribuição de gás.",
+    "divisions": [
+      { "code": "35", "label": "Eletricidade, gás e outras utilidades" }
+    ]
+  },
+  {
+    "code": "E",
+    "title": "Água, esgoto, atividades de gestão de resíduos e descontaminação",
+    "searchHint": "Saneamento, coleta de resíduos, tratamento de água e serviços ambientais.",
+    "divisions": [
+      { "code": "36", "label": "Captação, tratamento e distribuição de água" },
+      { "code": "37", "label": "Esgoto e atividades relacionadas" },
+      { "code": "38", "label": "Coleta, tratamento e disposição de resíduos" },
+      { "code": "39", "label": "Descontaminação e outros serviços de gestão de resíduos" }
+    ]
+  },
+  {
+    "code": "F",
+    "title": "Construção",
+    "searchHint": "Construtoras, incorporadoras, obras civis e instalações em edificações.",
+    "divisions": [
+      { "code": "41", "label": "Construção de edifícios" },
+      { "code": "42", "label": "Obras de infraestrutura" },
+      { "code": "43", "label": "Serviços especializados para construção" }
+    ]
+  },
+  {
+    "code": "G",
+    "title": "Comércio; reparação de veículos automotores e motocicletas",
+    "searchHint": "Lojas, supermercados, distribuidores, autopeças, postos e varejo em geral.",
+    "divisions": [
+      { "code": "45", "label": "Comércio e reparação de veículos automotores e motocicletas" },
+      { "code": "46", "label": "Comércio por atacado, exceto veículos automotores e motocicletas" },
+      { "code": "47", "label": "Comércio varejista" }
+    ]
+  },
+  {
+    "code": "H",
+    "title": "Transporte, armazenagem e correio",
+    "searchHint": "Transportadoras, logística, armazéns, entregas e operadores postais.",
+    "divisions": [
+      { "code": "49", "label": "Transporte terrestre" },
+      { "code": "50", "label": "Transporte aquaviário" },
+      { "code": "51", "label": "Transporte aéreo" },
+      { "code": "52", "label": "Armazenagem e atividades auxiliares dos transportes" },
+      { "code": "53", "label": "Correio e outras atividades de entrega" }
+    ]
+  },
+  {
+    "code": "I",
+    "title": "Alojamento e alimentação",
+    "searchHint": "Hotéis, pousadas, restaurantes, bares, catering e food service.",
+    "divisions": [
+      { "code": "55", "label": "Alojamento" },
+      { "code": "56", "label": "Alimentação" }
+    ]
+  },
+  {
+    "code": "J",
+    "title": "Informação e comunicação",
+    "searchHint": "Software, TI, telecom, editoras, produção audiovisual e serviços digitais.",
+    "divisions": [
+      { "code": "58", "label": "Edição e edição integrada à impressão" },
+      { "code": "59", "label": "Atividades cinematográficas, vídeos e produção de programas" },
+      { "code": "60", "label": "Atividades de rádio e de televisão" },
+      { "code": "61", "label": "Telecomunicações" },
+      { "code": "62", "label": "Atividades dos serviços de tecnologia da informação" },
+      { "code": "63", "label": "Atividades de prestação de serviços de informação" }
+    ]
+  },
+  {
+    "code": "K",
+    "title": "Atividades financeiras, de seguros e serviços relacionados",
+    "searchHint": "Bancos, fintechs, corretoras, seguradoras e serviços financeiros auxiliares.",
+    "divisions": [
+      { "code": "64", "label": "Atividades de serviços financeiros" },
+      { "code": "65", "label": "Seguros, resseguros, previdência complementar e planos de saúde" },
+      { "code": "66", "label": "Atividades auxiliares dos serviços financeiros, seguros e previdência" }
+    ]
+  },
+  {
+    "code": "L",
+    "title": "Atividades imobiliárias",
+    "searchHint": "Imobiliárias, administradoras de imóveis e corretagem.",
+    "divisions": [
+      { "code": "68", "label": "Atividades imobiliárias" }
+    ]
+  },
+  {
+    "code": "M",
+    "title": "Atividades profissionais, científicas e técnicas",
+    "searchHint": "Consultorias, engenharia, advocacia, contabilidade, marketing e serviços especializados.",
+    "divisions": [
+      { "code": "69", "label": "Atividades jurídicas, contábeis e de auditoria" },
+      { "code": "70", "label": "Sedes de empresas e consultoria em gestão empresarial" },
+      { "code": "71", "label": "Serviços de arquitetura e engenharia; testes e análises técnicas" },
+      { "code": "72", "label": "Pesquisa e desenvolvimento científico" },
+      { "code": "73", "label": "Publicidade e pesquisa de mercado" },
+      { "code": "74", "label": "Outras atividades profissionais, científicas e técnicas" },
+      { "code": "75", "label": "Atividades veterinárias" }
+    ]
+  },
+  {
+    "code": "N",
+    "title": "Atividades administrativas e serviços complementares",
+    "searchHint": "Facilities, limpeza, segurança, RH terceirizado, call center e locação de equipamentos.",
+    "divisions": [
+      { "code": "77", "label": "Aluguel de máquinas e equipamentos sem operador" },
+      { "code": "78", "label": "Seleção, agenciamento e locação de mão de obra" },
+      { "code": "79", "label": "Agências de viagens, operadores turísticos e serviços de reservas" },
+      { "code": "80", "label": "Atividades de vigilância, segurança e investigação" },
+      { "code": "81", "label": "Serviços para edifícios e atividades paisagísticas" },
+      { "code": "82", "label": "Serviços de escritório, apoio administrativo e outros serviços prestados às empresas" }
+    ]
+  },
+  {
+    "code": "O",
+    "title": "Administração pública, defesa e seguridade social",
+    "searchHint": "Órgãos públicos e administração governamental (geralmente fora do ICP B2B).",
+    "divisions": [
+      { "code": "84", "label": "Administração pública, defesa e seguridade social" }
+    ]
+  },
+  {
+    "code": "P",
+    "title": "Educação",
+    "searchHint": "Escolas, faculdades, cursos livres, EAD e treinamento corporativo.",
+    "divisions": [
+      { "code": "85", "label": "Educação" }
+    ]
+  },
+  {
+    "code": "Q",
+    "title": "Saúde humana e serviços sociais",
+    "searchHint": "Clínicas, hospitais, laboratórios, consultórios e serviços de assistência social.",
+    "divisions": [
+      { "code": "86", "label": "Atividades de atenção à saúde humana" },
+      { "code": "87", "label": "Atividades de atenção à saúde humana integradas com assistência social" },
+      { "code": "88", "label": "Serviços de assistência social sem alojamento" }
+    ]
+  },
+  {
+    "code": "R",
+    "title": "Artes, cultura, esporte e recreação",
+    "searchHint": "Eventos, academias, parques, produção artística e entretenimento.",
+    "divisions": [
+      { "code": "90", "label": "Atividades artísticas, criativas e espetáculos" },
+      { "code": "91", "label": "Atividades ligadas ao patrimônio cultural e ambiental" },
+      { "code": "92", "label": "Atividades de exploração de jogos de azar e apostas" },
+      { "code": "93", "label": "Atividades esportivas e de recreação e lazer" }
+    ]
+  },
+  {
+    "code": "S",
+    "title": "Outras atividades de serviços",
+    "searchHint": "Reparos, associações, serviços pessoais, lavanderias e manutenção doméstica.",
+    "divisions": [
+      { "code": "94", "label": "Atividades de organizações associativas" },
+      { "code": "95", "label": "Reparação e manutenção de equipamentos de informática e objetos pessoais" },
+      { "code": "96", "label": "Outras atividades de serviços pessoais" }
+    ]
+  },
+  {
+    "code": "T",
+    "title": "Serviços domésticos",
+    "searchHint": "Empregadores domésticos (segmento muito restrito para prospecção B2B).",
+    "divisions": [
+      { "code": "97", "label": "Serviços domésticos" }
+    ]
+  },
+  {
+    "code": "U",
+    "title": "Organismos internacionais e outras instituições extraterritoriais",
+    "searchHint": "Organismos internacionais (nicho específico, baixo volume de empresas).",
+    "divisions": [
+      { "code": "99", "label": "Organismos internacionais e outras instituições extraterritoriais" }
+    ]
+  }
+]

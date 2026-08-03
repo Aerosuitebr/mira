@@ -1,0 +1,15 @@
+# Proxy local para expor o MIRA via Cloudflare Tunnel (porta única 8083).
+# Uso: docker compose -f docker-compose.tunnel.yml up -d
+# Tunnel: search.aerosuite.app -> http://127.0.0.1:8083
+
+services:
+  mira-tunnel-proxy:
+    image: nginx:1.27-alpine
+    container_name: mira-tunnel-proxy
+    ports:
+      - "8083:80"
+    volumes:
+      - ./scripts/deploy/nginx-mira.conf:/etc/nginx/conf.d/default.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

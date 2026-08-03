@@ -1,0 +1,63 @@
+.pp-brand-mark {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  text-decoration: none;
+  color: inherit;
+  transition: opacity var(--pp-transition), transform var(--pp-transition);
+
+  img {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 8px 24px rgba(99, 102, 241, 0.18));
+  }
+
+  &:is(a):hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+  }
+}
+
+.pp-brand-mark__tagline {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pp-text-hint);
+  line-height: 1.2;
+}
+
+.pp-brand-mark--sidebar {
+  width: 100%;
+
+  img {
+    width: 100%;
+    height: auto;
+    max-height: 102px;
+    max-width: 100%;
+  }
+}
+
+.pp-brand-mark--hero img {
+  height: 132px;
+  max-width: 570px;
+}
+
+.pp-brand-mark--panel {
+  align-items: center;
+  width: 100%;
+
+  img {
+    height: 90px;
+    max-width: 396px;
+    filter: none;
+  }
+}
+
+.pp-brand-mark--compact img {
+  height: 84px;
+  max-width: 360px;
+}

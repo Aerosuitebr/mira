@@ -1,0 +1,603 @@
+<section class="pp-page prospecting-page" [class.prospecting-page--has-sticky]="mode === 'pj' && selectedCompanyIds.size > 0">
+  <header class="pp-page-header prospecting-hero">
+    <div>
+      <span class="pp-eyebrow">Mesa de prospecção</span>
+      <h1 class="pp-title">Central de crescimento</h1>
+      <p class="pp-subtitle">
+        @if (isAerosuiteMode) {
+          Fluxo guiado: defina o segmento, qualifique a lista e dispare a régua automática Aero Suite.
+        } @else {
+          Encontre empresas, capture pessoas físicas e avance etapa a etapa sem perder o ritmo comercial.
+        }
+      </p>
+    </div>
+
+    <div class="mode-switch" aria-label="Escolha o tipo de prospecção">
+      <button type="button" [class.active]="mode === 'pj'" (click)="setMode('pj')">Pessoa jurídica</button>
+      <button type="button" [class.active]="mode === 'pf'" (click)="setMode('pf')">Pessoa física</button>
+    </div>
+  </header>
+
+  @if (statusMessage) {
+    <div class="pp-banner pp-banner--success" role="status" aria-live="polite" [class.pp-banner--pf]="mode === 'pf'">{{ statusMessage }}</div>
+  }
+  @if (errorMessage) {
+    <div class="pp-banner prospecting-error" role="alert">{{ errorMessage }}</div>
+  }
+
+  @if (mode === 'pj') {
+    <nav class="step-tabs" aria-label="Etapas da prospecção">
+      <button type="button" class="step-tab" [class.step-tab--active]="activeStep === 1" [attr.aria-current]="activeStep === 1 ? 'step' : null" (click)="goToStep(1)">
+        <span class="step-num">1</span>
+        <span class="step-copy">
+          <strong>Segmento</strong>
+          <small>Filtre o radar</small>
+        </span>
+      </button>
+      <button type="button" class="step-tab" [class.step-tab--active]="activeStep === 2" [attr.aria-current]="activeStep === 2 ? 'step' : null" (click)="goToStep(2)">
+        <span class="step-num">2</span>
+        <span class="step-copy">
+          <strong>Lista</strong>
+          <small>Qualifique os leads</small>
+        </span>
+      </button>
+      <button type="button" class="step-tab" [class.step-tab--active]="activeStep === 3" [attr.aria-current]="activeStep === 3 ? 'step' : null" (click)="goToStep(3)">
+        <span class="step-num">3</span>
+        <span class="step-copy">
+          <strong>Automação</strong>
+          <small>WhatsApp + e-mail</small>
+        </span>
+      </button>
+    </nav>
+
+    <div class="prospecting-layout" [class.prospecting-layout--single]="activeStep !== 3">
+      <main class="prospecting-main">
+        @if (activeStep === 1) {
+          <section class="pp-glass command-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="pp-eyebrow">Etapa 1 · Segmento</span>
+                <h2>Defina o radar</h2>
+              </div>
+              <a routerLink="/discover" class="pp-btn pp-btn--ghost">Abrir mapa</a>
+            </div>
+
+            <div class="preset-row" role="radiogroup" aria-label="Segmento do radar">
+              @for (preset of presets; track preset.id) {
+                <button
+                  type="button"
+                  class="preset-card"
+                  role="radio"
+                  [attr.aria-checked]="isPresetActive(preset.id)"
+                  [class.preset-card--active]="isPresetActive(preset.id)"
+                  (click)="applyPreset(preset)"
+                >
+                  <strong>{{ preset.title }}</strong>
+                  <span>{{ preset.subtitle }}</span>
+                  <small>{{ preset.pitch }}</small>
+                </button>
+              }
+            </div>
+
+            <form class="prospect-form" (ngSubmit)="searchCompanies({ advanceToList: true })">
+              <div class="keyword-filter">
+                <label class="pp-field">
+                  <span>Palavra-chave</span>
+                  <input class="pp-input" name="keyword" [(ngModel)]="filters.keyword" placeholder="Nome, CNPJ, nicho ou dor" />
+                </label>
+                @if (filters.cnae) {
+                  <div class="cnae-badge"><span>CNAE ativo:</span> <strong>{{ filters.cnae }}</strong></div>
+                }
+              </div>
+              <label class="pp-field">
+                <span>UF</span>
+                <input class="pp-input" name="state" [(ngModel)]="filters.state" placeholder="RJ, SP..." />
+              </label>
+              <label class="pp-field">
+                <span>Cidade</span>
+                <input class="pp-input" name="city" [(ngModel)]="filters.city" placeholder="Cidade foco" />
+              </label>
+              <label class="pp-field">
+                <span>Porte</span>
+                <select class="pp-select" name="revenue" [(ngModel)]="filters.revenue">
+                  <option value="">Todos</option>
+                  <option value="SMALL">Pequeno</option>
+                  <option value="MEDIUM">Médio</option>
+                  <option value="LARGE">Grande</option>
+                </select>
+              </label>
+              <button type="submit" class="pp-btn pp-btn--primary search-submit" [disabled]="loadingCompanies">
+                @if (loadingCompanies) { Buscando... } @else { Buscar e ir para a lista }
+              </button>
+            </form>
+          </section>
+        }
+
+        @if (activeStep === 2) {
+          <section class="company-results">
+            <div class="results-toolbar">
+              <div>
+                <strong>{{ displayedCompanies.length | number }}</strong>
+                <span>empresas no radar</span>
+                @if (isAerosuiteMode && companies.length > 0) {
+                  <small class="icp-hint">{{ companies.length }} carregadas · {{ icpMatchCount }} no ICP</small>
+                }
+              </div>
+              <div class="results-toolbar-actions">
+                <button type="button" class="pp-btn pp-btn--ghost" (click)="goToStep(1)">Ajustar filtros</button>
+                <button type="button" class="pp-btn pp-btn--secondary" (click)="goToStep(3)">Ir para automação</button>
+              </div>
+            </div>
+
+            @if (loadingCompanies) {
+              <div class="pp-glass pp-empty">
+                <span class="pp-loading-dots"><span></span><span></span><span></span></span>
+              </div>
+            } @else if (companies.length === 0) {
+              <div class="pp-glass pp-empty">
+                <strong>Nenhuma empresa encontrada</strong>
+                <span>Volte ao segmento e ajuste cidade, UF ou porte.</span>
+                <button type="button" class="pp-btn pp-btn--primary" (click)="goToStep(1)">Definir segmento</button>
+              </div>
+            } @else if (displayedCompanies.length === 0) {
+              <div class="pp-glass pp-empty">
+                <strong>Nenhuma empresa neste recorte</strong>
+                <span>Amplie a busca ou ajuste os filtros de segmento.</span>
+                <button type="button" class="pp-btn pp-btn--secondary" (click)="selectMetric('sources')">
+                  Mostrar todas as empresas carregadas
+                </button>
+              </div>
+            } @else {
+              <div class="company-table" role="list">
+                @for (company of displayedCompanies; track company.id) {
+                  @let fit = aerosuiteFitFor(company);
+                  @let expanded = isCompanyExpanded(company.id);
+                  <article
+                    class="company-row"
+                    role="listitem"
+                    [class.company-row--selected]="selectedCompanyIds.has(company.id)"
+                    [class.company-row--expanded]="expanded"
+                  >
+                    <div class="company-row-main">
+                      <label class="row-check">
+                        <input
+                          type="checkbox"
+                          [checked]="selectedCompanyIds.has(company.id)"
+                          [attr.aria-label]="'Selecionar ' + (company.tradeName || company.legalName)"
+                          (change)="toggleCompany(company.id)"
+                        />
+                        <span class="score-chip">{{ scoreCompany(company) }}</span>
+                      </label>
+
+                      <button type="button" class="row-identity" (click)="toggleCompanyExpand(company.id)">
+                        <strong>{{ company.tradeName || company.legalName }}</strong>
+                        <small>{{ company.city }}/{{ company.state }} · {{ revenueLabel(company.estimatedRevenue) }}</small>
+                      </button>
+
+                      <div class="row-meta">
+                        <span class="row-cnae">{{ company.cnaeDescription || 'Atividade não informada' }}</span>
+                        @if (isAerosuiteMode && fit.icpMatch) {
+                          <span class="row-plan">{{ fit.plan.shortLabel }}</span>
+                        }
+                      </div>
+
+                      <div class="row-actions">
+                        <button type="button" class="mini-action" (click)="toggleCompanyExpand(company.id)">
+                          {{ expanded ? 'Recolher' : 'Detalhes' }}
+                        </button>
+                        <button type="button" class="mini-action mini-action--hot" (click)="fillMeetingFromCompany(company)">
+                          @if (isAerosuiteMode) { Agendar apresentação } @else { Agendar conversa }
+                        </button>
+                      </div>
+                    </div>
+
+                    @if (expanded) {
+                      <div class="company-row-details">
+                        @if (isAerosuiteMode) {
+                          <div class="aerosuite-fit-banner" [class.aerosuite-fit-banner--recommended]="fit.plan.recommended">
+                            <div>
+                              <span class="fit-segment">{{ segmentLabel(fit.icpSegment) }}</span>
+                              <strong>{{ fit.plan.shortLabel }}</strong>
+                              @if (fit.plan.recommended) {
+                                <em class="fit-badge">Recomendado</em>
+                              }
+                            </div>
+                            <div class="fit-pricing">
+                              <span>{{ fit.plan.monthlyPrice | currency:'BRL':'symbol':'1.0-0' }}/mês</span>
+                              <small>setup promo {{ fit.plan.setupPrice | currency:'BRL':'symbol':'1.0-0' }}</small>
+                            </div>
+                          </div>
+                          <div class="fit-tags">
+                            @for (module of fit.modules; track module) {
+                              <span class="fit-tag">{{ module }}</span>
+                            }
+                          </div>
+                          <p class="fit-pitch">{{ fit.pitchLine }}</p>
+                        }
+                        <dl class="row-dl">
+                          <div>
+                            <dt>CNPJ</dt>
+                            <dd>{{ company.cnpj }}</dd>
+                          </div>
+                          @if (isAerosuiteMode) {
+                            <div>
+                              <dt>Mês 1 (promo)</dt>
+                              <dd>{{ fit.plan.month1Price | currency:'BRL':'symbol':'1.0-0' }}</dd>
+                            </div>
+                          } @else {
+                            <div>
+                              <dt>Ticket sugerido</dt>
+                              <dd>{{ estimateTicket(company) | currency:'BRL':'symbol':'1.0-0' }}</dd>
+                            </div>
+                          }
+                          @if (company.email) {
+                            <div>
+                              <dt>E-mail</dt>
+                              <dd>{{ company.email }}</dd>
+                            </div>
+                          }
+                          @if (company.phone) {
+                            <div>
+                              <dt>Telefone</dt>
+                              <dd>{{ company.phone }}</dd>
+                            </div>
+                          }
+                        </dl>
+                      </div>
+                    }
+                  </article>
+                }
+              </div>
+            }
+          </section>
+        }
+
+        @if (activeStep === 3) {
+          <section class="pp-glass command-panel auto-step-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="pp-eyebrow">Etapa 3 · Automação</span>
+                <h2>Régua WhatsApp + e-mail</h2>
+                <p class="panel-lead">
+                  Usa o segmento da etapa 1, enriquece contatos, valida WhatsApp e envia com identidade Aero Suite.
+                </p>
+              </div>
+              <button type="button" class="pp-btn pp-btn--ghost" (click)="goToStep(2)">Ver lista</button>
+            </div>
+
+            <div class="auto-prospect-panel auto-prospect-panel--standalone">
+              <div class="auto-prospect-head">
+                <div>
+                  <h3>Disparo automático</h3>
+                  <p>
+                    Limite anti-ban ativo. Sem WhatsApp válido, cai no e-mail premium do site.
+                  </p>
+                </div>
+                <label class="test-toggle" title="Se marcado, e-mails são redirecionados e WhatsApp em massa fica omitido">
+                  <input type="checkbox" [(ngModel)]="autoProspect.testMode" name="autoTestMode" />
+                  Modo seguro
+                </label>
+              </div>
+              <div class="auto-prospect-actions">
+                <label class="pp-field">
+                  <span>Limite de empresas</span>
+                  <input class="pp-input" type="number" min="1" max="50" [(ngModel)]="autoProspect.limit" name="autoLimit" />
+                </label>
+                <button
+                  type="button"
+                  class="pp-btn pp-btn--primary"
+                  [disabled]="startingAutoProspect"
+                  (click)="startAutoProspect()"
+                >
+                  @if (startingAutoProspect) { Iniciando... } @else { Iniciar prospecção automática }
+                </button>
+              </div>
+
+              @if (activeJob) {
+                <div class="job-progress">
+                  <div class="job-progress-top">
+                    <strong>{{ activeJob.name }}</strong>
+                    <span class="job-status">{{ activeJob.status }}</span>
+                  </div>
+                  <div class="job-metrics">
+                    <span>Encontradas {{ activeJob.foundCount }}</span>
+                    <span>Fila {{ activeJob.queuedCount }}</span>
+                    <span>WA {{ activeJob.waSent }}</span>
+                    <span>E-mail {{ activeJob.emailSent }}</span>
+                    <span>Falhas {{ activeJob.failedCount }}</span>
+                  </div>
+                  @if (activeJob.errorDetail) {
+                    <small class="job-error">{{ activeJob.errorDetail }}</small>
+                  }
+                  <div class="job-actions">
+                    @if (activeJob.status === 'RUNNING' || activeJob.status === 'QUEUED') {
+                      <button type="button" class="pp-btn pp-btn--secondary" (click)="pauseJob()">Pausar</button>
+                    }
+                    @if (activeJob.status === 'PAUSED') {
+                      <button type="button" class="pp-btn pp-btn--primary" (click)="resumeJob()">Retomar</button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          </section>
+        }
+      </main>
+
+      @if (activeStep === 3) {
+        <aside class="prospecting-side">
+          <article class="pp-glass score-panel">
+            <span class="pp-eyebrow">Fila quente</span>
+            <h2>{{ selectedCompanyIds.size }} oportunidades</h2>
+            @if (isAerosuiteMode) {
+              <p>
+                MRR estimado: <strong>{{ pipelineMrr | currency:'BRL':'symbol':'1.0-0' }}</strong>
+                · Setup: <strong>{{ pipelineSetup | currency:'BRL':'symbol':'1.0-0' }}</strong>
+              </p>
+            } @else {
+              <p>Valor estimado da seleção: <strong>{{ pipelineValue | currency:'BRL':'symbol':'1.0-0' }}</strong></p>
+            }
+            <div class="selected-list">
+              @for (company of selectedCompanies; track company.id) {
+                <span>{{ company.tradeName || company.legalName }}</span>
+              } @empty {
+                <small>Selecione empresas na etapa 2 para montar a próxima leva.</small>
+              }
+            </div>
+          </article>
+
+          <article class="pp-glass meeting-panel">
+            <span class="pp-eyebrow">Agenda rápida</span>
+            <h2>Marcar conversa</h2>
+            <form class="meeting-form" (ngSubmit)="scheduleMeeting()">
+              <input class="pp-input" name="meetingName" [(ngModel)]="quickMeeting.clientName" placeholder="Nome do contato" />
+              <input class="pp-input" name="meetingCompany" [(ngModel)]="quickMeeting.clientCompany" placeholder="Empresa ou origem" />
+              <input class="pp-input" name="meetingPhone" [(ngModel)]="quickMeeting.clientPhone" placeholder="WhatsApp" />
+              <input class="pp-input" name="meetingTitle" [(ngModel)]="quickMeeting.title" placeholder="Título da reunião" />
+              <div class="meeting-schedule-picker">
+                <label>
+                  <span>Data</span>
+                  <input class="pp-input" type="date" name="meetingDate" [(ngModel)]="meetingDate" />
+                </label>
+                <label>
+                  <span>Horário</span>
+                  <input class="pp-input" type="time" name="meetingTime" [(ngModel)]="meetingTime" step="900" />
+                </label>
+              </div>
+              <label class="toggle-row">
+                <input type="checkbox" name="meetingVideo" [(ngModel)]="quickMeeting.videoConference" />
+                <span>Videoconferência</span>
+              </label>
+              <button type="submit" class="pp-btn pp-btn--primary" [disabled]="scheduling">
+                @if (scheduling) { Agendando... } @else { Criar reunião }
+              </button>
+            </form>
+          </article>
+
+          <article class="pp-glass playbook-panel">
+            <span class="pp-eyebrow">Playbook</span>
+            @for (step of activePlaybook; track step.title) {
+              <div class="playbook-step">
+                <span>{{ step.channel }}</span>
+                <strong>{{ step.title }}</strong>
+                <p>{{ step.body }}</p>
+              </div>
+            }
+          </article>
+
+          <article class="pp-glass agenda-panel">
+            <span class="pp-eyebrow">Próximas reuniões</span>
+            @for (meeting of upcomingMeetings; track meeting.id) {
+              <div class="agenda-item">
+                <strong>{{ meeting.title }}</strong>
+                <span>{{ meeting.clientName }}</span>
+                <small>{{ meeting.startsAt | date:'dd/MM HH:mm' }}</small>
+              </div>
+            } @empty {
+              <p>Nenhuma reunião futura. Crie uma conversa para aquecer a carteira.</p>
+            }
+          </article>
+        </aside>
+      }
+    </div>
+  } @else {
+    <nav class="pf-navigation" aria-label="Navegação da prospecção">
+      <button type="button" class="pp-btn pp-btn--ghost pf-back-button" (click)="returnToCompanyList()">
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M16.25 10H3.75m5-5-5 5 5 5" />
+        </svg>
+        <span>Voltar para a lista</span>
+      </button>
+      <button type="button" class="pp-btn pp-btn--ghost" (click)="returnToSegment()">Ajustar segmento</button>
+    </nav>
+
+    <div class="prospecting-layout">
+      <main class="prospecting-main">
+        <section class="pf-grid">
+          <article class="pp-glass command-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="pp-eyebrow">Radar PF</span>
+                <h2>Capture contatos e indicações</h2>
+                <p class="panel-lead">Cadastre uma pessoa na carteira para acompanhar o relacionamento e reutilizar seus dados em futuras abordagens.</p>
+              </div>
+            </div>
+
+            <form class="person-form" (ngSubmit)="savePerson()">
+              <label class="pp-field span-2">
+                <span>Nome</span>
+                <input class="pp-input" name="personName" [(ngModel)]="personForm.name" placeholder="Nome do contato" />
+              </label>
+              <label class="pp-field">
+                <span>CPF/CNPJ</span>
+                <input class="pp-input" name="personDocument" [(ngModel)]="personForm.document" placeholder="Documento" />
+              </label>
+              <label class="pp-field">
+                <span>Telefone</span>
+                <input class="pp-input" name="personPhone" [(ngModel)]="personForm.phone" placeholder="WhatsApp" />
+              </label>
+              <label class="pp-field">
+                <span>E-mail</span>
+                <input class="pp-input" name="personEmail" [(ngModel)]="personForm.email" placeholder="email@dominio.com" />
+              </label>
+              <label class="pp-field">
+                <span>Empresa ou ocupação</span>
+                <input class="pp-input" name="personCompany" [(ngModel)]="personForm.company" placeholder="Profissão, empresa ou origem" />
+              </label>
+              <label class="pp-field">
+                <span>Cidade</span>
+                <input class="pp-input" name="personCity" [(ngModel)]="personForm.city" placeholder="Cidade" />
+              </label>
+              <label class="pp-field">
+                <span>UF</span>
+                <input class="pp-input" name="personState" [(ngModel)]="personForm.state" placeholder="UF" maxlength="2" />
+              </label>
+              <label class="pp-field span-2">
+                <span>Valor potencial</span>
+                <input class="pp-input" type="number" name="personValue" [(ngModel)]="personForm.initialValue" placeholder="Ex.: 2500" />
+              </label>
+              <button type="submit" class="pp-btn pp-btn--primary span-2" [disabled]="savingPerson">
+                @if (savingPerson) { Salvando... } @else { Salvar contato na carteira }
+              </button>
+            </form>
+          </article>
+
+          <article class="pp-glass referral-panel">
+            <span class="pp-eyebrow">Loop viral</span>
+            <h2>Mensagem de indicação</h2>
+            <p>Use uma mensagem curta para transformar clientes satisfeitos em novas conversas.</p>
+            <textarea class="pp-textarea" readonly [value]="referralText()"></textarea>
+          </article>
+        </section>
+      </main>
+
+      <aside class="prospecting-side">
+        <article class="pp-glass meeting-panel">
+          <span class="pp-eyebrow">Agenda rápida</span>
+          <h2>Marcar conversa</h2>
+          <form class="meeting-form" (ngSubmit)="scheduleMeeting()">
+            <input class="pp-input" name="meetingNamePf" [(ngModel)]="quickMeeting.clientName" placeholder="Nome do contato" />
+            <input class="pp-input" name="meetingCompanyPf" [(ngModel)]="quickMeeting.clientCompany" placeholder="Empresa ou origem" />
+            <input class="pp-input" name="meetingPhonePf" [(ngModel)]="quickMeeting.clientPhone" placeholder="WhatsApp" />
+            <input class="pp-input" name="meetingTitlePf" [(ngModel)]="quickMeeting.title" placeholder="Título da reunião" />
+            <div class="meeting-schedule-picker">
+              <label>
+                <span>Data</span>
+                <input class="pp-input" type="date" name="meetingDatePf" [(ngModel)]="meetingDate" />
+              </label>
+              <label>
+                <span>Horário</span>
+                <input class="pp-input" type="time" name="meetingTimePf" [(ngModel)]="meetingTime" step="900" />
+              </label>
+            </div>
+            <label class="toggle-row">
+              <input type="checkbox" name="meetingVideoPf" [(ngModel)]="quickMeeting.videoConference" />
+              <span>Videoconferência</span>
+            </label>
+            <button type="submit" class="pp-btn pp-btn--primary" [disabled]="scheduling">
+              @if (scheduling) { Agendando... } @else { Criar reunião }
+            </button>
+            @if (lastCreatedAppointment) {
+              <div class="meeting-confirmation" role="status">
+                <strong>✓ Reunião marcada</strong>
+                <span>{{ lastCreatedAppointment.startsAt | date:'dd/MM/yyyy · HH:mm' }}</span>
+                <small>{{ lastCreatedAppointment.clientName }} · {{ lastCreatedAppointment.title }}</small>
+                @if (lastCreatedAppointment.meetingUrl) {
+                  <a [href]="lastCreatedAppointment.meetingUrl" target="_blank" rel="noopener">Abrir videoconferência</a>
+                }
+              </div>
+            }
+          </form>
+        </article>
+
+        <article class="pp-glass playbook-panel">
+          <span class="pp-eyebrow">Playbook</span>
+          @for (step of activePlaybook; track step.title) {
+            <div class="playbook-step">
+              <span>{{ step.channel }}</span>
+              <strong>{{ step.title }}</strong>
+              <p>{{ step.body }}</p>
+            </div>
+          }
+        </article>
+      </aside>
+    </div>
+  }
+
+  @if (mode === 'pj' && selectedCompanyIds.size > 0) {
+    <div class="sticky-batch-bar" role="region" aria-label="Ações em lote">
+      <div class="sticky-batch-bar__count">
+        <strong>{{ selectedCompanyIds.size }}</strong>
+        <span>selecionada(s)</span>
+      </div>
+      <div class="sticky-batch-bar__actions">
+        <button type="button" class="pp-btn pp-btn--ghost" (click)="clearSelection()">
+          Limpar
+        </button>
+        <button type="button" class="pp-btn pp-btn--secondary" (click)="sendSelectionToEnrichment()">Enriquecer</button>
+        <button type="button" class="pp-btn pp-btn--primary" (click)="sendSelectionToOutreach()">Abordar</button>
+      </div>
+    </div>
+  }
+
+  @if (mode === 'pj' && meetingDraftOpen) {
+    <div class="meeting-dialog-backdrop" (click)="closeMeetingDraft()">
+      <section class="pp-glass meeting-dialog" role="dialog" aria-modal="true" aria-labelledby="meeting-dialog-title" (click)="$event.stopPropagation()">
+        <header class="meeting-dialog__header">
+          <div>
+            <span class="pp-eyebrow">Pessoa jurídica · apresentação comercial</span>
+            <h2 id="meeting-dialog-title">Agendar apresentação</h2>
+            <p>Revise os dados da empresa, escolha data e horário e confirme.</p>
+          </div>
+          <button type="button" class="meeting-dialog__close" aria-label="Fechar" autofocus (click)="closeMeetingDraft()">×</button>
+        </header>
+
+        <form class="meeting-form meeting-dialog__form" (ngSubmit)="scheduleMeeting()">
+          <label class="pp-field">
+            <span>Empresa</span>
+            <input class="pp-input" name="dialogMeetingCompany" [(ngModel)]="quickMeeting.clientCompany" />
+          </label>
+          <label class="pp-field">
+            <span>Contato ou responsável</span>
+            <input class="pp-input" name="dialogMeetingName" [(ngModel)]="quickMeeting.clientName" />
+          </label>
+          <label class="pp-field">
+            <span>Telefone</span>
+            <input class="pp-input" name="dialogMeetingPhone" [(ngModel)]="quickMeeting.clientPhone" placeholder="WhatsApp" />
+          </label>
+          <label class="pp-field">
+            <span>Título</span>
+            <input class="pp-input" name="dialogMeetingTitle" [(ngModel)]="quickMeeting.title" />
+          </label>
+          <div class="meeting-schedule-picker">
+            <label>
+              <span>Data</span>
+              <input class="pp-input" type="date" name="dialogMeetingDate" [(ngModel)]="meetingDate" />
+            </label>
+            <label>
+              <span>Horário</span>
+              <input class="pp-input" type="time" name="dialogMeetingTime" [(ngModel)]="meetingTime" step="900" />
+            </label>
+          </div>
+          <label class="toggle-row">
+            <input type="checkbox" name="dialogMeetingVideo" [(ngModel)]="quickMeeting.videoConference" />
+            <span>Criar videoconferência</span>
+          </label>
+          <button type="submit" class="pp-btn pp-btn--primary" [disabled]="scheduling">
+            @if (scheduling) { Agendando... } @else { Confirmar apresentação }
+          </button>
+          @if (lastCreatedAppointment) {
+            <div class="meeting-confirmation" role="status">
+              <strong>✓ Apresentação marcada</strong>
+              <span>{{ lastCreatedAppointment.startsAt | date:'dd/MM/yyyy · HH:mm' }}</span>
+              <small>{{ lastCreatedAppointment.clientName }} · {{ lastCreatedAppointment.title }}</small>
+              @if (lastCreatedAppointment.meetingUrl) {
+                <a [href]="lastCreatedAppointment.meetingUrl" target="_blank" rel="noopener">Abrir videoconferência</a>
+              }
+            </div>
+          }
+        </form>
+      </section>
+    </div>
+  }
+</section>
