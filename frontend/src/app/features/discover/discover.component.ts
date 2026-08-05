@@ -1,11 +1,10 @@
-import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, HostListener, NgZone, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Subscription } from 'rxjs';
-import * as L from 'leaflet';
-import 'leaflet.markercluster';
+import { Subscription, forkJoin, timeout } from 'rxjs';
+import { L } from '../../core/leaflet';
 import { ApiService, Company } from '../../core/api.service';
 import {
   DISCOVER_IMPORTED_STATES,
@@ -28,6 +27,8 @@ const MAP_STYLE_OPTIONS: { id: MapStyleId; label: string; hint: string }[] = [
 ];
 
 const DEFAULT_STATE = '';
+/** Máximo de empresas mantidas em memória para filtro/paginação local. */
+const RESULT_CACHE_MAX = 500;
 
 const STATE_VIEWS: Record<string, { center: L.LatLngTuple; zoom: number; bounds: L.LatLngBoundsExpression }> = {
   BR: {
@@ -108,7 +109,7 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private map?: L.Map;
   private baseLayerGroup = L.layerGroup();
-  private markers!: L.MarkerClusterGroup;
+  private markers!: ReturnType<typeof L.markerClusterGroup>;
   private markerByCompanyId = new Map<string, L.Marker>();
   private markerCoordsByCompanyId = new Map<string, L.LatLngTuple>();
   private pendingSessionRefetch = false;
@@ -120,12 +121,17 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
   activeMapStyle: MapStyleId = this.readStoredMapStyle();
 
   companies: Company[] = [];
+  /** Resultado completo da busca em memória (todas as páginas, até RESULT_CACHE_MAX). */
+  allCompanies: Company[] = [];
+  resultCacheComplete = false;
   resultFilter = '';
   selected = new Set<string>();
   loading = false;
   searchError = '';
   hasSearched = false;
   totalElements = 0;
+  pageIndex = 0;
+  readonly pageSize = 40;
   filtersCollapsed = false;
   hoveredCompanyId: string | null = null;
 
@@ -135,27 +141,39 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
   streetViewExternalUrl = '';
   streetViewApproximate = false;
   refiningLocations = false;
+  listPaintActive = false;
+  private listPaintLastId: string | null = null;
   private searchSubscription?: Subscription;
+  private prefetchSubscription?: Subscription;
   private refineSubscription?: Subscription;
 
+  get filteredCompanies(): Company[] {
+    const query = this.resultFilter.trim().toLowerCase();
+    if (!query) {
+      return this.allCompanies;
+    }
+    const digits = query.replace(/\D/g, '');
+    return this.allCompanies.filter((company) => this.matchesResultFilter(company, query, digits));
+  }
+
   get mappedCompaniesCount(): number {
-    return this.visibleCompanies.filter((company) => this.hasMapCoordinates(company)).length;
+    return this.mapCompanies.filter((company) => this.hasMapCoordinates(company)).length;
   }
 
   get selectedOnMapCount(): number {
-    return this.visibleCompanies.filter(
+    return this.mapCompanies.filter(
       (company) => this.selected.has(company.id) && this.hasMapCoordinates(company)
     ).length;
   }
 
-  get visibleCompanies(): Company[] {
-    const query = this.resultFilter.trim().toLowerCase();
-    if (!query) {
-      return this.companies;
-    }
+  /** Empresas desenhadas no mapa: filtro ativo = todas as batidas; senão = página atual. */
+  get mapCompanies(): Company[] {
+    return this.hasResultFilter ? this.filteredCompanies : this.visibleCompanies;
+  }
 
-    const digits = query.replace(/\D/g, '');
-    return this.companies.filter((company) => this.matchesResultFilter(company, query, digits));
+  get visibleCompanies(): Company[] {
+    const start = this.pageIndex * this.pageSize;
+    return this.filteredCompanies.slice(start, start + this.pageSize);
   }
 
   get hasResultFilter(): boolean {
@@ -164,6 +182,24 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get selectedCountLabel(): string {
     return this.selected.size === 1 ? '1 empresa selecionada' : `${this.selected.size} empresas selecionadas`;
+  }
+
+  get allPageSelected(): boolean {
+    const page = this.visibleCompanies;
+    return page.length > 0 && page.every((company) => this.selected.has(company.id));
+  }
+
+  get somePageSelected(): boolean {
+    const page = this.visibleCompanies;
+    return page.some((company) => this.selected.has(company.id));
+  }
+
+  get selectPageLabel(): string {
+    const count = this.visibleCompanies.length;
+    if (this.allPageSelected) {
+      return count === 1 ? 'Desmarcar esta página' : `Desmarcar as ${count} desta página`;
+    }
+    return count === 1 ? 'Selecionar esta página' : `Selecionar as ${count} desta página`;
   }
 
   get selectedOnMapLabel(): string | null {
@@ -177,10 +213,45 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get totalElementsLabel(): string {
     const state = this.filters.getRawValue().state.trim();
-    if (!state && this.companies.length > 0 && this.companies.length >= 50) {
+    if (!state && this.allCompanies.length > 0 && this.allCompanies.length >= 50) {
       return `${this.totalElements.toLocaleString('pt-BR')}+`;
     }
     return this.totalElements.toLocaleString('pt-BR');
+  }
+
+  get totalPages(): number {
+    const count = this.filteredCompanies.length;
+    return count === 0 ? 0 : Math.ceil(count / this.pageSize);
+  }
+
+  get pageRangeLabel(): string {
+    const filtered = this.filteredCompanies.length;
+    if (filtered === 0 || this.visibleCompanies.length === 0) {
+      return '';
+    }
+    const from = this.pageIndex * this.pageSize + 1;
+    const to = this.pageIndex * this.pageSize + this.visibleCompanies.length;
+    if (this.hasResultFilter) {
+      return `${from}-${to} de ${filtered.toLocaleString('pt-BR')} filtradas`;
+    }
+    const span = Math.min(this.totalElements, Math.max(this.allCompanies.length, to));
+    return `${from}-${to} de ${span.toLocaleString('pt-BR')}`;
+  }
+
+  get canGoPrevPage(): boolean {
+    return this.pageIndex > 0 && !this.loading;
+  }
+
+  get canGoNextPage(): boolean {
+    if (this.loading || this.pageIndex + 1 >= this.totalPages) {
+      return false;
+    }
+    // Só avança se a próxima página já estiver em memória (prefetch quase imediato).
+    return this.filteredCompanies.length > (this.pageIndex + 1) * this.pageSize;
+  }
+
+  resultNumber(indexOnPage: number): number {
+    return this.pageIndex * this.pageSize + indexOnPage + 1;
   }
 
   get isNationalSearch(): boolean {
@@ -227,13 +298,18 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
   });
 
   ngOnInit(): void {
-    this.markers = L.markerClusterGroup({
-      showCoverageOnHover: false,
-      maxClusterRadius: 48,
-      spiderfyOnMaxZoom: true,
-      disableClusteringAtZoom: 16,
-      iconCreateFunction: (cluster) => this.createClusterIcon(cluster)
-    });
+    if (typeof L.markerClusterGroup !== 'function') {
+      console.error('leaflet.markercluster não carregou; usando layerGroup sem cluster');
+      this.markers = L.layerGroup() as unknown as ReturnType<typeof L.markerClusterGroup>;
+    } else {
+      this.markers = L.markerClusterGroup({
+        showCoverageOnHover: false,
+        maxClusterRadius: 48,
+        spiderfyOnMaxZoom: true,
+        disableClusteringAtZoom: 16,
+        iconCreateFunction: (cluster) => this.createClusterIcon(cluster)
+      });
+    }
     this.restoreSession();
   }
 
@@ -334,6 +410,7 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.endListPaint();
     this.abortActiveRequests();
     this.map?.remove();
     this.removeStreetViewKeyListener();
@@ -349,8 +426,10 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private abortActiveRequests(): void {
     this.searchSubscription?.unsubscribe();
+    this.prefetchSubscription?.unsubscribe();
     this.refineSubscription?.unsubscribe();
     this.searchSubscription = undefined;
+    this.prefetchSubscription = undefined;
     this.refineSubscription = undefined;
   }
 
@@ -374,6 +453,26 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   search(): void {
+    this.loadResults(0, true);
+  }
+
+  goToPrevPage(): void {
+    if (!this.canGoPrevPage) {
+      return;
+    }
+    this.pageIndex -= 1;
+    this.refreshPagedView(true);
+  }
+
+  goToNextPage(): void {
+    if (!this.canGoNextPage) {
+      return;
+    }
+    this.pageIndex += 1;
+    this.refreshPagedView(true);
+  }
+
+  private loadResults(_pageIndex: number, freshSearch: boolean): void {
     const filters = this.filters.getRawValue();
     const hasScope =
       filters.keyword.trim() !== '' ||
@@ -389,37 +488,171 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
     this.abortActiveRequests();
     this.loading = true;
     this.searchError = '';
-    this.resultFilter = '';
-    this.searchSubscription = this.api.searchCompanies({ ...filters, page: 0, size: 100 }).subscribe({
+    if (freshSearch) {
+      this.resultFilter = '';
+      this.selected.clear();
+    }
+    // Limpa lista imediatamente (evita “Cancelar busca” com resultado antigo).
+    this.companies = [];
+    this.allCompanies = [];
+    this.resultCacheComplete = false;
+    this.totalElements = 0;
+    this.pageIndex = 0;
+    this.renderMarkers([]);
+
+    this.searchSubscription = this.api
+      .searchCompanies({ ...filters, page: 0, size: this.pageSize })
+      .pipe(timeout({ first: 15_000 }))
+      .subscribe({
       next: (page) => {
-        this.companies = page.content;
         this.totalElements = page.totalElements;
-        this.selected = new Set(
-          [...this.selected].filter((id) => page.content.some((company) => company.id === id))
-        );
-        this.renderMarkers(page.content);
-        this.fitMapToResults(page.content, filters.state);
+        this.allCompanies = page.content;
+        this.resultCacheComplete =
+          page.content.length >= page.totalElements || page.totalElements <= this.pageSize;
         this.hasSearched = true;
         this.loading = false;
         this.filtersCollapsed = true;
         this.searchSubscription = undefined;
+        this.syncCompaniesFromCache();
         this.persistSession();
-        this.refineMapCoordinates(page.content);
-        queueMicrotask(() => this.map?.invalidateSize());
+        queueMicrotask(() => {
+          this.renderMarkers(this.mapCompanies);
+          this.fitMapToResults(this.mapCompanies, filters.state);
+          this.map?.invalidateSize();
+          this.refineMapCoordinates(this.visibleCompanies);
+          document.querySelector('.list-scroll')?.scrollTo({ top: 0 });
+        });
+        this.prefetchAllResults(filters, page.totalElements, page.content);
       },
-      error: (error: HttpErrorResponse) => {
-        if (this.isCancelledError(error)) {
+      error: (error: unknown) => {
+        if (error instanceof HttpErrorResponse && this.isCancelledError(error)) {
           return;
         }
         this.companies = [];
+        this.allCompanies = [];
+        this.resultCacheComplete = false;
         this.totalElements = 0;
-        this.renderMarkers([]);
-        this.fitMapToResults([], filters.state);
         this.hasSearched = true;
-        this.searchError = this.resolveSearchError(error);
+        if (error instanceof HttpErrorResponse) {
+          this.searchError = this.resolveSearchError(error);
+        } else if (error && typeof error === 'object' && 'name' in error && (error as { name?: string }).name === 'TimeoutError') {
+          this.searchError = 'A busca demorou demais. Tente de novo com UF + CNAE.';
+        } else {
+          this.searchError = 'Não foi possível concluir a busca. Tente novamente.';
+        }
         this.loading = false;
         this.searchSubscription = undefined;
+        queueMicrotask(() => {
+          this.renderMarkers([]);
+          this.fitMapToResults([], this.filters.getRawValue().state);
+        });
         this.persistSession();
+      }
+    });
+  }
+
+  /**
+   * Após a 1ª página (rápida), busca o restante em um único request em background.
+   * A UI já está liberada; o filtro passa a cobrir todas as páginas sem flicker.
+   */
+  private prefetchAllResults(
+    filters: ReturnType<typeof this.filters.getRawValue>,
+    totalElements: number,
+    firstPage: Company[]
+  ): void {
+    const targetSize = Math.min(totalElements, RESULT_CACHE_MAX);
+    if (targetSize <= firstPage.length) {
+      this.resultCacheComplete = true;
+      return;
+    }
+
+    this.prefetchSubscription = this.api
+      .searchCompanies({ ...filters, page: 0, size: targetSize })
+      .pipe(timeout({ first: 20_000 }))
+      .subscribe({
+        next: (page) => {
+          this.prefetchSubscription = undefined;
+          this.applyPrefetchedCompanies(page.content, page.totalElements, filters.state);
+        },
+        error: () => {
+          this.prefetchSubscription = undefined;
+          this.prefetchPagesInParallel(filters, totalElements, firstPage);
+        }
+      });
+  }
+
+  /** Fallback: páginas restantes em paralelo se o fetch único falhar. */
+  private prefetchPagesInParallel(
+    filters: ReturnType<typeof this.filters.getRawValue>,
+    totalElements: number,
+    firstPage: Company[]
+  ): void {
+    const capped = Math.min(totalElements, RESULT_CACHE_MAX);
+    const pagesNeeded = Math.ceil(capped / this.pageSize);
+    if (pagesNeeded <= 1) {
+      this.resultCacheComplete = true;
+      return;
+    }
+
+    const requests = [];
+    for (let page = 1; page < pagesNeeded; page += 1) {
+      requests.push(
+        this.api
+          .searchCompanies({ ...filters, page, size: this.pageSize })
+          .pipe(timeout({ first: 15_000 }))
+      );
+    }
+
+    this.prefetchSubscription = forkJoin(requests).subscribe({
+      next: (pages) => {
+        this.prefetchSubscription = undefined;
+        const merged = [...firstPage, ...pages.flatMap((p) => p.content)].slice(0, RESULT_CACHE_MAX);
+        this.applyPrefetchedCompanies(merged, totalElements, filters.state);
+      },
+      error: () => {
+        this.prefetchSubscription = undefined;
+        this.resultCacheComplete = false;
+      }
+    });
+  }
+
+  private applyPrefetchedCompanies(companies: Company[], totalElements: number, state: string): void {
+    this.allCompanies = companies;
+    this.totalElements = totalElements;
+    this.resultCacheComplete = companies.length >= Math.min(totalElements, RESULT_CACHE_MAX);
+
+    if (this.pageIndex >= this.totalPages && this.totalPages > 0) {
+      this.pageIndex = this.totalPages - 1;
+    }
+    this.syncCompaniesFromCache();
+    this.persistSession();
+
+    // Sem filtro e na 1ª página: lista/mapa já mostram o mesmo conteúdo (sem re-render).
+    if (this.hasResultFilter || this.pageIndex > 0) {
+      queueMicrotask(() => {
+        this.renderMarkers(this.mapCompanies);
+        this.fitMapToResults(this.mapCompanies, state);
+        if (this.pageIndex > 0) {
+          this.refineMapCoordinates(this.visibleCompanies);
+        }
+      });
+    }
+  }
+
+  private syncCompaniesFromCache(): void {
+    this.companies = this.visibleCompanies;
+  }
+
+  private refreshPagedView(scroll: boolean): void {
+    this.syncCompaniesFromCache();
+    this.persistSession();
+    queueMicrotask(() => {
+      this.renderMarkers(this.mapCompanies);
+      this.fitMapToResults(this.mapCompanies, this.filters.getRawValue().state);
+      this.map?.invalidateSize();
+      this.refineMapCoordinates(this.visibleCompanies);
+      if (scroll) {
+        document.querySelector('.list-scroll')?.scrollTo({ top: 0 });
       }
     });
   }
@@ -435,8 +668,11 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
       contactableOnly: false
     });
     this.companies = [];
+    this.allCompanies = [];
+    this.resultCacheComplete = false;
     this.resultFilter = '';
     this.totalElements = 0;
+    this.pageIndex = 0;
     this.selected.clear();
     this.hoveredCompanyId = null;
     this.filtersCollapsed = false;
@@ -491,11 +727,72 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  toggleSelectPage(): void {
+    const page = this.visibleCompanies;
+    if (page.length === 0) {
+      return;
+    }
+    const selectAll = !this.allPageSelected;
+    for (const company of page) {
+      if (selectAll) {
+        this.selected.add(company.id);
+      } else {
+        this.selected.delete(company.id);
+      }
+      this.syncMarkerAppearance(company.id);
+    }
+    this.refreshClusterIcons();
+    if (this.hasSearched) {
+      this.persistSession();
+    }
+  }
+
+  /** Clique esquerdo + arraste: entra numa empresa = alterna seleção; voltar = desmarca. */
+  onCompanyPointerDown(event: PointerEvent, companyId: string): void {
+    if (event.button !== 0) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('button, a, .card-action, .card-actions')) {
+      return;
+    }
+    event.preventDefault();
+    this.listPaintActive = true;
+    this.listPaintLastId = companyId;
+    this.toggleSelect(companyId);
+  }
+
+  onCompanyPointerEnter(companyId: string): void {
+    if (!this.listPaintActive || this.listPaintLastId === companyId) {
+      return;
+    }
+    this.listPaintLastId = companyId;
+    this.toggleSelect(companyId);
+  }
+
+  endListPaint(): void {
+    if (!this.listPaintActive) {
+      return;
+    }
+    this.listPaintActive = false;
+    this.listPaintLastId = null;
+  }
+
+  @HostListener('window:pointerup')
+  onWindowPointerUp(): void {
+    this.endListPaint();
+  }
+
+  @HostListener('window:pointercancel')
+  onWindowPointerCancel(): void {
+    this.endListPaint();
+  }
+
   storeSelection(): void {
     if (this.selected.size === 0) {
       return;
     }
-    const selectedCompanies = this.companies.filter((company) => this.selected.has(company.id));
+    const selectedCompanies = this.allCompanies.filter((company) => this.selected.has(company.id));
     sessionStorage.setItem('selected-companies', JSON.stringify([...this.selected]));
     sessionStorage.setItem('selected-companies-cache', JSON.stringify(selectedCompanies));
     this.persistSession();
@@ -504,7 +801,7 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
 
   sendToEnrich(companyId: string, event: Event): void {
     event.stopPropagation();
-    const company = this.companies.find((item) => item.id === companyId);
+    const company = this.allCompanies.find((item) => item.id === companyId);
     sessionStorage.setItem('selected-companies', JSON.stringify([companyId]));
     sessionStorage.setItem('selected-companies-cache', JSON.stringify(company ? [company] : []));
     this.persistSession();
@@ -564,37 +861,66 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private applyResultFilterView(): void {
-    const visible = this.visibleCompanies;
-    this.renderMarkers(visible);
-    this.fitMapToResults(visible, this.filters.getRawValue().state);
+    this.pageIndex = 0;
+    this.syncCompaniesFromCache();
+    this.renderMarkers(this.mapCompanies);
+    this.fitMapToResults(this.mapCompanies, this.filters.getRawValue().state);
+  }
+
+  private normalizeSearchText(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/\p{M}/gu, '')
+      .toLowerCase();
+  }
+
+  private compactSearchText(value: string): string {
+    return this.normalizeSearchText(value).replace(/[^a-z0-9]/g, '');
   }
 
   private matchesResultFilter(company: Company, query: string, digits: string): boolean {
-    const searchable = [
+    const normalizedQuery = this.normalizeSearchText(query);
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    const compactQuery = this.compactSearchText(query);
+    const queryChars = query.replace(/\s/g, '');
+    const digitRatio = digits.length / Math.max(queryChars.length, 1);
+    if (digits.length >= 3 && digitRatio >= 0.6) {
+      const cnpj = company.cnpj?.replace(/\D/g, '') ?? '';
+      return cnpj.includes(digits);
+    }
+
+    const fields = [
       company.tradeName,
       company.legalName,
       company.city,
       company.state,
       company.cnaeDescription,
-      company.cnaeMain
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase();
+      company.cnaeMain,
+      company.cnpj
+    ].filter((value): value is string => !!value && value.trim().length > 0);
 
-    if (searchable.includes(query)) {
-      return true;
-    }
-
-    if (digits.length >= 3) {
-      const cnpj = company.cnpj?.replace(/\D/g, '') ?? '';
-      return cnpj.includes(digits);
-    }
-
-    return false;
+    return fields.some((field) => {
+      const normalized = this.normalizeSearchText(field);
+      if (normalized.includes(normalizedQuery)) {
+        return true;
+      }
+      // "gec" deve achar "GE CELMA" (ignora espaço/pontuação)
+      if (compactQuery.length >= 2 && this.compactSearchText(field).includes(compactQuery)) {
+        return true;
+      }
+      return normalized
+        .split(/[^a-z0-9]+/)
+        .some((word) => word.startsWith(normalizedQuery));
+    });
   }
 
   private renderMarkers(companies: Company[]): void {
+    if (!this.markers) {
+      return;
+    }
     this.markers.clearLayers();
     this.markerByCompanyId.clear();
     this.markerCoordsByCompanyId.clear();
@@ -689,9 +1015,11 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private refineMapCoordinates(companies: Company[]): void {
+    // Só refina quem ainda não tem pin útil. CEP/CITY já bastam para o mapa.
     const ids = companies
-      .filter((company) => company.locationPrecision !== 'EXACT' && company.street?.trim())
-      .map((company) => company.id);
+      .filter((company) => !this.hasMapCoordinates(company) || company.locationPrecision === 'UNRESOLVED')
+      .map((company) => company.id)
+      .slice(0, 10);
     if (ids.length === 0) {
       return;
     }
@@ -723,9 +1051,12 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
     return company.locationPrecision !== 'EXACT';
   }
 
-  private createClusterIcon(cluster: L.MarkerCluster): L.DivIcon {
+  private createClusterIcon(cluster: {
+    getAllChildMarkers: () => L.Marker[];
+    getChildCount: () => number;
+  }): L.DivIcon {
     const childMarkers = cluster.getAllChildMarkers();
-    const selectedCount = childMarkers.filter((marker) => {
+    const selectedCount = childMarkers.filter((marker: L.Marker) => {
       const companyId = (marker.options as L.MarkerOptions & { companyId?: string }).companyId;
       return companyId != null && this.selected.has(companyId);
     }).length;
@@ -793,7 +1124,7 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const isSelected = this.selected.has(companyId);
     const hovered = this.hoveredCompanyId === companyId;
-    const company = this.companies.find((item) => item.id === companyId);
+    const company = this.allCompanies.find((item) => item.id === companyId);
     marker.setIcon(
       createCompanyMarkerIcon({
         selected: isSelected,
@@ -988,7 +1319,7 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
   private persistSession(): void {
     saveDiscoverSession({
       filters: this.filters.getRawValue(),
-      companies: this.companies,
+      companies: this.allCompanies.length <= 200 ? this.allCompanies : this.companies,
       resultFilter: this.resultFilter,
       totalElements: this.totalElements,
       selectedIds: [...this.selected],

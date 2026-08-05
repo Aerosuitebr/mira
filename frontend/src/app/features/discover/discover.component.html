@@ -199,11 +199,16 @@
               <small class="list-header__hint">Busca nacional - informe UF ou CNPJ completo para resultado instantâneo</small>
             }
           </div>
-          @if (hasSearched && companies.length > 0) {
-            <small class="list-header__map">{{ mappedCompaniesCount }} no mapa nesta página</small>
+          @if (hasSearched && allCompanies.length > 0) {
+            <small class="list-header__map">
+              {{ mappedCompaniesCount }} pin(s) nesta página
+              @if (totalPages > 1 && pageRangeLabel) {
+                · {{ pageRangeLabel }}
+              }
+            </small>
           }
         </div>
-        @if (hasSearched && companies.length > 0) {
+        @if (hasSearched && allCompanies.length > 0) {
           <div class="list-filter">
             <svg class="list-filter__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <circle cx="11" cy="11" r="7"/>
@@ -225,12 +230,28 @@
           </div>
           @if (hasResultFilter) {
             <small class="list-header__filter-count">
-              {{ visibleCompanies.length }} de {{ companies.length }} nesta página
+              {{ filteredCompanies.length }} de {{ allCompanies.length }} no resultado
             </small>
+          }
+          @if (visibleCompanies.length > 0) {
+            <label class="select-page">
+              <input
+                type="checkbox"
+                [checked]="allPageSelected"
+                [indeterminate]="somePageSelected && !allPageSelected"
+                (change)="toggleSelectPage()"
+                [attr.aria-label]="selectPageLabel"
+              />
+              <span>{{ selectPageLabel }}</span>
+            </label>
           }
         }
       </div>
-      <div class="list-scroll">
+      <div
+        class="list-scroll"
+        [class.list-scroll--paint]="listPaintActive"
+        (pointerleave)="endListPaint()"
+      >
         @if (loading) {
           <div class="loading-state">
             <span class="pp-loading-dots"><span></span><span></span><span></span></span>
@@ -240,7 +261,7 @@
             <strong>Serviço de busca indisponível</strong>
             <span>{{ searchError }}</span>
           </div>
-        } @else if (companies.length === 0 && hasSearched) {
+        } @else if (allCompanies.length === 0 && hasSearched) {
           <div class="pp-empty">
             <strong>Nenhum resultado</strong>
             @if (filters.get('contactableOnly')?.value) {
@@ -249,10 +270,10 @@
               <span>Ajuste os filtros e busque novamente.</span>
             }
           </div>
-        } @else if (visibleCompanies.length === 0 && companies.length > 0) {
+        } @else if (visibleCompanies.length === 0 && allCompanies.length > 0) {
           <div class="pp-empty">
             <strong>Nenhuma correspondência</strong>
-            <span>Nenhuma empresa nesta página corresponde a “{{ resultFilter.trim() }}”. Limpe o filtro ou refine a busca principal.</span>
+            <span>Nenhuma empresa no resultado corresponde a “{{ resultFilter.trim() }}”. Limpe o filtro ou refine a busca principal.</span>
           </div>
         } @else {
           @for (company of visibleCompanies; track company.id; let i = $index) {
@@ -264,11 +285,15 @@
               [style.animation-delay.ms]="i * 40"
               (mouseenter)="setHoveredCompany(company.id)"
               (mouseleave)="clearHoveredCompany(company.id)"
+              (pointerdown)="onCompanyPointerDown($event, company.id)"
+              (pointerenter)="onCompanyPointerEnter(company.id)"
             >
+              <span class="company-index" aria-hidden="true">{{ resultNumber(i) }}</span>
               <input
                 type="checkbox"
                 [checked]="selected.has(company.id)"
-                (change)="toggleSelect(company.id)"
+                tabindex="-1"
+                (click)="$event.preventDefault()"
                 [attr.aria-label]="'Selecionar ' + (company.tradeName || company.legalName)"
               />
               <div class="company-info">
@@ -308,6 +333,32 @@
           }
         }
       </div>
+      @if (hasSearched && !loading && !searchError && totalPages > 1) {
+        <div class="list-pager" role="navigation" aria-label="Paginação dos resultados">
+          <button
+            type="button"
+            class="list-pager__btn"
+            [disabled]="!canGoPrevPage"
+            (click)="goToPrevPage()"
+          >
+            Anterior
+          </button>
+          <span class="list-pager__meta">
+            Página {{ pageIndex + 1 }} de {{ totalPages }}
+            @if (pageRangeLabel) {
+              <small>· {{ pageRangeLabel }}</small>
+            }
+          </span>
+          <button
+            type="button"
+            class="list-pager__btn"
+            [disabled]="!canGoNextPage"
+            (click)="goToNextPage()"
+          >
+            Próxima
+          </button>
+        </div>
+      }
     </div>
 
     <div class="map-wrapper pp-glass" [attr.data-map-style]="activeMapStyle">

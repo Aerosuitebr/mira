@@ -12,7 +12,7 @@ export const DISCOVER_IMPORTED_STATES = [
 ] as const;
 
 /** Bump ao mudar semântica da busca (ex.: CNAE no Postgres) para invalidar cache antigo. */
-export const DISCOVER_SESSION_VERSION = 3;
+export const DISCOVER_SESSION_VERSION = 4;
 
 export interface DiscoverFiltersSnapshot {
   keyword: string;
