@@ -1,6 +1,6 @@
 import express from 'express';
 import Redis from 'ioredis';
-import { canOpenColdConversation, jobStep, nextColdAt, normalizePhone, selectStep1Text } from './state.js';
+import { canOpenColdConversation, jobStep, nextColdAt, normalizePhone, reportDay, selectStep1Text } from './state.js';
 
 const port = Number(process.env.PORT || 8090);
 const redis = new Redis(process.env.REDIS_URL || 'redis://redis:6379');
@@ -15,6 +15,7 @@ const config = {
   minIntervalSeconds: Number(process.env.OUTREACH_MIN_INTERVAL_SECONDS || 180),
   maxIntervalSeconds: Number(process.env.OUTREACH_MAX_INTERVAL_SECONDS || 300),
   dailyCap: Number(process.env.OUTREACH_DAILY_CAP || 15),
+  timeZone: process.env.OUTREACH_TIMEZONE || 'America/Sao_Paulo',
   deliveryEnabled: process.env.OUTREACH_DELIVERY_ENABLED === 'true',
   automaticStep2: process.env.OUTREACH_STEP2_AUTOMATIC === 'true'
 };
@@ -40,7 +41,7 @@ function evolutionMessageId(payload) {
 
 async function state() {
   const saved = await redis.hgetall(stateKey);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = reportDay(new Date(), config.timeZone);
   if (saved.day !== today) {
     saved.day = today;
     saved.sentToday = '0';
@@ -146,7 +147,7 @@ async function sendText(destination, text) {
 }
 
 async function canOpenNextColdConversation() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = reportDay(new Date(), config.timeZone);
   const current = await redis.hgetall(stateKey);
   if (current.day !== today) await redis.hset(stateKey, { day: today, sentToday: '0' });
   return canOpenColdConversation(current.day === today ? current : {}, config);

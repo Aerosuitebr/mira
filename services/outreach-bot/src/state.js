@@ -2,6 +2,17 @@ export function normalizePhone(value) {
   return String(value || '').replace(/@.+$/, '').replace(/\D/g, '');
 }
 
+export function reportDay(now = new Date(), timeZone = 'America/Sao_Paulo') {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 export function selectStep1Text(job, random = Math.random) {
   const company = String(job.companyName || '').trim();
   if (!company) return job.step1Text;
