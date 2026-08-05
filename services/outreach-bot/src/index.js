@@ -44,7 +44,20 @@ async function state() {
   if (saved.day !== today) {
     saved.day = today;
     saved.sentToday = '0';
-    await redis.hset(stateKey, { day: today, sentToday: '0' });
+    saved.coldOpened = '0';
+    saved.repliesReceived = '0';
+    saved.step2Sent = '0';
+    saved.failed = '0';
+    saved.throttled = '0';
+    await redis.hset(stateKey, {
+      day: today,
+      sentToday: '0',
+      coldOpened: '0',
+      repliesReceived: '0',
+      step2Sent: '0',
+      failed: '0',
+      throttled: '0'
+    });
   }
   const queue = await redis.llen(queueKey);
   const sentToday = Number(saved.sentToday || 0);
