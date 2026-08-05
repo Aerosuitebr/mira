@@ -228,6 +228,7 @@ export interface OutreachBotStatus {
   remainingToday: number;
   restrictionDetected: boolean;
   deliveryEnabled: boolean;
+  stage2ApprovalRequired: boolean;
   coldOpened: number;
   repliesReceived: number;
   step2Sent: number;

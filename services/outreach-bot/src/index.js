@@ -16,8 +16,7 @@ const config = {
   maxIntervalSeconds: Number(process.env.OUTREACH_MAX_INTERVAL_SECONDS || 300),
   dailyCap: Number(process.env.OUTREACH_DAILY_CAP || 15),
   timeZone: process.env.OUTREACH_TIMEZONE || 'America/Sao_Paulo',
-  deliveryEnabled: process.env.OUTREACH_DELIVERY_ENABLED === 'true',
-  automaticStep2: process.env.OUTREACH_STEP2_AUTOMATIC === 'true'
+  deliveryEnabled: process.env.OUTREACH_DELIVERY_ENABLED === 'true'
 };
 const serviceToken = process.env.BOT_SERVICE_TOKEN || process.env.MIRA_SERVICE_TOKEN || '';
 const webhookSecret = process.env.EVOLUTION_WEBHOOK_SECRET || process.env.APP_EVOLUTION_WEBHOOK_SECRET || '';
@@ -70,6 +69,7 @@ async function state() {
     remainingToday: Math.max(0, config.dailyCap - sentToday),
     restrictionDetected: saved.restrictionDetected === 'true',
     deliveryEnabled: config.deliveryEnabled,
+    stage2ApprovalRequired: true,
     coldOpened: Number(saved.coldOpened || 0),
     repliesReceived: Number(saved.repliesReceived || 0),
     step2Sent: Number(saved.step2Sent || 0),
@@ -227,16 +227,7 @@ app.post('/webhooks/evolution', async (req, res) => {
   const job = JSON.parse(raw);
   await emit('REPLY_RECEIVED', { messageId: job.messageId, phone: sender, providerMessageId: evolutionMessageId(payload) });
   await incrementMetric('REPLY_RECEIVED');
-  if (config.automaticStep2 && config.deliveryEnabled && job.step2Text) {
-    try {
-      const providerMessageId = await sendText(sender, job.step2Text);
-      await emit('STEP2_SENT', { messageId: job.messageId, phone: sender, providerMessageId, step2Text: job.step2Text });
-      await incrementMetric('STEP2_SENT');
-    } catch (error) {
-      await emit(error.rateLimited ? 'THROTTLED' : 'FAILED', { messageId: job.messageId, reason: error.message });
-      await incrementMetric(error.rateLimited ? 'THROTTLED' : 'FAILED');
-    }
-  }
+  // A resposta cria a revisÃ£o no MIRA. A etapa 2 sÃ³ Ã© enfileirada apÃ³s aprovaÃ§Ã£o humana.
   return res.sendStatus(202);
 });
 

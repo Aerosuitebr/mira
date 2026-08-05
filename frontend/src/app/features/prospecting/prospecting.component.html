@@ -378,6 +378,7 @@
                     <span>Aberturas {{ outreachBotStatus.coldOpened }}</span>
                     <span>Respostas {{ outreachBotStatus.repliesReceived }}</span>
                     <span>Etapa 2 {{ outreachBotStatus.step2Sent }}</span>
+                    @if (outreachBotStatus.stage2ApprovalRequired) { <span>Etapa 2: aprovaÃ§Ã£o obrigatÃ³ria</span> }
                     @if (outreachBotStatus.failed) { <span>Falhas {{ outreachBotStatus.failed }}</span> }
                     <span>Intervalo {{ outreachBotStatus.cadence.minSeconds }}–{{ outreachBotStatus.cadence.maxSeconds }} s</span>
                   </div>
