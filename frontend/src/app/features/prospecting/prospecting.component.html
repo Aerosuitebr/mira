@@ -375,6 +375,10 @@
                   <div class="job-metrics">
                     <span>Na fila {{ outreachBotStatus.queue }}</span>
                     <span>Hoje {{ outreachBotStatus.sentToday }}/{{ outreachBotStatus.cadence.dailyCap }}</span>
+                    <span>Aberturas {{ outreachBotStatus.coldOpened }}</span>
+                    <span>Respostas {{ outreachBotStatus.repliesReceived }}</span>
+                    <span>Etapa 2 {{ outreachBotStatus.step2Sent }}</span>
+                    @if (outreachBotStatus.failed) { <span>Falhas {{ outreachBotStatus.failed }}</span> }
                     <span>Intervalo {{ outreachBotStatus.cadence.minSeconds }}–{{ outreachBotStatus.cadence.maxSeconds }} s</span>
                   </div>
                   <div class="job-actions">

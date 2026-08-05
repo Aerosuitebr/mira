@@ -56,6 +56,10 @@ async function state() {
     remainingToday: Math.max(0, config.dailyCap - sentToday),
     restrictionDetected: saved.restrictionDetected === 'true',
     deliveryEnabled: config.deliveryEnabled,
+    coldOpened: Number(saved.coldOpened || 0),
+    repliesReceived: Number(saved.repliesReceived || 0),
+    step2Sent: Number(saved.step2Sent || 0),
+    failed: Number(saved.failed || 0),
     cadence: { minSeconds: config.minIntervalSeconds, maxSeconds: config.maxIntervalSeconds, dailyCap: config.dailyCap }
   };
 }

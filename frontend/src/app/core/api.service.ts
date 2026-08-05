@@ -228,6 +228,10 @@ export interface OutreachBotStatus {
   remainingToday: number;
   restrictionDetected: boolean;
   deliveryEnabled: boolean;
+  coldOpened: number;
+  repliesReceived: number;
+  step2Sent: number;
+  failed: number;
   cadence: { minSeconds: number; maxSeconds: number; dailyCap: number };
 }
 
