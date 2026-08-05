@@ -104,7 +104,7 @@
       <dl class="wa-meta">
         <div>
           <dt>Status</dt>
-          <dd><span class="wa-pill" [attr.data-phase]="phase">{{ connection?.statusLabel || '—' }}</span></dd>
+          <dd><span class="wa-pill" [attr.data-phase]="phase">{{ connection?.statusLabel || '-' }}</span></dd>
         </div>
         <div>
           <dt>Número</dt>
@@ -126,7 +126,7 @@
         </div>
         <div>
           <dt>Última checagem</dt>
-          <dd>{{ lastCheckedAt ? (lastCheckedAt | date:'HH:mm:ss') : '—' }}</dd>
+          <dd>{{ lastCheckedAt ? (lastCheckedAt | date:'HH:mm:ss') : '-' }}</dd>
         </div>
       </dl>
 

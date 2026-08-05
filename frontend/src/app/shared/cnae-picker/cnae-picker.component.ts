@@ -95,7 +95,7 @@ const CNAE_QUICK_SHORTCUTS: CnaeQuickShortcut[] = [
   {
     id: 'mro-aeronaves',
     label: 'MRO · Manutenção de aeronaves',
-    hint: 'CNAE 33163 — hangar e pista (oficinas Part 145)',
+    hint: 'CNAE 33163 - hangar e pista (oficinas Part 145)',
     filterValue: '33163',
     searchTerms: ['33163', '3316301', '3316302', 'aeronave', 'aeronaves', 'mro', 'aviação', 'aviacao', 'hangar'],
     tone: 'cyan'
@@ -103,7 +103,7 @@ const CNAE_QUICK_SHORTCUTS: CnaeQuickShortcut[] = [
   {
     id: 'transporte-aereo',
     label: 'Operadores aéreos',
-    hint: 'CNAE 51 — companhias e táxi aéreo (não é oficina MRO)',
+    hint: 'CNAE 51 - companhias e táxi aéreo (não é oficina MRO)',
     filterValue: '51',
     searchTerms: ['transporte aéreo', 'transporte aereo', 'taxi aereo'],
     tone: 'amber'
@@ -153,7 +153,7 @@ export class CnaePickerComponent implements ControlValueAccessor, OnDestroy {
 
     const activity: CnaeActivityOption = {
       code: shortcut.filterValue,
-      label: `${shortcut.filterValue} — ${shortcut.label}`,
+      label: `${shortcut.filterValue} - ${shortcut.label}`,
       filterValue: shortcut.filterValue,
       kind: 'DIVISION'
     };
@@ -383,7 +383,7 @@ export class CnaePickerComponent implements ControlValueAccessor, OnDestroy {
 
   activityTitle(activity: CnaeActivityOption): string {
     const label = activity.label ?? '';
-    const separator = label.includes(' — ') ? ' — ' : ' - ';
+    const separator = label.includes(' - ') ? ' - ' : ' - ';
     const parts = label.split(separator);
     return parts.length > 1 ? parts.slice(1).join(separator) : label;
   }

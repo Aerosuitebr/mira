@@ -51,7 +51,7 @@
                 <div class="card-time">
                   <strong>{{ item.startsAt | date:'HH:mm' }}</strong>
                   @if (item.endsAt) {
-                    <span>– {{ item.endsAt | date:'HH:mm' }}</span>
+                    <span>- {{ item.endsAt | date:'HH:mm' }}</span>
                   }
                 </div>
                 <div class="card-body">
@@ -154,7 +154,7 @@
             <select id="appt-client-select" class="pp-select" [(ngModel)]="form.clientId" name="clientId" (ngModelChange)="onClientSelected()">
               <option value="">Novo cliente (preencher abaixo)</option>
               @for (client of clients; track client.id) {
-                <option [value]="client.id">{{ client.displayName }} — {{ client.city }}/{{ client.state }}</option>
+                <option [value]="client.id">{{ client.displayName }} - {{ client.city }}/{{ client.state }}</option>
               }
             </select>
             <small>
@@ -199,7 +199,7 @@
             @if (phoneError) {
               <small class="field-error">{{ phoneError }}</small>
             } @else {
-              <small>Celular ou fixo com DDD — opcional</small>
+              <small>Celular ou fixo com DDD - opcional</small>
             }
           </div>
 
@@ -225,7 +225,7 @@
               [optional]="true"
               [minIso]="form.startsAt || null"
             />
-            <small>Opcional — deve ser após o início</small>
+            <small>Opcional - deve ser após o início</small>
           </div>
 
           <div class="pp-field span-2">

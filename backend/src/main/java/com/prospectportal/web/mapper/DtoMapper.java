@@ -94,7 +94,7 @@ public final class DtoMapper {
         } else if (alert.getAppointment() != null) {
             companyName = alert.getAppointment().getClientName();
         } else {
-            companyName = "—";
+            companyName = "-";
         }
         return new AlertResponse(
             alert.getId(),

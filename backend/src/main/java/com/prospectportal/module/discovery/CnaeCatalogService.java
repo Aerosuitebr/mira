@@ -168,7 +168,7 @@ public class CnaeCatalogService {
             String divisionLabel = resolveDivisionLabel(division.code(), division.label(), rfDescriptions);
             activities.add(new CnaeActivityOptionResponse(
                 division.code(),
-                division.code() + " — " + divisionLabel,
+                division.code() + " - " + divisionLabel,
                 division.code(),
                 KIND_DIVISION
             ));
@@ -186,7 +186,7 @@ public class CnaeCatalogService {
     private CnaeActivityOptionResponse toSubclassOption(String code, String description) {
         return new CnaeActivityOptionResponse(
             code,
-            code + " — " + description,
+            code + " - " + description,
             code,
             KIND_SUBCLASS
         );

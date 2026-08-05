@@ -18,9 +18,9 @@
     <div class="layout">
       <article class="panel pp-glass">
         <h2>Dados cadastrais</h2>
-        <p><strong>E-mail:</strong> {{ client.email || '—' }}</p>
-        <p><strong>Telefone:</strong> {{ client.phone || '—' }}</p>
-        <p><strong>Responsável:</strong> {{ client.ownerName || '—' }}</p>
+        <p><strong>E-mail:</strong> {{ client.email || '-' }}</p>
+        <p><strong>Telefone:</strong> {{ client.phone || '-' }}</p>
+        <p><strong>Responsável:</strong> {{ client.ownerName || '-' }}</p>
         <p><strong>Cliente desde:</strong> {{ client.contractedAt | date:'dd/MM/yyyy' }}</p>
       </article>
 
@@ -32,7 +32,7 @@
           <ul>
             @for (item of client.contactHistory; track item.id) {
               <li>
-                <strong>{{ item.channel }}</strong> — {{ item.subject || 'Sem assunto' }}
+                <strong>{{ item.channel }}</strong> - {{ item.subject || 'Sem assunto' }}
                 <small>{{ item.status }}</small>
               </li>
             }
@@ -47,7 +47,7 @@
         } @else {
           <ul>
             @for (p of client.proposals; track p.id) {
-              <li>{{ p.title }} — {{ p.status }} — {{ p.totalAmount | currency:'BRL':'symbol':'1.0-0':'pt-BR' }}</li>
+              <li>{{ p.title }} - {{ p.status }} - {{ p.totalAmount | currency:'BRL':'symbol':'1.0-0':'pt-BR' }}</li>
             }
           </ul>
         }
@@ -60,7 +60,7 @@
         } @else {
           <ul>
             @for (s of client.services; track s.id) {
-              <li>{{ s.name }} — {{ s.status }} ({{ s.progressPercent }}%)</li>
+              <li>{{ s.name }} - {{ s.status }} ({{ s.progressPercent }}%)</li>
             }
           </ul>
         }

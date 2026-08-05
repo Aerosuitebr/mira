@@ -33,9 +33,9 @@ export class WhatsAppConnectionComponent implements OnInit, OnDestroy {
   pollingLive = false;
 
   messagesSentToday = 0;
-  queueStatus = '—';
+  queueStatus = '-';
   queueTone: 'ok' | 'busy' | 'off' = 'off';
-  activeRateLabel = '—';
+  activeRateLabel = '-';
   metricsLoading = false;
   testResult: { ok: boolean; message: string } | null = null;
   toast: { ok: boolean; title: string; detail?: string } | null = null;
@@ -338,7 +338,7 @@ export class WhatsAppConnectionComponent implements OnInit, OnDestroy {
       this.queueStatus = 'Pronta';
       this.queueTone = 'ok';
     }
-    if (!this.activeRateLabel || this.activeRateLabel === '—') {
+    if (!this.activeRateLabel || this.activeRateLabel === '-') {
       this.activeRateLabel = '100%';
     }
   }

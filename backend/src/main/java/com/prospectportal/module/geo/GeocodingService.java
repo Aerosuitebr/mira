@@ -291,7 +291,7 @@ public class GeocodingService {
         for (String state : orderedStates) {
             geocodeStateFast(state, job.getId());
             long total = countGeocodedCompanies();
-            log.info("Geocodificação rápida concluída para {} — total geocodificado: {}", state, total);
+            log.info("Geocodificação rápida concluída para {} - total geocodificado: {}", state, total);
         }
 
         log.info("Geocodificação rápida finalizada: {} empresas", countGeocodedCompanies());
@@ -466,7 +466,7 @@ public class GeocodingService {
         });
     }
 
-    /** Geocodificação empresa a empresa (Nominatim) — uso pontual, não em massa. */
+    /** Geocodificação empresa a empresa (Nominatim) - uso pontual, não em massa. */
     public void geocodeAllPendingLegacy(Set<String> states, ImportJob job) throws InterruptedException {
         int total = 0;
         int batch;

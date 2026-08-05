@@ -15,8 +15,8 @@
         [class.wa-status-chip--off]="!waConnected && !waStatusLoading"
         [attr.title]="
           waConnected
-            ? 'WhatsApp conectado — clique para gerenciar'
-            : 'WhatsApp offline — clique para conectar'
+            ? 'WhatsApp conectado - clique para gerenciar'
+            : 'WhatsApp offline - clique para conectar'
         "
       >
         <svg class="wa-status-chip__icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -227,7 +227,7 @@
               </td>
               <td class="mono">{{ formatDocument(client.document) }}</td>
               <td>{{ client.city }}/{{ client.state }}</td>
-              <td>{{ client.ownerName || '—' }}</td>
+              <td>{{ client.ownerName || '-' }}</td>
               <td>{{ client.tenureDays }} d</td>
               <td class="ltv-cell">{{ client.lifetimeValue | currency:'BRL':'symbol':'1.0-0':'pt-BR' }}</td>
               <td>

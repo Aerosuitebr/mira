@@ -463,7 +463,7 @@ public class ProspectAutomationService {
 
         if (job.isDryRun()) {
             message.setStatus("SKIPPED");
-            message.setErrorDetail("Dry-run — envio não realizado");
+            message.setErrorDetail("Dry-run - envio não realizado");
             message.setSentAt(Instant.now());
             messageRepository.save(message);
             job.setFailedCount(job.getFailedCount() + 1);

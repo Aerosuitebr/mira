@@ -223,12 +223,12 @@ export class AerosuiteFitService {
       reasons.push('CNAE alinhado a manutenção aeronáutica (Part 145).');
     }
     if (airportHub) {
-      reasons.push('Localização próxima a hub aeroportuário — operação intensiva.');
+      reasons.push('Localização próxima a hub aeroportuário - operação intensiva.');
     }
     if (capital >= 1_000_000) {
-      reasons.push(`Capital social ${this.formatCapital(capital)} — absorve ${plan.shortLabel}.`);
+      reasons.push(`Capital social ${this.formatCapital(capital)} - absorve ${plan.shortLabel}.`);
     } else if (capital > 0) {
-      reasons.push(`Porte enxuto — entrada pelo ${plan.shortLabel} com trial 7 dias.`);
+      reasons.push(`Porte enxuto - entrada pelo ${plan.shortLabel} com trial 7 dias.`);
     }
     if (hasContact) {
       reasons.push('Contato RF disponível para abordagem comercial.');
@@ -237,7 +237,7 @@ export class AerosuiteFitService {
       reasons.push('Melhor equilíbrio custo × SGQ incluso (promo lançamento).');
     }
     if (company.openedAt && new Date(company.openedAt).getFullYear() <= 2018) {
-      reasons.push('Operação madura — maior chance de processos legados fragmentados.');
+      reasons.push('Operação madura - maior chance de processos legados fragmentados.');
     }
     return reasons.slice(0, 4);
   }
@@ -293,7 +293,7 @@ export class AerosuiteFitService {
     if (segment.startsWith('MRO')) {
       return `${name}: unificar proposta → OS → estoque rastreável com Aero Suite (${plan.shortLabel}, R$ ${plan.monthlyPrice.toLocaleString('pt-BR')}/mês). Dor provável: ${pain}.`;
     }
-    return `${name}: avaliar Aero Suite para digitalizar operação aeronáutica — ${plan.shortLabel} a partir de R$ ${plan.monthlyPrice.toLocaleString('pt-BR')}/mês.`;
+    return `${name}: avaliar Aero Suite para digitalizar operação aeronáutica - ${plan.shortLabel} a partir de R$ ${plan.monthlyPrice.toLocaleString('pt-BR')}/mês.`;
   }
 
   private isAirportHub(company: Company): boolean {
