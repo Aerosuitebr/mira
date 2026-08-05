@@ -114,7 +114,7 @@ jobs:
           # O proxy pode ter sido criado por uma versão anterior do compose;
           # descubra o bind mount real antes de recarregar a rota do webhook.
           if docker inspect mira-tunnel-proxy >/dev/null 2>&1; then
-            proxy_config="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination \"/etc/nginx/conf.d/default.conf\"}}{{.Source}}{{end}}{{end}}' mira-tunnel-proxy)"
+            proxy_config="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/nginx/conf.d/default.conf"}}{{.Source}}{{end}}{{end}}' mira-tunnel-proxy)"
             if [ -n "$proxy_config" ]; then
               cp scripts/deploy/nginx-mira.conf "$proxy_config"
               docker exec mira-tunnel-proxy nginx -s reload
