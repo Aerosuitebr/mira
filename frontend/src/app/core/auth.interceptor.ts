@@ -6,7 +6,9 @@ import { AuthService } from './auth.service';
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const token = auth.token();
-  if (token) {
+  const isPublicApiRequest =
+    req.url.includes('/public/') || req.url.includes('/webhooks/evolution/approvals/');
+  if (token && !isPublicApiRequest) {
     req = req.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
   }
 
@@ -22,11 +24,15 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         req.url.includes('/whatsapp/status') ||
         req.url.includes('/whatsapp/disconnect') ||
         req.url.includes('/whatsapp/send');
+      const isPublicOutreachRequest = req.url.includes('/public/outreach/');
+      const isPublicProposalRequest = req.url.includes('/public/proposals');
       if (
         !isAuthRequest &&
         !isCnaeCatalogRequest &&
         !isDiscoverySearchRequest &&
         !isWhatsAppSessionRequest &&
+        !isPublicOutreachRequest &&
+        !isPublicProposalRequest &&
         error.status === 401 &&
         auth.isAuthenticated()
       ) {

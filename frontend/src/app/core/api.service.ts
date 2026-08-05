@@ -572,12 +572,13 @@ export class ApiService {
   }
 
   publicFollowUp(token: string) {
-    return this.http.get<FollowUpReviewItem>(`${environment.apiUrl}/webhooks/evolution/approvals/${token}`);
+    return this.http.get<FollowUpReviewItem>(`${environment.apiUrl}/public/outreach/approvals/${token}`);
   }
 
   approvePublicFollowUp(token: string) {
     return this.http.post<{ id: string; status: string; error: string | null }>(
-      `${environment.apiUrl}/webhooks/evolution/approvals/${token}`, {}
+      `${environment.apiUrl}/public/outreach/approvals/${token}`,
+      {}
     );
   }
 

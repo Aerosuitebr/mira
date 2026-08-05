@@ -106,7 +106,7 @@ public class SecurityConfig {
 
                     "/api/webhooks/evolution",
 
-                    "/api/webhooks/evolution/approvals/**",
+                    "/api/webhooks/evolution/**",
 
                     "/api/discovery/cnaes/**",
 
