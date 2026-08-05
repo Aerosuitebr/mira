@@ -116,7 +116,9 @@ jobs:
           if docker inspect mira-tunnel-proxy >/dev/null 2>&1; then
             proxy_config="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/nginx/conf.d/default.conf"}}{{.Source}}{{end}}{{end}}' mira-tunnel-proxy)"
             if [ -n "$proxy_config" ]; then
-              cp scripts/deploy/nginx-mira.conf "$proxy_config"
+              if [ "$(readlink -f "$proxy_config")" != "$(readlink -f scripts/deploy/nginx-mira.conf)" ]; then
+                cp scripts/deploy/nginx-mira.conf "$proxy_config"
+              fi
               docker exec mira-tunnel-proxy nginx -s reload
               webhook_code="$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8083/webhooks/outreach-bot -H 'Content-Type: application/json' -d '{}')"
               echo "outreach_webhook_http=$webhook_code"
