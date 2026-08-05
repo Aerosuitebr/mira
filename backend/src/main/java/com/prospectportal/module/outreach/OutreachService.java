@@ -318,6 +318,7 @@ public class OutreachService {
         var brand = outreachSettingsService.resolveBrand(tenant.getId());
 
         int sent = 0;
+        int queued = 0;
         int waSent = 0;
         int emailSent = 0;
         int failed = 0;
@@ -393,8 +394,7 @@ public class OutreachService {
                     messageRepository.save(message);
                     outreachBotQueueService.enqueue(message, companyName, step2Text);
                     deliveries.add(deliveryItem(companyId, companyName, message, "Abertura curta na fila protegida"));
-                    waSent++;
-                    sent++;
+                    queued++;
                     if (false) { // Mantido apenas até remover o legado; não há caminho de execução direta.
                     Delivery delivery = sendWhatsApp(waInstance, company, contact, body, brand);
                     if (delivery.notWhatsApp()) {
@@ -469,12 +469,12 @@ public class OutreachService {
         }
 
         campaign.setSentCount(sent);
-        campaign.setStatus(failed == 0 ? "SENT" : (sent == 0 ? "FAILED" : "PARTIAL"));
+        campaign.setStatus(failed == 0 ? (queued > 0 ? "QUEUED" : "SENT") : (sent == 0 && queued == 0 ? "FAILED" : "PARTIAL"));
         campaignRepository.save(campaign);
         tenant.setCreditsUsed(tenant.getCreditsUsed() + sent);
         tenantRepository.save(tenant);
 
-        String detail = buildDetail(waSent, emailSent, failed, failures, nonWhatsApp);
+        String detail = buildDetail(queued, waSent, emailSent, failed, failures, nonWhatsApp);
         return new BulkCampaignResponse(
             campaign.getId(),
             campaign.getName(),
@@ -728,6 +728,7 @@ public class OutreachService {
     }
 
     private static String buildDetail(
+        int queued,
         int waSent,
         int emailSent,
         int failed,
@@ -737,12 +738,15 @@ public class OutreachService {
         int sent = waSent + emailSent;
         String breakdown = waSent + " WhatsApp · " + emailSent + " e-mail";
         StringBuilder detail = new StringBuilder();
-        if (failed == 0) {
+        if (failed == 0 && sent > 0) {
             detail.append(sent).append(" mensagem(ns) entregue(s): ").append(breakdown).append('.');
-        } else {
+        } else if (failed > 0) {
             String sample = failures.stream().limit(3).reduce((a, b) -> a + " | " + b).orElse("");
             detail.append(sent).append(" entregue(s) (").append(breakdown).append("), ")
                 .append(failed).append(" falha(s). ").append(sample);
+        }
+        if (queued > 0) {
+            detail.append(' ').append(queued).append(" abertura(s) na fila protegida do WhatsApp.");
         }
         if (!nonWhatsApp.isEmpty()) {
             detail.append(' ')
