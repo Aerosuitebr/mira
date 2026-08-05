@@ -115,7 +115,12 @@ jobs:
           # O nginx monta o arquivo de configuração. Recriar o proxy garante que
           # ele use o inode novo extraído pelo release, inclusive para o webhook.
           docker compose -f docker-compose.tunnel.yml up -d --force-recreate mira-tunnel-proxy
-          webhook_code="$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8083/webhooks/outreach-bot -H 'Content-Type: application/json' -d '{}')"
+          webhook_code="000"
+          for i in $(seq 1 15); do
+            webhook_code="$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8083/webhooks/outreach-bot -H 'Content-Type: application/json' -d '{}' || true)"
+            [ "$webhook_code" = "401" ] && break
+            sleep 1
+          done
           echo "outreach_webhook_http=$webhook_code"
           test "$webhook_code" = "401"
 
