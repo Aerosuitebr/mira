@@ -120,6 +120,8 @@ jobs:
                 cp scripts/deploy/nginx-mira.conf "$proxy_config"
               fi
               docker exec mira-tunnel-proxy nginx -s reload
+              docker exec mira-tunnel-proxy nginx -T 2>&1 | grep -A8 -B2 'outreach-bot' || true
+              curl -sS -i -X POST http://127.0.0.1:8083/webhooks/outreach-bot -H 'Content-Type: application/json' -d '{}' | head -20 || true
               webhook_code="$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8083/webhooks/outreach-bot -H 'Content-Type: application/json' -d '{}')"
               echo "outreach_webhook_http=$webhook_code"
               test "$webhook_code" = "401"
