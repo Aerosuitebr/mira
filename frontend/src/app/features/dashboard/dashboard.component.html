@@ -210,7 +210,7 @@
           </div>
         } @else {
           <ul class="alerts-list">
-            @for (alert of alerts; track alert.id) {
+            @for (alert of visibleAlerts; track alert.id) {
               <li class="alert-item" [class.read]="alert.read">
                 <div class="alert-icon" [attr.data-type]="alert.alertType"></div>
                 <div class="alert-body">
@@ -229,6 +229,15 @@
               </li>
             }
           </ul>
+          @if (alerts.length > 5) {
+            <button type="button" class="alerts-toggle" (click)="showAllAlerts = !showAllAlerts">
+              @if (showAllAlerts) {
+                Mostrar menos alertas
+              } @else {
+                Ver mais {{ hiddenAlertsCount }} alertas
+              }
+            </button>
+          }
         }
       </article>
     </div>

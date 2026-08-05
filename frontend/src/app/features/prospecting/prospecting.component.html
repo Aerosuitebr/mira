@@ -322,7 +322,13 @@
 
               @if (outreachReport) {
                 <div class="reply-report" aria-label="Relatório de respostas WhatsApp">
-                  <strong>Relatório de respostas</strong>
+                  <div class="reply-report__header">
+                    <div>
+                      <strong>Controle da abordagem em 2 etapas</strong>
+                      <p>A etapa 2 só é liberada após resposta do lead e aprovação humana.</p>
+                    </div>
+                    <span class="reply-report__safe">Envio protegido</span>
+                  </div>
                   <div class="job-metrics">
                     <span>Etapa 1 enviadas {{ outreachReport.firstStepSent }}</span>
                     <span>Respostas {{ outreachReport.repliesReceived }}</span>

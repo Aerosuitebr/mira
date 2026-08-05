@@ -44,6 +44,7 @@ export class DashboardComponent implements OnInit {
   loadError = false;
 
   alerts: AlertItem[] = [];
+  showAllAlerts = false;
   clientTotal = 0;
   crmCardTotal = 0;
   campaignTotal = 0;
@@ -66,6 +67,14 @@ export class DashboardComponent implements OnInit {
 
   get unreadAlerts(): number {
     return this.alerts.filter((alert) => !alert.read).length;
+  }
+
+  get visibleAlerts(): AlertItem[] {
+    return this.showAllAlerts ? this.alerts : this.alerts.slice(0, 5);
+  }
+
+  get hiddenAlertsCount(): number {
+    return Math.max(0, this.alerts.length - this.visibleAlerts.length);
   }
 
   get hasOperationalData(): boolean {
