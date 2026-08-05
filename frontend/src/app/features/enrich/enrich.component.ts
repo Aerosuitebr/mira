@@ -112,7 +112,7 @@ export class EnrichComponent implements OnInit {
     void this.router.navigate(['/discover']);
   }
 
-  goToOutreach(): void {
+  goToAutomation(): void {
     if (this.selectedIds.size === 0) {
       this.message = 'Selecione ao menos uma empresa para seguir.';
       return;
@@ -120,7 +120,7 @@ export class EnrichComponent implements OnInit {
     const selected = this.companies.filter((company) => this.selectedIds.has(company.id));
     sessionStorage.setItem('selected-companies', JSON.stringify([...this.selectedIds]));
     sessionStorage.setItem('selected-companies-cache', JSON.stringify(selected));
-    void this.router.navigate(['/outreach']);
+    void this.router.navigate(['/prospecting'], { queryParams: { step: 3 } });
   }
 
   importCsv(event: Event): void {

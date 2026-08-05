@@ -1,7 +1,7 @@
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { Component, HostListener, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   ApiService,
   AppointmentItem,
@@ -63,6 +63,7 @@ interface PlaybookStep {
 export class ProspectingComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly aerosuiteFit = inject(AerosuiteFitService);
   private readonly fitByCompanyId = new Map<string, AerosuiteFitAnalysis>();
 
@@ -213,16 +214,42 @@ export class ProspectingComponent implements OnInit {
   ];
 
   ngOnInit(): void {
-    const defaultPreset = this.presets.find((preset) => preset.id === this.defaultPresetId);
-    if (defaultPreset) {
-      this.applyPreset(defaultPreset, { announce: false });
-    } else {
-      this.searchCompanies();
+    const hasIncomingSelection = this.restoreIncomingSelection();
+    if (this.route.snapshot.queryParamMap.get('step') === '3') {
+      this.activeStep = 3;
+    }
+    if (!hasIncomingSelection) {
+      const defaultPreset = this.presets.find((preset) => preset.id === this.defaultPresetId);
+      if (defaultPreset) {
+        this.applyPreset(defaultPreset, { announce: false });
+      } else {
+        this.searchCompanies();
+      }
     }
     this.loadAppointments();
     this.refreshLatestJob();
     this.loadOutreachReport();
     this.loadFollowUpsAwaitingApproval();
+  }
+
+  private restoreIncomingSelection(): boolean {
+    try {
+      const rawIds = sessionStorage.getItem('selected-companies');
+      const ids = rawIds ? (JSON.parse(rawIds) as string[]) : [];
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return false;
+      }
+      this.selectedCompanyIds = new Set(ids);
+      const rawCompanies = sessionStorage.getItem('selected-companies-cache');
+      const selected = rawCompanies ? (JSON.parse(rawCompanies) as Company[]) : [];
+      if (Array.isArray(selected) && selected.length > 0) {
+        this.companies = selected.filter((company) => this.selectedCompanyIds.has(company.id));
+        this.rebuildFitCache(this.companies);
+      }
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   startAutoProspect(): void {
