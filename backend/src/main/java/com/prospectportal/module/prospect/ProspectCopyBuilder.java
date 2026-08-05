@@ -166,6 +166,12 @@ public class ProspectCopyBuilder {
             + "Site: " + productUrl;
     }
 
+    /** Entrada curta, sem URL: única copy permitida na primeira mensagem fria. */
+    public String whatsappStep1(String companyName) {
+        return "Olá, boa tarde! Tudo bem? Nesse contato falo com o responsável comercial da "
+            + shortCompanyName(companyName) + "?";
+    }
+
     public String whatsappBody(String companyName, String contactName, String cityState, String segment) {
         return whatsappCaption(companyName, contactName, cityState, segment);
     }

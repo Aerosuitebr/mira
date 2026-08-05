@@ -14,6 +14,7 @@ import com.prospectportal.module.evolution.EvolutionClient;
 import com.prospectportal.module.mail.MailSenderService;
 import com.prospectportal.module.outreach.CrmAutomationService;
 import com.prospectportal.module.outreach.OutreachSettingsService;
+import com.prospectportal.module.outreach.OutreachBotQueueService;
 import com.prospectportal.module.outreach.entity.OutreachCampaign;
 import com.prospectportal.module.outreach.entity.OutreachMessage;
 import com.prospectportal.module.outreach.repository.OutreachCampaignRepository;
@@ -66,6 +67,7 @@ public class ProspectAutomationService {
     private final MailSenderService mailSenderService;
     private final ProspectCopyBuilder copyBuilder;
     private final OutreachSettingsService outreachSettingsService;
+    private final OutreachBotQueueService outreachBotQueueService;
     private final WhatsAppThrottle throttle;
     private final ProspectJobPreparer jobPreparer;
     private final boolean defaultTestMode;
@@ -89,6 +91,7 @@ public class ProspectAutomationService {
         MailSenderService mailSenderService,
         ProspectCopyBuilder copyBuilder,
         OutreachSettingsService outreachSettingsService,
+        OutreachBotQueueService outreachBotQueueService,
         WhatsAppThrottle throttle,
         @Lazy ProspectJobPreparer jobPreparer,
         @Value("${app.outreach.test-mode:false}") boolean defaultTestMode,
@@ -111,6 +114,7 @@ public class ProspectAutomationService {
         this.mailSenderService = mailSenderService;
         this.copyBuilder = copyBuilder;
         this.outreachSettingsService = outreachSettingsService;
+        this.outreachBotQueueService = outreachBotQueueService;
         this.throttle = throttle;
         this.jobPreparer = jobPreparer;
         this.defaultTestMode = defaultTestMode;
@@ -427,12 +431,13 @@ public class ProspectAutomationService {
             message.setLead(lead);
             message.setChannel("AUTO");
             message.setSubject(copyBuilder.emailSubject(companyName, brand));
-            message.setBody(copyBuilder.whatsappBody(companyName, contactName, cityState, segment, brand));
-            message.setStatus("PENDING");
+            message.setBody(copyBuilder.whatsappStep1(companyName));
+            message.setStatus("QUEUED_BOT");
             message.setProspectJobId(job.getId());
             message.setRecipient(preferredPhone(contact, company));
             message.setCreatedAt(Instant.now());
             messageRepository.save(message);
+            outreachBotQueueService.enqueue(message, companyName, copyBuilder.whatsappFollowUp(companyName, brand));
             queued++;
         }
 

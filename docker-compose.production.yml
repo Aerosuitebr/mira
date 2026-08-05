@@ -47,6 +47,7 @@ services:
       PROSPECT_DATA_ROOT: ${PROSPECT_DATA_ROOT:-/var/mira}
       APP_DISCOVERY_TEST_FIXTURES: "false"
       APP_OUTREACH_TEST_MODE: "false"
+      MIRA_SERVICE_TOKEN: ${MIRA_SERVICE_TOKEN:-}
       CORS_ALLOWED_ORIGINS: https://search.aerosuite.com.br,https://search.aerosuite.app
       PUBLIC_BASE_URL: https://search.aerosuite.com.br
       # Default true: este arquivo é só produção. Sem isso, ${...:-false} sobrescreve
@@ -83,6 +84,26 @@ services:
       - "127.0.0.1:4201:80"
     depends_on:
       - mira-api
+
+  mira-outreach-bot:
+    build: ./services/outreach-bot
+    container_name: mira-outreach-bot
+    restart: unless-stopped
+    environment:
+      PORT: 8090
+      REDIS_URL: redis://redis:6379
+      OUTREACH_BOT_PAUSED: ${OUTREACH_BOT_PAUSED:-true}
+      OUTREACH_MIN_INTERVAL_SECONDS: ${OUTREACH_MIN_INTERVAL_SECONDS:-180}
+      OUTREACH_MAX_INTERVAL_SECONDS: ${OUTREACH_MAX_INTERVAL_SECONDS:-300}
+      OUTREACH_DAILY_CAP: ${OUTREACH_DAILY_CAP:-15}
+      MIRA_API_URL: http://mira-api:8082
+      MIRA_SERVICE_TOKEN: ${MIRA_SERVICE_TOKEN:-}
+    networks:
+      - default
+      - aerosuite_default
+    depends_on:
+      redis:
+        condition: service_started
 
   # Opcional: API MIRA em container no mesmo host, falando com Evolution do AeroSuite.
   # Descomente quando containerizar o backend.

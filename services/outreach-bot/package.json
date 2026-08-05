@@ -1,0 +1,7 @@
+{
+  "name": "mira-outreach-bot",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node src/index.js" },
+  "dependencies": { "express": "^4.21.2", "ioredis": "^5.5.0" }
+}
