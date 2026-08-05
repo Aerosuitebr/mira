@@ -3,9 +3,11 @@ package com.prospectportal.module.outreach;
 import com.prospectportal.common.entity.Tenant;
 import com.prospectportal.common.repository.TenantRepository;
 import com.prospectportal.module.prospect.ProspectCopyBuilder;
+import com.prospectportal.module.evolution.EvolutionClient;
 import com.prospectportal.security.AuthContext;
 import com.prospectportal.web.dto.OutreachSettingsRequest;
 import com.prospectportal.web.dto.OutreachSettingsResponse;
+import com.prospectportal.web.dto.ApprovalNotificationTestResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -25,10 +27,12 @@ public class OutreachSettingsService {
 
     private final AuthContext authContext;
     private final TenantRepository tenantRepository;
+    private final EvolutionClient evolutionClient;
 
-    public OutreachSettingsService(AuthContext authContext, TenantRepository tenantRepository) {
+    public OutreachSettingsService(AuthContext authContext, TenantRepository tenantRepository, EvolutionClient evolutionClient) {
         this.authContext = authContext;
         this.tenantRepository = tenantRepository;
+        this.evolutionClient = evolutionClient;
     }
 
     @Transactional(readOnly = true)
@@ -40,7 +44,9 @@ public class OutreachSettingsService {
             hasImage,
             tenant.getBrandImageMime(),
             tenant.getBrandImageFileName(),
-            hasImage ? tenant.getBrandImageBase64() : null
+            hasImage ? tenant.getBrandImageBase64() : null,
+            tenant.getOutreachApprovalRecipient1(),
+            tenant.getOutreachApprovalRecipient2()
         );
     }
 
@@ -56,6 +62,8 @@ public class OutreachSettingsService {
             throw new ResponseStatusException(BAD_REQUEST, "Nome do remetente muito longo (máx. 120 caracteres)");
         }
         tenant.setOutreachSenderName(sender.isBlank() ? null : sender);
+        tenant.setOutreachApprovalRecipient1(normalizePhone(request.approvalRecipient1()));
+        tenant.setOutreachApprovalRecipient2(normalizePhone(request.approvalRecipient2()));
 
         boolean clear = Boolean.TRUE.equals(request.clearBrandImage());
         if (clear) {
@@ -138,6 +146,31 @@ public class OutreachSettingsService {
             return "image/jpeg";
         }
         return normalized;
+    }
+
+    public ApprovalNotificationTestResponse sendApprovalNotificationTest() {
+        Tenant tenant = requireTenant();
+        var recipients = java.util.stream.Stream.of(tenant.getOutreachApprovalRecipient1(), tenant.getOutreachApprovalRecipient2())
+            .filter(value -> value != null && !value.isBlank()).distinct().toList();
+        if (recipients.isEmpty()) return new ApprovalNotificationTestResponse(0, 0, "Cadastre ao menos um responsável.");
+        int sent = 0;
+        String error = null;
+        for (String recipient : recipients) {
+            var result = evolutionClient.sendInternalNotification(recipient,
+                "Teste MIRA: este número receberá links de aprovação quando um lead responder à etapa 1.");
+            if (result.success()) sent++;
+            else error = result.error();
+        }
+        return new ApprovalNotificationTestResponse(recipients.size(), sent, error);
+    }
+
+    private static String normalizePhone(String value) {
+        if (value == null || value.isBlank()) return null;
+        String digits = value.replaceAll("\\D", "");
+        if (digits.length() < 12 || digits.length() > 15) {
+            throw new ResponseStatusException(BAD_REQUEST, "Informe os responsáveis com DDI e DDD.");
+        }
+        return digits;
     }
 
     public record BrandProfile(String senderName, ProspectCopyBuilder.LogoAsset logo) {

@@ -162,6 +162,16 @@ public class WhatsAppConnectionService {
         );
     }
 
+    public WhatsAppConnectionResponse configureReplyWebhook() {
+        Tenant tenant = requireTenant();
+        String instance = resolveSendInstanceForTenant(tenant.getId());
+        var result = evolutionClient.configureReplyWebhook(instance);
+        if (!result.success()) {
+            throw new ResponseStatusException(SERVICE_UNAVAILABLE, result.error());
+        }
+        return status();
+    }
+
     @Transactional
     public WhatsAppConnectionResponse refreshQr() {
         return connect();

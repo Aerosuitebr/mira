@@ -211,6 +211,22 @@ export class WhatsAppConnectionComponent implements OnInit, OnDestroy {
     });
   }
 
+  configureWebhook(): void {
+    this.acting = true;
+    this.error = '';
+    this.api.whatsappConfigureWebhook().subscribe({
+      next: conn => {
+        this.acting = false;
+        this.applyConnection(conn, false);
+        this.showToast(true, 'Webhook de respostas configurado', 'A Evolution enviará respostas ao MIRA.');
+      },
+      error: err => {
+        this.acting = false;
+        this.error = err?.error?.message || 'Não foi possível configurar o webhook.';
+      }
+    });
+  }
+
   disconnect(): void {
     if (!confirm('Desconectar este WhatsApp? Os envios automáticos ficarão pausados até reconectar.')) {
       return;

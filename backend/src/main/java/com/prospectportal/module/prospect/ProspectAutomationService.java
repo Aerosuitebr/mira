@@ -69,6 +69,7 @@ public class ProspectAutomationService {
     private final ProspectJobPreparer jobPreparer;
     private final boolean defaultTestMode;
     private final boolean whatsappEnabled;
+    private final boolean dispatchEnabled;
 
     public ProspectAutomationService(
         AuthContext authContext,
@@ -90,7 +91,8 @@ public class ProspectAutomationService {
         WhatsAppThrottle throttle,
         @Lazy ProspectJobPreparer jobPreparer,
         @Value("${app.outreach.test-mode:false}") boolean defaultTestMode,
-        @Value("${app.outreach.whatsapp.enabled:true}") boolean whatsappEnabled
+        @Value("${app.outreach.whatsapp.enabled:true}") boolean whatsappEnabled,
+        @Value("${app.outreach.dispatch-enabled:false}") boolean dispatchEnabled
     ) {
         this.authContext = authContext;
         this.tenantRepository = tenantRepository;
@@ -112,6 +114,7 @@ public class ProspectAutomationService {
         this.jobPreparer = jobPreparer;
         this.defaultTestMode = defaultTestMode;
         this.whatsappEnabled = whatsappEnabled;
+        this.dispatchEnabled = dispatchEnabled;
     }
 
     public ChannelStatusResponse channels() {
@@ -136,28 +139,45 @@ public class ProspectAutomationService {
     }
 
     public TestEmailResponse sendTestEmail() {
-        if (!mailSenderService.isTestMode()) {
+        return sendTestEmail(null);
+    }
+
+    /**
+     * Amostra de e-mail com o mesmo builder da campanha.
+     * Se {@code destinationOverride} for informado, envia para esse endereço mesmo em produção
+     * (validação pontual do padrão). Caso contrário, exige modo teste + APP_OUTREACH_TEST_EMAIL.
+     */
+    public TestEmailResponse sendTestEmail(String destinationOverride) {
+        String destination;
+        if (destinationOverride != null && !destinationOverride.isBlank()) {
+            destination = destinationOverride.trim();
+        } else if (mailSenderService.isTestMode()) {
+            destination = mailSenderService.testEmail();
+            if (destination == null || destination.isBlank()) {
+                return TestEmailResponse.fail("APP_OUTREACH_TEST_EMAIL não configurado");
+            }
+        } else {
             return TestEmailResponse.fail(
-                "Modo produção ativo: e-mails vão para os contatos reais via prospecção automática. "
-                    + "Para teste manual, defina APP_OUTREACH_TEST_MODE=true e APP_OUTREACH_TEST_EMAIL."
+                "Informe o e-mail de destino no body {\"email\":\"...\"} para amostra pontual, "
+                    + "ou ative APP_OUTREACH_TEST_MODE com APP_OUTREACH_TEST_EMAIL."
             );
         }
-        String destination = mailSenderService.testEmail();
-        if (destination == null || destination.isBlank()) {
-            return TestEmailResponse.fail("APP_OUTREACH_TEST_EMAIL não configurado");
-        }
-        String company = copyBuilder.sampleCompanyName();
+
+        // Pessoa fictícia neutra (não usar nome real da equipe) para validar saudação.
+        String company = "Helipse Aviation Ltda";
+        String contact = "Maria Silva";
         var brand = outreachSettingsService.resolveBrandForCurrentTenant();
-        String subject = copyBuilder.emailSubject(company, brand);
-        String html = copyBuilder.emailHtml(company, "Contato", "Cabo Frio/RJ", "Manutenção de aeronaves", brand);
-        String text = copyBuilder.emailText(company, "Contato", "Cabo Frio/RJ", "Manutenção de aeronaves", brand);
+        String subject = copyBuilder.emailSubject(company, brand) + " (amostra de padrão)";
+        String html = copyBuilder.emailHtml(company, contact, "Rio de Janeiro/RJ", "Manutenção de aeronaves", brand);
+        String text = copyBuilder.emailText(company, contact, "Rio de Janeiro/RJ", "Manutenção de aeronaves", brand);
         var result = mailSenderService.sendHtml(
             destination,
             subject,
             html,
             text,
-            "prospecto@exemplo.com.br",
-            brand.senderName()
+            destination,
+            brand.senderName(),
+            toInlineImage(copyBuilder.resolveEmailInlineLogo(brand))
         );
         if (!result.success()) {
             return TestEmailResponse.fail(result.error());
@@ -167,6 +187,13 @@ public class ProspectAutomationService {
 
     public TestWhatsAppResponse sendTestWhatsApp(String phone) {
         String instance = safeTenantInstance();
+        if (!dispatchEnabled) {
+            return TestWhatsAppResponse.fail(
+                phone == null ? "" : EvolutionClient.cleanPhone(phone),
+                instance,
+                "Envios WhatsApp estão desabilitados na Fase 1. A fila e as mensagens ficam disponíveis para revisão, sem disparo."
+            );
+        }
         if (phone == null || phone.isBlank()) {
             return TestWhatsAppResponse.fail(
                 "",
@@ -194,16 +221,16 @@ public class ProspectAutomationService {
 
         var brand = outreachSettingsService.resolveBrandForCurrentTenant();
         String caption = copyBuilder.whatsappCaption(
-            "Oficina Exemplo MRO",
-            "Welle",
-            "Cabo Frio/RJ",
+            "Helipse Aviation Ltda",
+            "Maria Silva",
+            "Rio de Janeiro/RJ",
             "Manutenção e reparação de aeronaves",
             brand
         );
         String plain = copyBuilder.whatsappFallbackPlainText(
-            "Oficina Exemplo MRO",
-            "Welle",
-            "Cabo Frio/RJ",
+            "Helipse Aviation Ltda",
+            "Maria Silva",
+            "Rio de Janeiro/RJ",
             "Manutenção e reparação de aeronaves",
             brand
         );
@@ -317,14 +344,16 @@ public class ProspectAutomationService {
         ProspectJob job = jobRepository.findById(jobId)
             .orElseThrow(() -> new IllegalStateException("Job não encontrado: " + jobId));
 
-        job.setStatus("RUNNING");
+        // Fase 1 termina com a campanha preparada para revisão. O worker de envio
+        // permanece bloqueado por configuração até a etapa de webhook/resposta.
+        job.setStatus("QUEUED");
         job.setStartedAt(Instant.now());
         job.setUpdatedAt(Instant.now());
         job.setNextDispatchAt(Instant.now());
         jobRepository.save(job);
 
         if (job.getCampaign() != null) {
-            job.getCampaign().setStatus("RUNNING");
+            job.getCampaign().setStatus("QUEUED");
             campaignRepository.save(job.getCampaign());
         }
 
@@ -369,7 +398,7 @@ public class ProspectAutomationService {
                 .stream().findFirst().orElse(null);
 
             String companyName = displayName(company);
-            String contactName = contact != null && contact.getFullName() != null ? contact.getFullName() : "decisor";
+            String contactName = greetingName(contact);
             String cityState = formatCityState(company);
             String segment = company.getCnaeDescription() != null ? company.getCnaeDescription() : company.getCnaeMain();
             var brand = outreachSettingsService.resolveBrand(tenant.getId());
@@ -423,7 +452,7 @@ public class ProspectAutomationService {
             .stream().findFirst().orElse(null);
 
         String companyName = displayName(company);
-        String contactName = contact != null && contact.getFullName() != null ? contact.getFullName() : "decisor";
+        String contactName = greetingName(contact);
         String cityState = formatCityState(company);
         String segment = company.getCnaeDescription() != null ? company.getCnaeDescription() : company.getCnaeMain();
         String phone = preferredPhone(contact, company);
@@ -520,7 +549,8 @@ public class ProspectAutomationService {
             html,
             text,
             email != null ? email : emailTarget,
-            brand.senderName()
+            brand.senderName(),
+            toInlineImage(copyBuilder.resolveEmailInlineLogo(brand))
         );
         if (mailResult.success()) {
             OutreachMessage emailMsg = message;
@@ -697,6 +727,16 @@ public class ProspectAutomationService {
         return company.getLegalName();
     }
 
+    private static String greetingName(CompanyContact contact) {
+        if (contact == null || contact.getFullName() == null || contact.getFullName().isBlank()) {
+            return "decisor";
+        }
+        if (ProspectCopyBuilder.isNonPersonContactLabel(contact.getFullName())) {
+            return "decisor";
+        }
+        return contact.getFullName().trim();
+    }
+
     private static String formatCityState(Company company) {
         String city = company.getCity() != null ? company.getCity() : "";
         String state = company.getState() != null ? company.getState() : "";
@@ -739,5 +779,13 @@ public class ProspectAutomationService {
             job.getCompletedAt(),
             job.getCampaign() != null ? job.getCampaign().getId() : null
         );
+    }
+
+    private static MailSenderService.InlineImage toInlineImage(
+        java.util.Optional<ProspectCopyBuilder.EmailInlineLogo> logo
+    ) {
+        return logo
+            .map(l -> MailSenderService.InlineImage.from(l.contentId(), l.bytes(), l.mimeType(), l.fileName()))
+            .orElse(null);
     }
 }

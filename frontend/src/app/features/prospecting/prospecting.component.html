@@ -257,9 +257,9 @@
             <div class="panel-heading">
               <div>
                 <span class="pp-eyebrow">Etapa 3 · Automação</span>
-                <h2>Régua WhatsApp + e-mail</h2>
+                <h2>Fila de abordagem WhatsApp</h2>
                 <p class="panel-lead">
-                  Usa o segmento da etapa 1, enriquece contatos, valida WhatsApp e envia com identidade Aero Suite.
+                  Enriquecer contatos e preparar a primeira mensagem curta para revisão.
                 </p>
               </div>
               <button type="button" class="pp-btn pp-btn--ghost" (click)="goToStep(2)">Ver lista</button>
@@ -268,14 +268,14 @@
             <div class="auto-prospect-panel auto-prospect-panel--standalone">
               <div class="auto-prospect-head">
                 <div>
-                  <h3>Disparo automático</h3>
+                  <h3>Preparar fila</h3>
                   <p>
-                    Limite anti-ban ativo. Sem WhatsApp válido, cai no e-mail premium do site.
+                    Fase 1: sem disparos. A abertura não inclui links e fica na fila para revisão.
                   </p>
                 </div>
                 <label class="test-toggle" title="Se marcado, e-mails são redirecionados e WhatsApp em massa fica omitido">
                   <input type="checkbox" [(ngModel)]="autoProspect.testMode" name="autoTestMode" />
-                  Modo seguro
+                  Preparação segura
                 </label>
               </div>
               <div class="auto-prospect-actions">
@@ -289,7 +289,7 @@
                   [disabled]="startingAutoProspect"
                   (click)="startAutoProspect()"
                 >
-                  @if (startingAutoProspect) { Iniciando... } @else { Iniciar prospecção automática }
+                  @if (startingAutoProspect) { Preparando... } @else { Preparar fila de abordagem }
                 </button>
               </div>
 
@@ -317,6 +317,41 @@
                       <button type="button" class="pp-btn pp-btn--primary" (click)="resumeJob()">Retomar</button>
                     }
                   </div>
+                </div>
+              }
+
+              @if (outreachReport) {
+                <div class="reply-report" aria-label="Relatório de respostas WhatsApp">
+                  <strong>Relatório de respostas</strong>
+                  <div class="job-metrics">
+                    <span>Etapa 1 enviadas {{ outreachReport.firstStepSent }}</span>
+                    <span>Respostas {{ outreachReport.repliesReceived }}</span>
+                    <span>Etapa 2 para revisar {{ outreachReport.followUpsAwaitingApproval }}</span>
+                    <span>Etapa 2 enviadas {{ outreachReport.followUpsSent }}</span>
+                    @if (outreachReport.followUpsFailed) {
+                      <span>Falhas {{ outreachReport.followUpsFailed }}</span>
+                    }
+                  </div>
+                </div>
+              }
+
+              @if (followUpsAwaitingApproval.length > 0) {
+                <div class="job-progress">
+                  <strong>Etapa 2 aguardando revisão</strong>
+                  @for (followUp of followUpsAwaitingApproval; track followUp.id) {
+                    <div>
+                      <strong>{{ followUp.companyName }}</strong>
+                      <p>{{ followUp.body }}</p>
+                      <button
+                        type="button"
+                        class="pp-btn pp-btn--secondary"
+                        [disabled]="approvingFollowUpId === followUp.id"
+                        (click)="approveFollowUp(followUp.id)"
+                      >
+                        @if (approvingFollowUpId === followUp.id) { Enviando... } @else { Aprovar envio }
+                      </button>
+                    </div>
+                  }
                 </div>
               }
             </div>

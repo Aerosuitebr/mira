@@ -44,17 +44,29 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      PROSPECT_DATA_ROOT: ${PROSPECT_DATA_ROOT:-/var/mira}
+      APP_DISCOVERY_TEST_FIXTURES: "false"
+      APP_OUTREACH_TEST_MODE: "false"
       CORS_ALLOWED_ORIGINS: https://search.aerosuite.com.br,https://search.aerosuite.app
       PUBLIC_BASE_URL: https://search.aerosuite.com.br
-      APP_EVOLUTION_ENABLED: ${APP_EVOLUTION_ENABLED:-false}
+      # Default true: este arquivo é só produção. Sem isso, ${...:-false} sobrescreve
+      # o env_file .env.production e o botão WhatsApp fica sempre desabilitado.
+      APP_EVOLUTION_ENABLED: ${APP_EVOLUTION_ENABLED:-true}
       MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
-      APP_EVOLUTION_API_BASE_URL: ${APP_EVOLUTION_API_BASE_URL:-http://host.docker.internal:18082}
+      # Evolution do Aero Suite escuta só em 127.0.0.1:18082 no host; do container
+      # use a rede aerosuite_default + hostname interno (não host.docker.internal).
+      APP_EVOLUTION_API_BASE_URL: ${APP_EVOLUTION_API_BASE_URL:-http://aerosuite-evolution-api:8080}
       APP_EVOLUTION_API_KEY: ${APP_EVOLUTION_API_KEY:-}
       APP_EVOLUTION_INSTANCE: ${APP_EVOLUTION_INSTANCE:-aerosuite-default}
+    volumes:
+      - ${PROSPECT_DATA_ROOT:-/var/mira}:/var/mira
     ports:
       - "127.0.0.1:8082:8082"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - aerosuite_default
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,8 +110,8 @@ services:
   #   #   - default
   #   #   - aerosuite_default
 
-# networks:
-#   aerosuite_default:
-#     external: true
-#     # Nome padrão do Compose no diretório aerosuite. Ajuste se o project name for outro:
-#     # docker network ls | grep aerosuite
+networks:
+  aerosuite_default:
+    external: true
+    # Nome padrão do Compose no diretório aerosuite. Ajuste se o project name for outro:
+    # docker network ls | grep aerosuite

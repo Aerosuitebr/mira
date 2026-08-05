@@ -1,11 +1,16 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ApiService, ChannelStatus, Company, DeliveryItem, Template } from '../../core/api.service';
+import { timeout } from 'rxjs';
+import { ApiService, ApproachVariant, ChannelStatus, Company, DeliveryItem, Template } from '../../core/api.service';
 
 interface AiPreviewCopy {
   subject: string;
+  /** Saudação dinâmica (travada na UI). */
+  greeting: string;
+  /** Corpo editável. */
   body: string;
+  approachId: string;
 }
 
 interface ChannelUiStatus {
@@ -54,7 +59,11 @@ interface SendProgressState {
 export class OutreachComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly fb = inject(FormBuilder);
+  private readonly cdr = inject(ChangeDetectorRef);
   private progressTimer: ReturnType<typeof setInterval> | null = null;
+  private sendWaitTimer: ReturnType<typeof setTimeout> | null = null;
+  private sendSub: { unsubscribe(): void } | null = null;
+  canForceCloseSend = false;
 
   readonly templateVariables = [
     { token: '{{companyName}}', label: 'Nome da empresa' },
@@ -68,6 +77,11 @@ export class OutreachComponent implements OnInit, OnDestroy {
   templates: Template[] = [];
   previewCompanyId = '';
   previewsByCompany: Record<string, AiPreviewCopy> = {};
+  approaches: ApproachVariant[] = [];
+  selectedApproachId = 'DIRECT';
+  /** Saudação dinâmica travada (nome da empresa/contato). */
+  aiGreeting = '';
+  /** Corpo editável da mensagem. */
   aiPreview = '';
   aiSubject = '';
   loading = false;
@@ -107,6 +121,9 @@ export class OutreachComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.clearProgressTimer();
+    this.clearSendWaitTimer();
+    this.sendSub?.unsubscribe();
+    this.sendSub = null;
   }
 
   private restoreSelectedCompanies(): void {
@@ -161,7 +178,9 @@ export class OutreachComponent implements OnInit, OnDestroy {
   }
 
   get previewReadyCount(): number {
-    return Object.values(this.previewsByCompany).filter((preview) => preview.body.trim().length > 0).length;
+    return Object.values(this.previewsByCompany).filter(
+      (preview) => this.composeFullBody(preview.greeting, preview.body).trim().length > 0
+    ).length;
   }
 
   get canGenerateAi(): boolean {
@@ -214,6 +233,10 @@ export class OutreachComponent implements OnInit, OnDestroy {
     return this.segmentPreviewText(this.aiPreview);
   }
 
+  get previewGreetingSegments(): PreviewSegment[] {
+    return this.segmentPreviewText(this.aiGreeting);
+  }
+
   get hasPreviewTokens(): boolean {
     return (
       this.previewSubjectSegments.some((s) => s.kind !== 'text') ||
@@ -244,8 +267,58 @@ export class OutreachComponent implements OnInit, OnDestroy {
 
   onPreviewCompanyChange(companyId: string): void {
     this.persistCurrentPreview();
+    const keptBody = this.aiPreview;
+    const keptSubject = this.aiSubject;
+    const keptApproach = this.selectedApproachId;
     this.previewCompanyId = companyId;
+    const cached = this.previewsByCompany[companyId];
+    if (cached) {
+      this.syncPreviewFromCache();
+      return;
+    }
+    if (keptBody.trim() || this.approaches.length > 0) {
+      this.refreshGreetingForCompany(companyId, keptBody, keptSubject, keptApproach);
+      return;
+    }
     this.syncPreviewFromCache();
+  }
+
+  private refreshGreetingForCompany(
+    companyId: string,
+    keptBody: string,
+    keptSubject: string,
+    keptApproach: string
+  ): void {
+    this.api
+      .generateAiCopy({
+        companyId,
+        channel: this.form.controls.channel.value,
+        productDescription: this.form.controls.productDescription.value,
+        tone: keptApproach || 'DIRECT'
+      })
+      .subscribe({
+        next: (copy) => {
+          const channel = this.form.controls.channel.value;
+          const selected =
+            (copy.approaches || []).find((a) => a.id === (keptApproach || copy.selectedApproachId)) ||
+            copy.approaches?.[0];
+          const greeting =
+            channel === 'WHATSAPP'
+              ? this.normalizeWhatsAppCopy(selected?.greeting || copy.greeting || '')
+              : selected?.greeting || copy.greeting || '';
+          this.applyPreview(companyId, {
+            subject: keptSubject || selected?.subject || copy.subject || '',
+            greeting,
+            body: keptBody.trim()
+              ? keptBody
+              : channel === 'WHATSAPP'
+                ? this.normalizeWhatsAppCopy(selected?.body || copy.editableBody || '')
+                : selected?.body || copy.editableBody || '',
+            approachId: keptApproach || selected?.id || 'DIRECT'
+          });
+        },
+        error: () => this.syncPreviewFromCache()
+      });
   }
 
   onPreviewSubjectInput(event: Event): void {
@@ -282,10 +355,16 @@ export class OutreachComponent implements OnInit, OnDestroy {
   }
 
   closeSendProgress(): void {
-    if (this.isSendBusy) {
+    if (this.isSendBusy && !this.canForceCloseSend) {
       return;
     }
+    if (this.isSendBusy && this.canForceCloseSend) {
+      this.sendSub?.unsubscribe();
+      this.sendSub = null;
+    }
     this.clearProgressTimer();
+    this.clearSendWaitTimer();
+    this.canForceCloseSend = false;
     this.sendProgress = this.emptySendProgress();
   }
 
@@ -327,31 +406,72 @@ export class OutreachComponent implements OnInit, OnDestroy {
       .generateAiCopy({
         companyId: company.id,
         channel: this.form.controls.channel.value,
-        productDescription: this.form.controls.productDescription.value
+        productDescription: this.form.controls.productDescription.value,
+        tone: this.selectedApproachId || 'DIRECT'
       })
       .subscribe({
         next: (copy) => {
           const channel = this.form.controls.channel.value;
+          this.approaches = (copy.approaches || []).map((a) => ({
+            ...a,
+            greeting:
+              channel === 'WHATSAPP' ? this.normalizeWhatsAppCopy(a.greeting || '') : a.greeting || '',
+            body: channel === 'WHATSAPP' ? this.normalizeWhatsAppCopy(a.body || '') : a.body || ''
+          }));
+          const selectedId = copy.selectedApproachId || this.approaches[0]?.id || 'DIRECT';
+          this.selectedApproachId = selectedId;
+          const selected =
+            this.approaches.find((a) => a.id === selectedId) || this.approaches[0] || null;
+          const greeting =
+            selected?.greeting ||
+            (channel === 'WHATSAPP'
+              ? this.normalizeWhatsAppCopy(copy.greeting || '')
+              : copy.greeting || '');
           const body =
-            channel === 'WHATSAPP' ? this.normalizeWhatsAppCopy(copy.body) : copy.body;
+            selected?.body ||
+            (channel === 'WHATSAPP'
+              ? this.normalizeWhatsAppCopy(copy.editableBody || copy.body || '')
+              : copy.editableBody || copy.body || '');
           const preview: AiPreviewCopy = {
-            subject: copy.subject ?? '',
-            body
+            subject: selected?.subject || copy.subject || '',
+            greeting,
+            body,
+            approachId: selectedId
           };
-          this.previewsByCompany[company.id] = preview;
-          this.aiSubject = preview.subject;
-          this.aiPreview = preview.body;
+          this.applyPreview(company.id, preview);
           this.generatingAi = false;
           this.showFeedback(
-            `Prévia gerada para ${company.tradeName || company.legalName}. Revise à direita e só então dispare.`,
+            `4 abordagens geradas para ${company.tradeName || company.legalName}. Escolha uma à direita.`,
             false
           );
         },
         error: () => {
           this.generatingAi = false;
-          this.showFeedback('Falha ao gerar copy com IA.', true);
+          this.showFeedback('Falha ao gerar texto de prospecção.', true);
         }
       });
+  }
+
+  selectApproach(approach: ApproachVariant): void {
+    if (!approach) {
+      return;
+    }
+    this.selectedApproachId = approach.id;
+    const companyId = this.previewCompanyId || this.companies[0]?.id;
+    if (!companyId) {
+      return;
+    }
+    const channel = this.form.controls.channel.value;
+    const preview: AiPreviewCopy = {
+      subject: approach.subject || '',
+      greeting:
+        channel === 'WHATSAPP'
+          ? this.normalizeWhatsAppCopy(approach.greeting || '')
+          : approach.greeting || '',
+      body: channel === 'WHATSAPP' ? this.normalizeWhatsAppCopy(approach.body || '') : approach.body || '',
+      approachId: approach.id
+    };
+    this.applyPreview(companyId, preview);
   }
 
   sendCampaign(): void {
@@ -371,27 +491,33 @@ export class OutreachComponent implements OnInit, OnDestroy {
     this.persistCurrentPreview();
     this.loading = true;
     this.message = '';
+    this.canForceCloseSend = false;
 
     const channel = this.form.controls.channel.value === 'WHATSAPP' ? 'WHATSAPP' : 'EMAIL';
     const campaignName = this.form.controls.campaignName.value;
     this.beginSendProgress(channel, campaignName);
 
+    // NÃO reaproveitar prévia já resolvida de 1 empresa no lote inteiro.
+    // Só envia override se o texto ainda tiver placeholders; senão o backend
+    // regenera copy personalizada por empresa (evita "Olá Telefone" / empresa errada).
     const messages: Record<string, { subject?: string; body?: string }> = {};
     for (const id of this.companyIds) {
       const cached = this.previewsByCompany[id];
-      const rawBody = cached?.body?.trim() ? cached.body : this.aiPreview.trim() ? this.aiPreview : '';
-      if (!rawBody) {
+      const rawBody = this.composeFullBody(cached?.greeting || '', cached?.body || '');
+      if (!rawBody || !this.hasCopyPlaceholders(rawBody)) {
         continue;
       }
       const body = channel === 'WHATSAPP' ? this.normalizeWhatsAppCopy(rawBody) : rawBody;
+      const subject = cached?.subject?.trim() ?? '';
       messages[id] = {
-        subject: cached?.subject ?? this.aiSubject,
+        subject: this.hasCopyPlaceholders(subject) ? subject : undefined,
         body
       };
     }
 
     const emailFallback = localStorage.getItem('mira.whatsapp.emailFallback');
-    this.api
+    this.sendSub?.unsubscribe();
+    this.sendSub = this.api
       .sendBulk({
         campaignName,
         templateId: this.form.controls.templateId.value,
@@ -399,10 +525,15 @@ export class OutreachComponent implements OnInit, OnDestroy {
         companyIds: this.companyIds,
         productDescription: this.form.controls.productDescription.value,
         messages,
-        emailFallback: emailFallback === null ? true : emailFallback === 'true'
+        emailFallback: emailFallback === null ? true : emailFallback === 'true',
+        approachId: this.selectedApproachId || 'DIRECT',
+        editableBody: this.aiPreview.trim() || undefined,
+        editableSubject: channel === 'EMAIL' ? this.aiSubject.trim() || undefined : undefined
       })
+      .pipe(timeout({ first: 300_000 }))
       .subscribe({
         next: (campaign) => {
+          this.sendSub = null;
           const failed = campaign.failedCount ?? 0;
           const sent = campaign.sentCount ?? 0;
           const waSent = campaign.waSent ?? 0;
@@ -421,7 +552,11 @@ export class OutreachComponent implements OnInit, OnDestroy {
           this.loading = false;
         },
         error: (err) => {
-          const msg = err?.error?.message || err?.error || 'Falha ao enviar campanha.';
+          this.sendSub = null;
+          const timedOut = err?.name === 'TimeoutError';
+          const msg = timedOut
+            ? 'Tempo esgotado aguardando o servidor. Confira no CRM se parte dos envios concluiu.'
+            : err?.error?.message || err?.error || 'Falha ao enviar campanha.';
           const detail = typeof msg === 'string' ? msg : 'Falha ao enviar campanha.';
           this.finishSendProgress({
             campaignName,
@@ -439,8 +574,14 @@ export class OutreachComponent implements OnInit, OnDestroy {
       });
   }
 
+  private hasCopyPlaceholders(text: string): boolean {
+    return /\{\{\s*(companyName|contactName|cnaeDescription|senderName)\s*\}\}/.test(text);
+  }
+
   private beginSendProgress(channel: 'EMAIL' | 'WHATSAPP', campaignName: string): void {
     this.clearProgressTimer();
+    this.clearSendWaitTimer();
+    this.canForceCloseSend = false;
     const total = Math.max(this.companyIds.length, 1);
     const firstLead = this.companies[0];
     const firstActive = this.effectiveChannelForCompany(firstLead, channel);
@@ -464,9 +605,23 @@ export class OutreachComponent implements OnInit, OnDestroy {
       deliveries: [],
       statusMessage:
         channel === 'WHATSAPP'
-          ? 'Validando sessão WhatsApp e montando mensagens…'
-          : 'Validando SMTP e montando mensagens…'
+          ? 'Validando sessão WhatsApp e montando mensagens personalizadas por empresa…'
+          : 'Validando SMTP e montando mensagens personalizadas por empresa…'
     };
+    this.cdr.markForCheck();
+
+    // Após 45s ainda busy: permite fechar o modal (não trava a UI).
+    this.sendWaitTimer = setTimeout(() => {
+      if (this.isSendBusy) {
+        this.canForceCloseSend = true;
+        this.sendProgress = {
+          ...this.sendProgress,
+          statusMessage:
+            this.sendProgress.statusMessage + ' (demorando: você pode fechar e acompanhar no CRM)'
+        };
+        this.cdr.markForCheck();
+      }
+    }, 45_000);
 
     window.setTimeout(() => {
       if (!this.sendProgress.open || this.sendProgress.phase !== 'preparing') {
@@ -482,6 +637,7 @@ export class OutreachComponent implements OnInit, OnDestroy {
             ? 'Disparando mensagens no WhatsApp…'
             : 'Disparando e-mails pela caixa SMTP…'
       };
+      this.cdr.markForCheck();
       this.startSimulatedProgress();
     }, 700);
   }
@@ -516,6 +672,7 @@ export class OutreachComponent implements OnInit, OnDestroy {
               ? `Sem telefone: enviando e-mail para ${leadName}…`
               : `Enviando e-mail para ${leadName}…`
       };
+      this.cdr.detectChanges();
 
       if (nextIndex >= total) {
         this.sendProgress = {
@@ -523,6 +680,7 @@ export class OutreachComponent implements OnInit, OnDestroy {
           statusMessage: 'Aguardando confirmação do servidor…'
         };
         this.clearProgressTimer();
+        this.cdr.detectChanges();
       }
     }, tickMs);
   }
@@ -551,6 +709,8 @@ export class OutreachComponent implements OnInit, OnDestroy {
     deliveries?: DeliveryItem[];
   }): void {
     this.clearProgressTimer();
+    this.clearSendWaitTimer();
+    this.canForceCloseSend = false;
     const failureLines = this.parseFailureLines(result.detail, result.failed);
     const nonWhatsAppLines = (result.nonWhatsApp ?? []).filter((line) => !!line?.trim());
     let phase: SendPhase = 'success';
@@ -575,6 +735,7 @@ export class OutreachComponent implements OnInit, OnDestroy {
 
     this.sendProgress = {
       ...this.sendProgress,
+      open: true,
       phase,
       progress: 100,
       currentIndex: this.sendProgress.total,
@@ -591,6 +752,7 @@ export class OutreachComponent implements OnInit, OnDestroy {
     };
 
     this.showFeedback(statusMessage, phase === 'error' || phase === 'partial');
+    this.cdr.detectChanges();
   }
 
   private parseFailureLines(detail: string, failedCount: number): string[] {
@@ -641,16 +803,25 @@ export class OutreachComponent implements OnInit, OnDestroy {
     }
   }
 
+  private clearSendWaitTimer(): void {
+    if (this.sendWaitTimer) {
+      clearTimeout(this.sendWaitTimer);
+      this.sendWaitTimer = null;
+    }
+  }
+
   private persistCurrentPreview(): void {
     if (!this.previewCompanyId) {
       return;
     }
-    if (!this.aiPreview.trim() && !this.aiSubject.trim()) {
+    if (!this.aiGreeting.trim() && !this.aiPreview.trim() && !this.aiSubject.trim()) {
       return;
     }
     this.previewsByCompany[this.previewCompanyId] = {
       subject: this.aiSubject,
-      body: this.aiPreview
+      greeting: this.aiGreeting,
+      body: this.aiPreview,
+      approachId: this.selectedApproachId || 'DIRECT'
     };
   }
 
@@ -658,11 +829,35 @@ export class OutreachComponent implements OnInit, OnDestroy {
     const cached = this.previewsByCompany[this.previewCompanyId];
     if (cached) {
       this.aiSubject = cached.subject;
+      this.aiGreeting = cached.greeting || '';
       this.aiPreview = cached.body;
+      this.selectedApproachId = cached.approachId || this.selectedApproachId || 'DIRECT';
     } else {
       this.aiSubject = '';
+      this.aiGreeting = '';
       this.aiPreview = '';
     }
+  }
+
+  private applyPreview(companyId: string, preview: AiPreviewCopy): void {
+    this.previewsByCompany[companyId] = preview;
+    this.previewCompanyId = companyId;
+    this.aiSubject = preview.subject;
+    this.aiGreeting = preview.greeting;
+    this.aiPreview = preview.body;
+    this.selectedApproachId = preview.approachId || 'DIRECT';
+  }
+
+  private composeFullBody(greeting: string, body: string): string {
+    const g = (greeting || '').trim();
+    const b = (body || '').trim();
+    if (!g) {
+      return b;
+    }
+    if (!b) {
+      return g;
+    }
+    return `${g}\n\n${b}`;
   }
 
   private showFeedback(text: string, isError: boolean): void {

@@ -5,6 +5,7 @@ import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -56,7 +57,7 @@ public class MailSenderService {
     }
 
     public SendResult sendHtml(String to, String subject, String htmlBody, String textBody, String intendedRecipient) {
-        return sendHtml(to, subject, htmlBody, textBody, intendedRecipient, null);
+        return sendHtml(to, subject, htmlBody, textBody, intendedRecipient, null, null);
     }
 
     public SendResult sendHtml(
@@ -66,6 +67,18 @@ public class MailSenderService {
         String textBody,
         String intendedRecipient,
         String fromNameOverride
+    ) {
+        return sendHtml(to, subject, htmlBody, textBody, intendedRecipient, fromNameOverride, null);
+    }
+
+    public SendResult sendHtml(
+        String to,
+        String subject,
+        String htmlBody,
+        String textBody,
+        String intendedRecipient,
+        String fromNameOverride,
+        InlineImage inlineLogo
     ) {
         if (!isConfigured()) {
             return SendResult.fail("SMTP não configurado");
@@ -84,12 +97,34 @@ public class MailSenderService {
             helper.setReplyTo(username != null && !username.isBlank() ? username : from);
             helper.setSubject(finalSubject);
             helper.setText(finalText != null ? finalText : "", finalHtml);
+            if (inlineLogo != null && inlineLogo.bytes() != null && inlineLogo.bytes().length > 0) {
+                String cid = inlineLogo.contentId() != null && !inlineLogo.contentId().isBlank()
+                    ? inlineLogo.contentId()
+                    : "aero-suite-logo";
+                String mime = inlineLogo.mimeType() != null && !inlineLogo.mimeType().isBlank()
+                    ? inlineLogo.mimeType()
+                    : "image/png";
+                helper.addInline(cid, new ByteArrayResource(inlineLogo.bytes()) {
+                    @Override
+                    public String getFilename() {
+                        return inlineLogo.fileName() != null && !inlineLogo.fileName().isBlank()
+                            ? inlineLogo.fileName()
+                            : "logo.png";
+                    }
+                }, mime);
+            }
             mailSender.send(message);
             log.info("E-mail enviado para {} (assunto: {})", destination, finalSubject);
             return SendResult.ok(destination);
         } catch (Exception ex) {
             log.error("Falha ao enviar e-mail para {}: {}", destination, ex.getMessage());
             return SendResult.fail(ex.getMessage());
+        }
+    }
+
+    public record InlineImage(String contentId, byte[] bytes, String mimeType, String fileName) {
+        public static InlineImage from(String contentId, byte[] bytes, String mimeType, String fileName) {
+            return new InlineImage(contentId, bytes, mimeType, fileName);
         }
     }
 

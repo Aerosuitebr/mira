@@ -92,8 +92,8 @@ public class CompanyIndexingService {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
             """
             SELECT id, cnpj, legal_name, trade_name, cnae_main, cnae_secondary, cnae_description,
-                   city, state, estimated_revenue, data_source, latitude, longitude,
-                   registration_status, web_contactable
+                   city, state, neighborhood, street, zip_code, estimated_revenue, data_source,
+                   latitude, longitude, location_precision, registration_status, web_contactable
             FROM companies
             WHERE id IN (%s)
             """.formatted(placeholders),
@@ -131,8 +131,8 @@ public class CompanyIndexingService {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 """
                 SELECT id, cnpj, legal_name, trade_name, cnae_main, cnae_secondary, cnae_description,
-                       city, state, estimated_revenue, data_source, latitude, longitude,
-                       registration_status, web_contactable
+                       city, state, neighborhood, street, zip_code, estimated_revenue, data_source,
+                       latitude, longitude, location_precision, registration_status, web_contactable
                 FROM companies
                 WHERE state = ?
                   AND (?::uuid IS NULL OR id > ?::uuid)
@@ -181,11 +181,19 @@ public class CompanyIndexingService {
         doc.setCnaeDescription(cnaeDesc == null ? null : cnaeDesc.toString());
         doc.setCity(String.valueOf(row.get("city")));
         doc.setState(String.valueOf(row.get("state")));
+        Object neighborhood = row.get("neighborhood");
+        doc.setNeighborhood(neighborhood == null ? null : neighborhood.toString());
+        Object street = row.get("street");
+        doc.setStreet(street == null ? null : street.toString());
+        Object zip = row.get("zip_code");
+        doc.setZipCode(zip == null ? null : zip.toString());
         Object revenue = row.get("estimated_revenue");
         doc.setEstimatedRevenue(revenue == null ? null : revenue.toString());
         doc.setDataSource(String.valueOf(row.get("data_source")));
         Object registrationStatus = row.get("registration_status");
         doc.setRegistrationStatus(registrationStatus == null ? "02" : registrationStatus.toString());
+        Object precision = row.get("location_precision");
+        doc.setLocationPrecision(precision == null ? null : precision.toString());
         doc.setWebContactable(Boolean.TRUE.equals(row.get("web_contactable")));
         Object lat = row.get("latitude");
         Object lng = row.get("longitude");

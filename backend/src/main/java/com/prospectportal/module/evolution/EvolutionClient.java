@@ -26,9 +26,13 @@ public class EvolutionClient {
     private static final Logger log = LoggerFactory.getLogger(EvolutionClient.class);
 
     private final boolean enabled;
+    private final boolean outboundEnabled;
+    private final boolean internalNotificationsEnabled;
     private final String apiBaseUrl;
     private final String apiKey;
     private final String defaultInstance;
+    private final String publicBaseUrl;
+    private final String webhookSecret;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(15))
@@ -36,15 +40,23 @@ public class EvolutionClient {
 
     public EvolutionClient(
         @Value("${app.evolution.enabled:false}") boolean enabled,
+        @Value("${app.evolution.outbound-enabled:false}") boolean outboundEnabled,
+        @Value("${app.evolution.internal-notifications-enabled:false}") boolean internalNotificationsEnabled,
         @Value("${app.evolution.api-base-url:http://localhost:18082}") String apiBaseUrl,
         @Value("${app.evolution.api-key:}") String apiKey,
         @Value("${app.evolution.instance:mira-prospect}") String instance,
+        @Value("${app.public-base-url:http://localhost:4201}") String publicBaseUrl,
+        @Value("${app.evolution.webhook-secret:}") String webhookSecret,
         ObjectMapper objectMapper
     ) {
         this.enabled = enabled;
+        this.outboundEnabled = outboundEnabled;
+        this.internalNotificationsEnabled = internalNotificationsEnabled;
         this.apiBaseUrl = trimSlash(apiBaseUrl);
         this.apiKey = apiKey;
         this.defaultInstance = instance;
+        this.publicBaseUrl = trimSlash(publicBaseUrl);
+        this.webhookSecret = webhookSecret;
         this.objectMapper = objectMapper;
     }
 
@@ -214,6 +226,9 @@ public class EvolutionClient {
     }
 
     public SendResult sendText(String instance, String phoneE164, String text) {
+        if (!outboundEnabled) {
+            return SendResult.fail("Envios WhatsApp desabilitados na Fase 1");
+        }
         if (!isEnabled()) {
             return SendResult.fail("Evolution API desabilitada");
         }
@@ -228,6 +243,48 @@ public class EvolutionClient {
             return SendResult.rateLimited(ex.getMessage());
         } catch (Exception ex) {
             log.warn("Falha ao enviar WA para {}: {}", phoneE164, ex.getMessage());
+            return SendResult.fail(ex.getMessage());
+        }
+    }
+
+    /** Configura somente o evento de nova mensagem para a instância conectada. */
+    public SendResult configureReplyWebhook(String instance) {
+        if (!isEnabled()) return SendResult.fail("Evolution API desabilitada");
+        if (webhookSecret == null || webhookSecret.isBlank()) return SendResult.fail("APP_EVOLUTION_WEBHOOK_SECRET não configurado");
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("enabled", true);
+            body.put("url", publicBaseUrl + "/api/webhooks/evolution");
+            body.put("events", List.of("MESSAGES_UPSERT"));
+            body.put("headers", Map.of("X-Webhook-Secret", webhookSecret));
+            body.put("base64", false);
+            post("/webhook/set/" + encode(resolveInstance(instance)), body);
+            return SendResult.ok(null);
+        } catch (Exception ex) {
+            return SendResult.fail(ex.getMessage());
+        }
+    }
+
+    /** Alerta operacional para contatos internos; não habilita envios aos leads. */
+    public SendResult sendInternalNotification(String phoneE164, String text) {
+        if (!internalNotificationsEnabled) {
+            return SendResult.fail("Alertas internos WhatsApp desabilitados");
+        }
+        return sendTextUnchecked(defaultInstance, phoneE164, text);
+    }
+
+    private SendResult sendTextUnchecked(String instance, String phoneE164, String text) {
+        if (!isEnabled()) return SendResult.fail("Evolution API desabilitada");
+        String name = resolveInstance(instance);
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("number", cleanPhone(phoneE164));
+            body.put("text", text);
+            return SendResult.ok(extractMessageId(post("/message/sendText/" + encode(name), body)));
+        } catch (RateLimitedException ex) {
+            return SendResult.rateLimited(ex.getMessage());
+        } catch (Exception ex) {
+            log.warn("Falha ao enviar alerta interno para {}: {}", phoneE164, ex.getMessage());
             return SendResult.fail(ex.getMessage());
         }
     }
@@ -248,6 +305,9 @@ public class EvolutionClient {
         String base64Png,
         String fileName
     ) {
+        if (!outboundEnabled) {
+            return SendResult.fail("Envios WhatsApp desabilitados na Fase 1");
+        }
         if (!isEnabled()) {
             return SendResult.fail("Evolution API desabilitada");
         }

@@ -146,6 +146,9 @@
           </button>
         }
         @if (phase === 'connected') {
+          <button type="button" class="pp-btn pp-btn--outline" (click)="configureWebhook()" [disabled]="acting">
+            Configurar webhook de respostas
+          </button>
           <button type="button" class="pp-btn pp-btn--outline wa-disconnect" (click)="disconnect()" [disabled]="acting">
             {{ acting ? 'Desconectando…' : 'Desconectar' }}
           </button>

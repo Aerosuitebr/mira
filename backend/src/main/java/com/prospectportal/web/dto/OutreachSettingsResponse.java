@@ -5,6 +5,8 @@ public record OutreachSettingsResponse(
     boolean hasBrandImage,
     String brandImageMime,
     String brandImageFileName,
-    String brandImageBase64
+    String brandImageBase64,
+    String approvalRecipient1,
+    String approvalRecipient2
 ) {
 }

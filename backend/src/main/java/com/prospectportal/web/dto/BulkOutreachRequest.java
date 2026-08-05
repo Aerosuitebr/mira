@@ -11,7 +11,10 @@ public record BulkOutreachRequest(
     List<UUID> companyIds,
     String productDescription,
     Map<String, MessageOverride> messages,
-    Boolean emailFallback
+    Boolean emailFallback,
+    String approachId,
+    String editableBody,
+    String editableSubject
 ) {
     public record MessageOverride(String subject, String body) {
     }

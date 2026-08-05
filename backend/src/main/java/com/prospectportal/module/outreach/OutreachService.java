@@ -27,6 +27,9 @@ import com.prospectportal.web.dto.CampaignResponse;
 import com.prospectportal.web.dto.ApproachStatusResponse;
 import com.prospectportal.web.dto.DeliveryItem;
 import com.prospectportal.web.dto.OutreachMessageHistoryItem;
+import com.prospectportal.web.dto.OutreachReportResponse;
+import com.prospectportal.web.dto.FollowUpReviewItem;
+import com.prospectportal.web.dto.FollowUpApprovalResponse;
 import com.prospectportal.web.dto.TemplateResponse;
 import com.prospectportal.web.mapper.DtoMapper;
 import org.slf4j.Logger;
@@ -115,6 +118,48 @@ public class OutreachService {
     }
 
     @Transactional(readOnly = true)
+    public OutreachReportResponse report() {
+        UUID tenantId = authContext.tenantId();
+        return new OutreachReportResponse(
+            messageRepository.countByTenantAndStepAndStatus(tenantId, (short) 1, "SENT"),
+            messageRepository.countRepliesByTenant(tenantId),
+            messageRepository.countByTenantAndStepAndStatus(tenantId, (short) 2, "AWAITING_APPROVAL"),
+            messageRepository.countByTenantAndStepAndStatus(tenantId, (short) 2, "SENT"),
+            messageRepository.countByTenantAndStepAndStatus(tenantId, (short) 2, "FAILED")
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<FollowUpReviewItem> followUpsAwaitingApproval() {
+        return messageRepository.findFollowUpsAwaitingApproval(authContext.tenantId()).stream()
+            .map(m -> new FollowUpReviewItem(
+                m.getId(), m.getLead().getCompany().getId(), companyDisplayName(m.getLead().getCompany()),
+                m.getRecipient(), m.getBody(), m.getCreatedAt()
+            ))
+            .toList();
+    }
+
+    @Transactional
+    public FollowUpApprovalResponse approveFollowUp(UUID id) {
+        OutreachMessage message = messageRepository.findByIdAndTenantId(id, authContext.tenantId())
+            .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Mensagem não encontrada"));
+        if (message.getOutreachStep() != 2 || !"AWAITING_APPROVAL".equals(message.getStatus())) {
+            throw new ResponseStatusException(BAD_REQUEST, "Mensagem não está aguardando aprovação");
+        }
+        String instance = message.getCampaign().getTenant().getEvolutionInstanceName();
+        var result = evolutionClient.sendText(instance, message.getRecipient(), message.getBody());
+        if (!result.success()) {
+            return new FollowUpApprovalResponse(message.getId(), message.getStatus(), result.error());
+        }
+        message.setStatus("SENT");
+        message.setProvider("evolution");
+        message.setProviderMessageId(result.messageId());
+        message.setSentAt(Instant.now());
+        messageRepository.save(message);
+        return new FollowUpApprovalResponse(message.getId(), message.getStatus(), null);
+    }
+
+    @Transactional(readOnly = true)
     public List<ApproachStatusResponse> approachStatus(List<UUID> companyIds) {
         if (companyIds == null || companyIds.isEmpty()) {
             return List.of();
@@ -169,33 +214,75 @@ public class OutreachService {
         Company company = companyRepository.findById(request.companyId())
             .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Empresa não encontrada"));
 
-        String contactName = contactRepository.findByCompanyIdOrderByConfidenceDesc(company.getId())
-            .stream()
-            .findFirst()
-            .map(CompanyContact::getFullName)
-            .orElse("equipe");
+        String contactName = resolveGreetingName(resolveBestContact(company.getId()));
 
         String companyName = company.getTradeName() != null ? company.getTradeName() : company.getLegalName();
         String cityState = (company.getCity() != null ? company.getCity() : "")
             + (company.getState() != null ? "/" + company.getState() : "");
         String segment = company.getCnaeDescription() != null ? company.getCnaeDescription() : company.getCnaeMain();
         var brand = outreachSettingsService.resolveBrandForCurrentTenant();
+        boolean whatsapp = "WHATSAPP".equalsIgnoreCase(request.channel());
+        var selected = ProspectCopyBuilder.ApproachId.from(request.tone());
 
-        if ("WHATSAPP".equalsIgnoreCase(request.channel())) {
-            return new AiCopyResponse(
-                null,
-                ProspectCopyBuilder.normalizeWhatsAppCopy(
-                    copyBuilder.whatsappCaption(companyName, contactName, cityState, segment, brand)
-                ),
-                "WHATSAPP"
-            );
+        var approaches = copyBuilder.listApproaches(
+            companyName, contactName, cityState, segment, brand, request.channel()
+        ).stream()
+            .map(a -> {
+                String body = whatsapp
+                    ? ProspectCopyBuilder.normalizeWhatsAppCopy(a.body())
+                    : a.body();
+                String greeting = whatsapp
+                    ? ProspectCopyBuilder.normalizeWhatsAppCopy(a.greeting())
+                    : a.greeting();
+                return new AiCopyResponse.ApproachVariant(
+                    a.id(),
+                    a.label(),
+                    a.description(),
+                    greeting,
+                    body,
+                    a.subject()
+                );
+            })
+            .toList();
+
+        var chosen = approaches.stream()
+            .filter(a -> selected.name().equals(a.id()))
+            .findFirst()
+            .orElse(approaches.get(0));
+
+        String fullBody = joinGreetingBody(chosen.greeting(), chosen.body());
+        if (whatsapp) {
+            fullBody = ProspectCopyBuilder.normalizeWhatsAppCopy(fullBody);
         }
 
         return new AiCopyResponse(
-            copyBuilder.emailSubject(companyName, brand),
-            copyBuilder.emailText(companyName, contactName, cityState, segment, brand),
-            "EMAIL"
+            chosen.subject(),
+            fullBody,
+            whatsapp ? "WHATSAPP" : "EMAIL",
+            chosen.greeting(),
+            chosen.body(),
+            chosen.id(),
+            approaches
         );
+    }
+
+    private static String joinGreetingBody(String greeting, String body) {
+        String g = greeting != null ? greeting.trim() : "";
+        String b = body != null ? body.trim() : "";
+        if (g.isEmpty()) {
+            return b;
+        }
+        if (b.isEmpty()) {
+            return g;
+        }
+        return g + "\n\n" + b;
+    }
+
+    private static String companyDisplayName(Company company) {
+        if (company.getTradeName() != null && !company.getTradeName().isBlank()) {
+            return company.getTradeName();
+        }
+        return company.getLegalName();
     }
 
     public BulkCampaignResponse sendBulk(BulkOutreachRequest request) {
@@ -253,20 +340,19 @@ public class OutreachService {
             Lead lead = leadRepository.findByTenantIdAndCompanyId(tenantId, companyId)
                 .orElseGet(() -> createLead(tenant, company));
 
-            CompanyContact contact = contactRepository.findByCompanyIdOrderByConfidenceDesc(companyId)
-                .stream()
-                .findFirst()
-                .orElse(null);
+            CompanyContact contact = resolveBestContact(companyId);
 
             String companyName = company.getTradeName() != null ? company.getTradeName() : company.getLegalName();
-            String contactName = contact != null && contact.getFullName() != null ? contact.getFullName() : "decisor";
+            String contactName = resolveGreetingName(contact);
             String cityState = (company.getCity() != null ? company.getCity() : "")
                 + (company.getState() != null ? "/" + company.getState() : "");
             String segment = company.getCnaeDescription() != null ? company.getCnaeDescription() : company.getCnaeMain();
 
             BulkOutreachRequest.MessageOverride override = overrides.get(companyId.toString());
-            String body = resolveBody(override, template, companyName, contactName, company, whatsapp, cityState, segment, brand);
-            String subject = resolveSubject(override, template, companyName, brand);
+            String body = resolveBody(
+                override, template, companyName, contactName, company, whatsapp, cityState, segment, brand, request
+            );
+            String subject = resolveSubject(override, template, companyName, brand, request, contactName, cityState, segment);
 
             OutreachMessage message = new OutreachMessage();
             message.setCampaign(campaign);
@@ -502,7 +588,8 @@ public class OutreachService {
             html,
             text,
             email,
-            brand != null ? brand.senderName() : null
+            brand != null ? brand.senderName() : null,
+            toInlineImage(copyBuilder.resolveEmailInlineLogo(brand))
         );
         if (result.success()) {
             return Delivery.ok(result.deliveredTo() != null ? result.deliveredTo() : email, null);
@@ -519,12 +606,16 @@ public class OutreachService {
         boolean whatsapp,
         String cityState,
         String segment,
-        OutreachSettingsService.BrandProfile brand
+        OutreachSettingsService.BrandProfile brand,
+        BulkOutreachRequest request
     ) {
         String senderName = brand != null && brand.senderName() != null && !brand.senderName().isBlank()
             ? brand.senderName()
             : authContext.currentUser().fullName();
-        if (override != null && override.body() != null && !override.body().isBlank()) {
+        // Override só vale se ainda tiver placeholders. Texto já resolvido (prévia de 1 empresa)
+        // NÃO pode ser reaproveitado no lote: gerava "Olá Telefone" / empresa errada em todos.
+        if (override != null && override.body() != null && !override.body().isBlank()
+            && hasCopyPlaceholders(override.body())) {
             String resolved = override.body()
                 .replace("{{companyName}}", companyName)
                 .replace("{{contactName}}", contactName)
@@ -532,29 +623,80 @@ public class OutreachService {
                 .replace("{{senderName}}", senderName);
             return whatsapp ? ProspectCopyBuilder.normalizeWhatsAppCopy(resolved) : resolved;
         }
-        if (whatsapp) {
-            return copyBuilder.whatsappCaption(companyName, contactName, cityState, segment, brand);
+
+        var approach = ProspectCopyBuilder.ApproachId.from(request != null ? request.approachId() : null);
+        String editable = request != null ? request.editableBody() : null;
+        if (editable != null && !editable.isBlank()) {
+            var built = copyBuilder.buildApproach(
+                approach, whatsapp, companyName, contactName, cityState, segment, brand
+            );
+            String joined = joinGreetingBody(built.greeting(), editable.trim());
+            return whatsapp ? ProspectCopyBuilder.normalizeWhatsAppCopy(joined) : joined;
         }
-        return template.getBodyTemplate()
-            .replace("{{companyName}}", companyName)
-            .replace("{{cnaeDescription}}", company.getCnaeDescription() != null ? company.getCnaeDescription() : "")
-            .replace("{{contactName}}", contactName)
-            .replace("{{senderName}}", senderName);
+
+        if (whatsapp) {
+            return copyBuilder.whatsappCaption(companyName, contactName, cityState, segment, brand, approach);
+        }
+        if (template.getBodyTemplate() != null && !template.getBodyTemplate().isBlank()) {
+            return template.getBodyTemplate()
+                .replace("{{companyName}}", companyName)
+                .replace("{{cnaeDescription}}", company.getCnaeDescription() != null ? company.getCnaeDescription() : "")
+                .replace("{{contactName}}", contactName)
+                .replace("{{senderName}}", senderName);
+        }
+        return copyBuilder.emailText(companyName, contactName, cityState, segment, brand, approach);
+    }
+
+    private CompanyContact resolveBestContact(UUID companyId) {
+        var contacts = contactRepository.findByCompanyIdOrderByConfidenceDesc(companyId);
+        return contacts.stream()
+            .filter(c -> c.getFullName() != null && !ProspectCopyBuilder.isNonPersonContactLabel(c.getFullName()))
+            .findFirst()
+            .orElseGet(() -> contacts.stream().findFirst().orElse(null));
+    }
+
+    private static String resolveGreetingName(CompanyContact contact) {
+        if (contact == null || contact.getFullName() == null || contact.getFullName().isBlank()) {
+            return "decisor";
+        }
+        if (ProspectCopyBuilder.isNonPersonContactLabel(contact.getFullName())) {
+            return "decisor";
+        }
+        return contact.getFullName().trim();
+    }
+
+    private static boolean hasCopyPlaceholders(String text) {
+        return text.contains("{{companyName}}")
+            || text.contains("{{contactName}}")
+            || text.contains("{{cnaeDescription}}")
+            || text.contains("{{senderName}}");
     }
 
     private String resolveSubject(
         BulkOutreachRequest.MessageOverride override,
         OutreachTemplate template,
         String companyName,
-        OutreachSettingsService.BrandProfile brand
+        OutreachSettingsService.BrandProfile brand,
+        BulkOutreachRequest request,
+        String contactName,
+        String cityState,
+        String segment
     ) {
-        if (override != null && override.subject() != null && !override.subject().isBlank()) {
+        if (override != null && override.subject() != null && !override.subject().isBlank()
+            && hasCopyPlaceholders(override.subject())) {
             return override.subject().replace("{{companyName}}", companyName);
         }
-        if (template.getSubject() != null) {
+        String editableSubject = request != null ? request.editableSubject() : null;
+        if (editableSubject != null && !editableSubject.isBlank() && !hasCopyPlaceholders(editableSubject)) {
+            // Assunto editado na prévia: usa no lote (não depende do nome da empresa no meio).
+            return editableSubject.trim();
+        }
+        var approach = ProspectCopyBuilder.ApproachId.from(request != null ? request.approachId() : null);
+        if (template.getSubject() != null && !template.getSubject().isBlank()
+            && (request == null || request.approachId() == null || request.approachId().isBlank())) {
             return template.getSubject().replace("{{companyName}}", companyName);
         }
-        return copyBuilder.emailSubject(companyName, brand);
+        return copyBuilder.emailSubject(companyName, brand, approach);
     }
 
     private static String resolvePhone(Company company, CompanyContact contact) {
@@ -634,5 +776,13 @@ public class OutreachService {
         static Delivery notWhatsApp(String phone) {
             return new Delivery(false, phone, null, "Número sem WhatsApp (não encontrado na rede)", true);
         }
+    }
+
+    private static MailSenderService.InlineImage toInlineImage(
+        java.util.Optional<ProspectCopyBuilder.EmailInlineLogo> logo
+    ) {
+        return logo
+            .map(l -> MailSenderService.InlineImage.from(l.contentId(), l.bytes(), l.mimeType(), l.fileName()))
+            .orElse(null);
     }
 }

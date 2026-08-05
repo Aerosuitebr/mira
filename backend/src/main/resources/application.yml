@@ -84,9 +84,10 @@ app:
     enabled: true
     nominatim-url: https://nominatim.openstreetmap.org/search
     awesome-cep-url: https://cep.awesomeapi.com.br
+    brasil-api-cep-url: https://brasilapi.com.br/api/cep/v2
     rate-limit-ms: 1100
-    cep-rate-limit-ms: 25
-    cep-parallelism: 24
+    cep-rate-limit-ms: 80
+    cep-parallelism: 8
     cep-batch-size: 3000
   import:
     chunk-size: 2000
@@ -109,12 +110,19 @@ app:
     support-email: ${APP_MAIL_SUPPORT:contato@aerosuite.com.br}
   evolution:
     enabled: ${APP_EVOLUTION_ENABLED:false}
+    # Mantém conexão/QR disponíveis, mas bloqueia toda saída na Fase 1.
+    outbound-enabled: ${APP_EVOLUTION_OUTBOUND_ENABLED:false}
+    internal-notifications-enabled: ${APP_EVOLUTION_INTERNAL_NOTIFICATIONS_ENABLED:false}
+    webhook-secret: ${APP_EVOLUTION_WEBHOOK_SECRET:}
     api-base-url: ${APP_EVOLUTION_API_BASE_URL:http://localhost:18082}
     api-key: ${APP_EVOLUTION_API_KEY:aerosuite-evolution-api-key-2024}
     instance: ${APP_EVOLUTION_INSTANCE:mira-prospect}
   discovery:
     test-fixtures-enabled: ${APP_DISCOVERY_TEST_FIXTURES:false}
   outreach:
+    # Fase 1: prepara a fila e a copy para revisão, mas nunca dispara contatos.
+    # A liberação do worker será feita somente na fase 2, após a integração do webhook.
+    dispatch-enabled: ${APP_OUTREACH_DISPATCH_ENABLED:false}
     test-mode: ${APP_OUTREACH_TEST_MODE:false}
     test-email: ${APP_OUTREACH_TEST_EMAIL:}
     product-url: ${APP_OUTREACH_PRODUCT_URL:https://aerosuite.com.br}

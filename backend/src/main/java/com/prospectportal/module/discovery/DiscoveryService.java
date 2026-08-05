@@ -104,7 +104,8 @@ public class DiscoveryService {
                     size
                 );
                 if (esResult.totalElements() > 0) {
-                    return withMapCoordinatesPage(hydrateCompanies(esResult));
+                    // Resposta direta do ES: sem hidratar Postgres nem geo_cache no hot path.
+                    return esResult;
                 }
                 // Índice ES vazio ou dessincronizado: confirma no PostgreSQL antes de devolver zero.
             } catch (Exception ex) {
@@ -389,11 +390,34 @@ public class DiscoveryService {
         );
     }
 
-    @Cacheable(value = "geoSearch", key = "#latitude + '-' + #longitude + '-' + #radiusKm + '-' + #cnae")
+    @Cacheable(
+        value = "geoSearch",
+        key = "#latitude + '-' + #longitude + '-' + #radiusKm + '-' + #cnae + '-' + #limit",
+        unless = "#result == null or #result.isEmpty()"
+    )
     public List<CompanyResponse> searchByRadius(double latitude, double longitude, double radiusKm, String cnae, int limit) {
         if (flowTestFixtureService.isEnabled()) {
             return flowTestFixtureService.loadResponses();
         }
+
+        // Elasticsearch é o caminho principal para raio (geo_point já indexado).
+        if (companySearchService != null && companySearchService.isIndexPopulated()) {
+            try {
+                List<CompanyResponse> esResult = companySearchService.searchByRadius(
+                    latitude,
+                    longitude,
+                    radiusKm,
+                    blankToNull(cnae),
+                    limit
+                );
+                if (!esResult.isEmpty()) {
+                    return esResult;
+                }
+            } catch (Exception ex) {
+                // fallback PostGIS se Elasticsearch indisponível
+            }
+        }
+
         double radiusMeters = radiusKm * 1000;
         CnaeFilter cnaeFilter = CnaeFilter.parse(cnae);
         return companyRepository.findWithinRadius(
@@ -563,24 +587,28 @@ public class DiscoveryService {
     }
 
     private PageResponse<CompanyResponse> hydrateCompanies(PageResponse<CompanyResponse> page) {
-        List<UUID> ids = page.content().stream()
+        List<CompanyResponse> hydrated = hydrateCompaniesList(page.content());
+        return new PageResponse<>(hydrated, page.totalElements(), page.totalPages(), page.page(), page.size());
+    }
+
+    private List<CompanyResponse> hydrateCompaniesList(List<CompanyResponse> companies) {
+        List<UUID> ids = companies.stream()
             .map(CompanyResponse::id)
             .toList();
         if (ids.isEmpty()) {
-            return page;
+            return companies;
         }
 
         Map<UUID, Company> byId = companyRepository.findAllById(ids).stream()
             .collect(Collectors.toMap(Company::getId, Function.identity()));
         if (byId.isEmpty()) {
-            return page;
+            return companies;
         }
 
-        List<CompanyResponse> hydrated = page.content().stream()
+        return companies.stream()
             .map(company -> byId.containsKey(company.id())
                 ? DtoMapper.toCompany(byId.get(company.id()))
                 : company)
             .toList();
-        return new PageResponse<>(hydrated, page.totalElements(), page.totalPages(), page.page(), page.size());
     }
 }

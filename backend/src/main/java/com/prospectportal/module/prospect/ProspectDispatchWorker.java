@@ -5,6 +5,7 @@ import com.prospectportal.module.prospect.repository.ProspectJobRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -16,17 +17,23 @@ public class ProspectDispatchWorker {
 
     private final ProspectJobRepository jobRepository;
     private final ProspectAutomationService automationService;
+    private final boolean dispatchEnabled;
 
     public ProspectDispatchWorker(
         ProspectJobRepository jobRepository,
-        ProspectAutomationService automationService
+        ProspectAutomationService automationService,
+        @Value("${app.outreach.dispatch-enabled:false}") boolean dispatchEnabled
     ) {
         this.jobRepository = jobRepository;
         this.automationService = automationService;
+        this.dispatchEnabled = dispatchEnabled;
     }
 
     @Scheduled(fixedDelayString = "${app.outreach.dispatch-interval-ms:20000}")
     public void tick() {
+        if (!dispatchEnabled) {
+            return;
+        }
         List<ProspectJob> running = jobRepository.findRunningJobs();
         if (running.isEmpty()) {
             return;

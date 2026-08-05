@@ -9,6 +9,7 @@ import com.prospectportal.web.dto.BulkOutreachRequest;
 import com.prospectportal.web.dto.CampaignResponse;
 import com.prospectportal.web.dto.ChannelStatusResponse;
 import com.prospectportal.web.dto.TemplateResponse;
+import com.prospectportal.web.dto.TestEmailRequest;
 import com.prospectportal.web.dto.TestEmailResponse;
 import com.prospectportal.web.dto.TestWhatsAppRequest;
 import com.prospectportal.web.dto.TestWhatsAppResponse;
@@ -22,6 +23,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 import com.prospectportal.web.dto.OutreachMessageHistoryItem;
+import com.prospectportal.web.dto.OutreachReportResponse;
+import com.prospectportal.web.dto.FollowUpReviewItem;
+import com.prospectportal.web.dto.FollowUpApprovalResponse;
 
 @RestController
 @RequestMapping("/api/outreach")
@@ -48,6 +52,21 @@ public class OutreachController {
         return outreachService.listCampaigns();
     }
 
+    @GetMapping("/report")
+    public OutreachReportResponse report() {
+        return outreachService.report();
+    }
+
+    @GetMapping("/follow-ups")
+    public List<FollowUpReviewItem> followUpsAwaitingApproval() {
+        return outreachService.followUpsAwaitingApproval();
+    }
+
+    @PostMapping("/follow-ups/{id}/approve")
+    public FollowUpApprovalResponse approveFollowUp(@PathVariable UUID id) {
+        return outreachService.approveFollowUp(id);
+    }
+
     @GetMapping("/companies/{companyId}/messages")
     public List<OutreachMessageHistoryItem> companyMessages(@PathVariable UUID companyId) {
         return outreachService.companyMessages(companyId);
@@ -69,8 +88,9 @@ public class OutreachController {
     }
 
     @PostMapping("/test-email")
-    public TestEmailResponse testEmail() {
-        return prospectAutomationService.sendTestEmail();
+    public TestEmailResponse testEmail(@RequestBody(required = false) TestEmailRequest request) {
+        String email = request != null ? request.email() : null;
+        return prospectAutomationService.sendTestEmail(email);
     }
 
     @PostMapping("/test-whatsapp")

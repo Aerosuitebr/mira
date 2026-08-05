@@ -19,9 +19,12 @@ export class OutreachSettingsComponent implements OnInit {
   brandImageMime: string | null = null;
   brandImageFileName: string | null = null;
   clearBrandImage = false;
+  approvalRecipient1 = '';
+  approvalRecipient2 = '';
 
   loading = true;
   saving = false;
+  testingApprovalNotification = false;
   message = '';
   error = '';
 
@@ -95,7 +98,9 @@ export class OutreachSettingsComponent implements OnInit {
         brandImageBase64: this.clearBrandImage ? null : this.brandImageBase64,
         brandImageMime: this.clearBrandImage ? null : this.brandImageMime,
         brandImageFileName: this.clearBrandImage ? null : this.brandImageFileName,
-        clearBrandImage: this.clearBrandImage
+        clearBrandImage: this.clearBrandImage,
+        approvalRecipient1: this.approvalRecipient1.trim() || null,
+        approvalRecipient2: this.approvalRecipient2.trim() || null
       })
       .subscribe({
         next: (settings) => {
@@ -110,8 +115,26 @@ export class OutreachSettingsComponent implements OnInit {
       });
   }
 
+  testApprovalNotification(): void {
+    this.testingApprovalNotification = true;
+    this.message = '';
+    this.error = '';
+    this.api.testApprovalNotification().subscribe({
+      next: result => {
+        this.testingApprovalNotification = false;
+        this.message = result.error || `Alerta enviado a ${result.sentCount} de ${result.configuredCount} responsável(is).`;
+      },
+      error: err => {
+        this.testingApprovalNotification = false;
+        this.error = err?.error?.message || 'Não foi possível enviar o alerta de teste.';
+      }
+    });
+  }
+
   private applySettings(settings: OutreachSettings): void {
     this.senderName = settings.senderName || '';
+    this.approvalRecipient1 = settings.approvalRecipient1 || '';
+    this.approvalRecipient2 = settings.approvalRecipient2 || '';
     this.clearBrandImage = false;
     if (settings.hasBrandImage && settings.brandImageBase64) {
       const mime = settings.brandImageMime || 'image/png';

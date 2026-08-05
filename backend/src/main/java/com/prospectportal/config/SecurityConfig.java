@@ -104,6 +104,10 @@ public class SecurityConfig {
 
                     "/api/public/**",
 
+                    "/api/webhooks/evolution",
+
+                    "/api/webhooks/evolution/approvals/**",
+
                     "/api/discovery/cnaes/**",
 
                     "/actuator/health",

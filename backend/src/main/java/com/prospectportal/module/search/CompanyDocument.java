@@ -38,6 +38,15 @@ public class CompanyDocument {
     private String state;
 
     @Field(type = FieldType.Keyword)
+    private String neighborhood;
+
+    @Field(type = FieldType.Text)
+    private String street;
+
+    @Field(type = FieldType.Keyword)
+    private String zipCode;
+
+    @Field(type = FieldType.Keyword)
     private String estimatedRevenue;
 
     @Field(type = FieldType.Keyword)
@@ -48,6 +57,9 @@ public class CompanyDocument {
 
     @Field(type = FieldType.Keyword)
     private String registrationStatus;
+
+    @Field(type = FieldType.Keyword)
+    private String locationPrecision;
 
     @GeoPointField
     private GeoPoint location;
@@ -124,6 +136,30 @@ public class CompanyDocument {
         this.state = state;
     }
 
+    public String getNeighborhood() {
+        return neighborhood;
+    }
+
+    public void setNeighborhood(String neighborhood) {
+        this.neighborhood = neighborhood;
+    }
+
+    public String getStreet() {
+        return street;
+    }
+
+    public void setStreet(String street) {
+        this.street = street;
+    }
+
+    public String getZipCode() {
+        return zipCode;
+    }
+
+    public void setZipCode(String zipCode) {
+        this.zipCode = zipCode;
+    }
+
     public String getEstimatedRevenue() {
         return estimatedRevenue;
     }
@@ -154,6 +190,14 @@ public class CompanyDocument {
 
     public void setRegistrationStatus(String registrationStatus) {
         this.registrationStatus = registrationStatus;
+    }
+
+    public String getLocationPrecision() {
+        return locationPrecision;
+    }
+
+    public void setLocationPrecision(String locationPrecision) {
+        this.locationPrecision = locationPrecision;
     }
 
     public GeoPoint getLocation() {

@@ -39,6 +39,12 @@ public class Tenant extends BaseEntity {
     @Column(name = "outreach_sender_name", length = 120)
     private String outreachSenderName;
 
+    @Column(name = "outreach_approval_recipient_1", length = 30)
+    private String outreachApprovalRecipient1;
+
+    @Column(name = "outreach_approval_recipient_2", length = 30)
+    private String outreachApprovalRecipient2;
+
     @Column(name = "brand_image_base64", columnDefinition = "TEXT")
     private String brandImageBase64;
 

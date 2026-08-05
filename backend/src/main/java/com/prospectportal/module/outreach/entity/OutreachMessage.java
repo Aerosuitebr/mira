@@ -65,6 +65,21 @@ public class OutreachMessage {
     @Column(name = "fallback_of")
     private UUID fallbackOf;
 
+    @Column(name = "outreach_step", nullable = false)
+    private short outreachStep = 1;
+
+    @Column(name = "reply_to_message_id")
+    private UUID replyToMessageId;
+
+    @Column(name = "approval_token", length = 80)
+    private String approvalToken;
+
+    @Column(name = "approval_expires_at")
+    private Instant approvalExpiresAt;
+
+    @Column(name = "approval_approved_at")
+    private Instant approvalApprovedAt;
+
     @Column(name = "prospect_job_id")
     private UUID prospectJobId;
 

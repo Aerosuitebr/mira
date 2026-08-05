@@ -6,7 +6,10 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -17,6 +20,64 @@ import java.util.Optional;
 public class ProspectCopyBuilder {
 
     public static final String LOGO_RESOURCE = "branding/Aero_Claro.png";
+    /** Content-ID do logo inline no e-mail (Gmail bloqueia data: URI). */
+    public static final String EMAIL_LOGO_CID = "aero-suite-logo";
+    public static final String DEFAULT_APPROACH = ApproachId.DIRECT.name();
+
+    public enum ApproachId {
+        DIRECT("Contato direto", "Abertura pessoal acompanhando o trabalho da empresa"),
+        ANAC("Foco ANAC", "Ênfase em FIFO, OS e preparação para auditoria"),
+        DEMO("Demo 15 min", "Convite curto para demonstração objetiva"),
+        CONSULTIVE("Consultivo", "Tom de descoberta sobre estoque e ordens de serviço");
+
+        private final String label;
+        private final String description;
+
+        ApproachId(String label, String description) {
+            this.label = label;
+            this.description = description;
+        }
+
+        public String label() {
+            return label;
+        }
+
+        public String description() {
+            return description;
+        }
+
+        public static ApproachId from(String raw) {
+            if (raw == null || raw.isBlank()) {
+                return DIRECT;
+            }
+            try {
+                return ApproachId.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ex) {
+                return DIRECT;
+            }
+        }
+    }
+
+    public record ApproachCopy(
+        String id,
+        String label,
+        String description,
+        String greeting,
+        String body,
+        String subject
+    ) {
+        public String fullMessage() {
+            String g = greeting != null ? greeting.trim() : "";
+            String b = body != null ? body.trim() : "";
+            if (g.isEmpty()) {
+                return b;
+            }
+            if (b.isEmpty()) {
+                return g;
+            }
+            return g + "\n\n" + b;
+        }
+    }
 
     private final String productUrl;
     private final String demoUrl;
@@ -37,8 +98,19 @@ public class ProspectCopyBuilder {
     }
 
     public String emailSubject(String companyName, BrandProfile brand) {
+        return emailSubject(companyName, brand, ApproachId.DIRECT);
+    }
+
+    public String emailSubject(String companyName, BrandProfile brand, ApproachId approach) {
+        ApproachId id = approach != null ? approach : ApproachId.DIRECT;
         String sender = brand != null ? brand.senderName() : BrandProfile.DEFAULT_SENDER;
-        return sender + " · Uma conversa sobre organizar o fluxo da " + companyName;
+        String company = companyName != null && !companyName.isBlank() ? companyName.trim() : "sua empresa";
+        return switch (id) {
+            case ANAC -> sender + " · Estoque FIFO, OS e auditoria ANAC na " + company;
+            case DEMO -> sender + " · 15 minutos para mostrar o fluxo da " + company;
+            case CONSULTIVE -> sender + " · Uma conversa sobre o controle operacional da " + company;
+            case DIRECT -> sender + " · Uma conversa sobre organizar o fluxo da " + company;
+        };
     }
 
     public String whatsappCaption(String companyName, String contactName, String cityState, String segment) {
@@ -52,7 +124,21 @@ public class ProspectCopyBuilder {
         String segment,
         BrandProfile brand
     ) {
-        return normalizeWhatsAppCopy(buildWhatsAppMessage(companyName, contactName, cityState, segment, brand));
+        return whatsappCaption(companyName, contactName, cityState, segment, brand, ApproachId.DIRECT);
+    }
+
+    public String whatsappCaption(
+        String companyName,
+        String contactName,
+        String cityState,
+        String segment,
+        BrandProfile brand,
+        ApproachId approach
+    ) {
+        return normalizeWhatsAppCopy(
+            buildApproach(ApproachId.from(approach != null ? approach.name() : null), true, companyName, contactName, cityState, segment, brand)
+                .fullMessage()
+        );
     }
 
     public String whatsappFallbackPlainText(String companyName, String contactName, String cityState, String segment) {
@@ -66,12 +152,18 @@ public class ProspectCopyBuilder {
         String segment,
         BrandProfile brand
     ) {
-        String sender = brand != null ? brand.senderName() : BrandProfile.DEFAULT_SENDER;
-        return normalizeWhatsAppCopy("""
-            *%s*
+        return whatsappCaption(companyName, contactName, cityState, segment, brand, ApproachId.DIRECT);
+    }
 
-            %s
-            """.formatted(sender, buildWhatsAppMessage(companyName, contactName, cityState, segment, brand)));
+    /** Segunda etapa, usada apenas após uma resposta real recebida no webhook. */
+    public String whatsappFollowUp(String companyName, BrandProfile brand) {
+        String sender = brand != null ? brand.senderName() : BrandProfile.DEFAULT_SENDER;
+        String company = shortCompanyName(companyName);
+        return "Obrigado por responder! Sou da " + sender + ". "
+            + "Ajudamos operações como a " + company
+            + " a organizar comercial, estoque FIFO e Ordens de Serviço no mesmo fluxo. "
+            + "Se fizer sentido, posso explicar em uma conversa rápida.\n\n"
+            + "Site: " + productUrl;
     }
 
     public String whatsappBody(String companyName, String contactName, String cityState, String segment) {
@@ -88,6 +180,38 @@ public class ProspectCopyBuilder {
         return whatsappCaption(companyName, contactName, cityState, segment, brand);
     }
 
+    public List<ApproachCopy> listApproaches(
+        String companyName,
+        String contactName,
+        String cityState,
+        String segment,
+        BrandProfile brand,
+        String channel
+    ) {
+        boolean whatsapp = channel == null || channel.isBlank() || "WHATSAPP".equalsIgnoreCase(channel);
+        List<ApproachCopy> list = new ArrayList<>();
+        for (ApproachId id : ApproachId.values()) {
+            list.add(buildApproach(id, whatsapp, companyName, contactName, cityState, segment, brand));
+        }
+        return list;
+    }
+
+    public ApproachCopy buildApproach(
+        ApproachId approach,
+        boolean whatsapp,
+        String companyName,
+        String contactName,
+        String cityState,
+        String segment,
+        BrandProfile brand
+    ) {
+        ApproachId id = approach != null ? approach : ApproachId.DIRECT;
+        if (whatsapp) {
+            return buildWhatsAppApproach(id, companyName);
+        }
+        return buildEmailApproach(id, companyName, contactName, cityState, segment, brand);
+    }
+
     public static String normalizeWhatsAppCopy(String raw) {
         if (raw == null || raw.isBlank()) {
             return "";
@@ -101,54 +225,158 @@ public class ProspectCopyBuilder {
         return text.trim();
     }
 
-    private String buildWhatsAppMessage(
+    private ApproachCopy buildWhatsAppApproach(ApproachId id, String companyName) {
+        String company = shortCompanyName(companyName);
+        return switch (id) {
+            case ANAC -> new ApproachCopy(
+                id.name(),
+                id.label(),
+                id.description(),
+                "Olá, boa tarde! Tudo bem?",
+                "Nesse contato falo com o responsável pela operação e preparação ANAC da " + company + "?",
+                null
+            );
+            case DEMO -> new ApproachCopy(
+                id.name(),
+                id.label(),
+                id.description(),
+                "Olá! Tudo bem?",
+                "Falo com quem cuida do comercial ou da operação da " + company + "?",
+                null
+            );
+            case CONSULTIVE -> new ApproachCopy(
+                id.name(),
+                id.label(),
+                id.description(),
+                "Olá, boa tarde!",
+                "Posso falar com a pessoa responsável por estoque ou Ordens de Serviço da " + company + "?",
+                null
+            );
+            case DIRECT -> new ApproachCopy(
+                id.name(),
+                id.label(),
+                id.description(),
+                "Olá, boa tarde! Tudo bem?",
+                "Nesse contato falo com o responsável pelo comercial ou hangar da " + company + "?",
+                null
+            );
+        };
+    }
+
+    private ApproachCopy buildEmailApproach(
+        ApproachId id,
         String companyName,
         String contactName,
         String cityState,
         String segment,
         BrandProfile brand
     ) {
-        String firstName = firstName(contactName);
-        String place = cityState != null && !cityState.isBlank() ? " em " + cityState.trim() : "";
-        String company = companyName != null && !companyName.isBlank() ? companyName.trim() : "sua empresa";
+        String who = emailGreetingName(contactName);
+        String place = cityState != null && !cityState.isBlank() ? cityState : "sua região";
+        String seg = segment != null && !segment.isBlank() ? segment : "seu segmento";
         String sender = brand != null ? brand.senderName() : BrandProfile.DEFAULT_SENDER;
+        String company = companyName != null && !companyName.isBlank() ? companyName.trim() : "sua empresa";
+        String subject = emailSubject(company, brand, id);
+        String greeting = "Olá " + who + ",";
 
-        return """
-            Olá, *%s*! 👋
+        String body = switch (id) {
+            case ANAC -> """
+                Sou %s.
 
-            Identificamos a *%s*%s e gostaríamos de apresentar uma oportunidade concreta: conhecer uma ferramenta para organizar todo o fluxo da empresa, do comercial ao estoque, das operações à conformidade.
+                Identificamos a %s (%s · %s) e queremos ajudar a unificar comercial, estoque FIFO e Ordens de Serviço no mesmo ambiente, com menos planilha e mais disciplina para auditorias da ANAC.
 
-            Em poucos minutos de demonstração, você vê como unificar:
-            • Propostas e pipeline comercial
-            • Estoque com rastreabilidade
-            • Operações MRO e disciplina operacional
-            • Visão gerencial em um só ambiente
+                Em uma demonstração objetiva, mostramos rastreabilidade, OS e visão gerencial em um só fluxo.
 
-            Posso reservar *15 minutos* para uma demonstração objetiva, sem compromisso?
+                Agende: %s
+                Plataforma: %s
 
-            📅 Agendar: %s
+                Atenciosamente,
+                %s
+                %s
+                """.formatted(sender, company, place, seg, demoUrl, productUrl, sender, supportEmail).trim();
+            case DEMO -> """
+                Sou %s.
 
-            Atenciosamente,
-            %s
-            🌐 %s
-            📧 %s
-            """.formatted(firstName, company, place, demoUrl, sender, productUrl, supportEmail);
+                Quero propor 15 minutos para mostrar à %s como comercial, estoque e operações podem ficar no mesmo ambiente.
+
+                Se fizer sentido, agende aqui: %s
+                Ou conheça a plataforma: %s
+
+                Atenciosamente,
+                %s
+                %s
+                """.formatted(sender, company, demoUrl, productUrl, sender, supportEmail).trim();
+            case CONSULTIVE -> """
+                Sou %s.
+
+                Acompanhei a %s (%s · %s) e fiquei curioso sobre como vocês organizam estoque e Ordens de Serviço hoje.
+
+                Se fizer sentido, posso te mostrar em 15 minutos uma forma de unificar comercial, estoque e conformidade no mesmo ambiente.
+
+                Agende: %s
+                Site: %s
+
+                Atenciosamente,
+                %s
+                %s
+                """.formatted(sender, company, place, seg, demoUrl, productUrl, sender, supportEmail).trim();
+            case DIRECT -> """
+                Sou %s.
+
+                Identificamos a %s (%s · %s) e gostaríamos de apresentar uma oportunidade concreta: conhecer uma ferramenta poderosa para organizar todo o fluxo da empresa (comercial, estoque, operações e rastreabilidade).
+
+                Em uma demonstração de 30 minutos, mostramos como unificar proposta, ordem de serviço, estoque e conformidade em um único ambiente, com visão global e disciplina operacional.
+
+                Agende sua demonstração: %s
+                Conheça a plataforma: %s
+
+                Ficamos à disposição.
+
+                Atenciosamente,
+                %s
+                %s
+                """.formatted(sender, company, place, seg, demoUrl, productUrl, sender, supportEmail).trim();
+        };
+
+        return new ApproachCopy(id.name(), id.label(), id.description(), greeting, body, subject);
+    }
+
+    private static String emailGreetingName(String contactName) {
+        if (contactName == null || contactName.isBlank() || isNonPersonContactLabel(contactName)) {
+            return "Prezado(a)";
+        }
+        return contactName.trim();
+    }
+
+    /** Nome fantasia curto; evita razão social gigante no WhatsApp. */
+    private static String shortCompanyName(String companyName) {
+        if (companyName == null || companyName.isBlank()) {
+            return "sua empresa";
+        }
+        String name = companyName.trim()
+            .replaceAll("(?i)\\s+(LTDA\\.?|LTDA|ME|EPP|EIRELI|S/?A\\.?|S\\.A\\.)$", "")
+            .trim();
+        if (name.length() > 42) {
+            int space = name.lastIndexOf(' ', 42);
+            name = (space > 20 ? name.substring(0, space) : name.substring(0, 42)).trim();
+        }
+        return name.isBlank() ? companyName.trim() : name;
     }
 
     public String whatsappTestCaption() {
         return whatsappCaption(
-            "Oficina Exemplo MRO",
-            "Welle",
-            "Cabo Frio/RJ",
+            "Helipse Aviation Ltda",
+            "Maria Silva",
+            "Rio de Janeiro/RJ",
             "Manutenção e reparação de aeronaves"
         );
     }
 
     public String whatsappTestFallback() {
         return whatsappFallbackPlainText(
-            "Oficina Exemplo MRO",
-            "Welle",
-            "Cabo Frio/RJ",
+            "Helipse Aviation Ltda",
+            "Maria Silva",
+            "Rio de Janeiro/RJ",
             "Manutenção e reparação de aeronaves"
         );
     }
@@ -204,29 +432,25 @@ public class ProspectCopyBuilder {
         String segment,
         BrandProfile brand
     ) {
-        String who = contactName != null && !contactName.isBlank() ? contactName : "Prezado(a)";
-        String place = cityState != null && !cityState.isBlank() ? cityState : "sua região";
-        String seg = segment != null && !segment.isBlank() ? segment : "seu segmento";
-        String sender = brand != null ? brand.senderName() : BrandProfile.DEFAULT_SENDER;
+        return emailText(companyName, contactName, cityState, segment, brand, ApproachId.DIRECT);
+    }
 
-        return """
-            Olá %s,
-
-            Sou %s.
-
-            Identificamos a %s (%s · %s) e gostaríamos de apresentar uma oportunidade concreta: conhecer uma ferramenta poderosa para organizar todo o fluxo da empresa (comercial, estoque, operações e rastreabilidade).
-
-            Em uma demonstração de 30 minutos, mostramos como unificar proposta, ordem de serviço, estoque e conformidade em um único ambiente, com visão global e disciplina operacional.
-
-            Agende sua demonstração: %s
-            Conheça a plataforma: %s
-
-            Ficamos à disposição.
-
-            Atenciosamente,
-            %s
-            %s
-            """.formatted(who, sender, companyName, place, seg, demoUrl, productUrl, sender, supportEmail).trim();
+    public String emailText(
+        String companyName,
+        String contactName,
+        String cityState,
+        String segment,
+        BrandProfile brand,
+        ApproachId approach
+    ) {
+        return buildEmailApproach(
+            approach != null ? approach : ApproachId.DIRECT,
+            companyName,
+            contactName,
+            cityState,
+            segment,
+            brand
+        ).fullMessage();
     }
 
     public String emailHtml(String companyName, String contactName, String cityState, String segment) {
@@ -240,17 +464,23 @@ public class ProspectCopyBuilder {
         String segment,
         BrandProfile brand
     ) {
-        String who = contactName != null && !contactName.isBlank() ? contactName : "Prezado(a)";
+        String who;
+        if (contactName == null || contactName.isBlank() || isNonPersonContactLabel(contactName)) {
+            who = "Prezado(a)";
+        } else {
+            who = contactName.trim();
+        }
         String place = cityState != null && !cityState.isBlank() ? cityState : "sua região";
         String seg = segment != null && !segment.isBlank() ? segment : "seu segmento";
         String sender = brand != null ? brand.senderName() : BrandProfile.DEFAULT_SENDER;
         Optional<LogoAsset> logo = resolveWhatsAppLogo(brand);
 
+        // cid: + anexo inline no MailSenderService (data: URI é bloqueado pelo Gmail)
         String logoBlock = logo.map(asset -> """
                       <div style="margin:0 0 14px 0;">
-                        <img src="data:%s;base64,%s" alt="%s" width="160" style="display:inline-block;max-width:160px;height:auto;border:0;" />
+                        <img src="cid:%s" alt="%s" width="160" style="display:inline-block;max-width:160px;height:auto;border:0;" />
                       </div>
-            """.formatted(escape(asset.mimeType()), asset.base64(), escape(sender))).orElse("");
+            """.formatted(EMAIL_LOGO_CID, escape(sender))).orElse("");
 
         return """
             <!DOCTYPE html>
@@ -365,13 +595,39 @@ public class ProspectCopyBuilder {
         return "Oficina Exemplo MRO";
     }
 
+    /**
+     * Primeiro nome para saudação. Rótulos de canal do enrichment (Telefone fixo, WhatsApp, etc.)
+     * não são pessoas: cai no genérico para nunca gerar "Olá, Telefone!".
+     */
     private static String firstName(String contactName) {
-        if (contactName == null || contactName.isBlank() || "decisor".equalsIgnoreCase(contactName) || "equipe".equalsIgnoreCase(contactName)) {
+        if (contactName == null || contactName.isBlank() || isNonPersonContactLabel(contactName)) {
             return "tudo bem";
         }
         String trimmed = contactName.trim();
         int space = trimmed.indexOf(' ');
         return space > 0 ? trimmed.substring(0, space) : trimmed;
+    }
+
+    /** Contatos gerados pelo crawl/RF com nome de canal, não de pessoa. */
+    public static boolean isNonPersonContactLabel(String contactName) {
+        if (contactName == null || contactName.isBlank()) {
+            return true;
+        }
+        String n = contactName.trim().toLowerCase(java.util.Locale.ROOT);
+        if ("decisor".equals(n) || "equipe".equals(n) || "contato".equals(n)) {
+            return true;
+        }
+        return n.startsWith("telefone")
+            || n.startsWith("whatsapp")
+            || n.startsWith("e-mail")
+            || n.startsWith("email")
+            || n.startsWith("linkedin")
+            || n.startsWith("instagram")
+            || n.contains("cadastral")
+            || n.contains("do site")
+            || n.contains("da empresa")
+            || n.contains("rede social")
+            || n.contains("rede profissional");
     }
 
     private static String escape(String value) {
@@ -385,5 +641,27 @@ public class ProspectCopyBuilder {
             .replace("\"", "&quot;");
     }
 
+    /**
+     * Bytes do logo para anexo CID no e-mail. Retorna vazio se não houver asset.
+     */
+    public Optional<EmailInlineLogo> resolveEmailInlineLogo(BrandProfile brand) {
+        return resolveWhatsAppLogo(brand).map(asset -> {
+            String mime = asset.mimeType() != null && !asset.mimeType().isBlank()
+                ? asset.mimeType()
+                : "image/png";
+            String name = asset.fileName() != null && !asset.fileName().isBlank()
+                ? asset.fileName()
+                : "Aero_Claro.png";
+            return new EmailInlineLogo(
+                EMAIL_LOGO_CID,
+                Base64.getDecoder().decode(asset.base64()),
+                mime,
+                name
+            );
+        });
+    }
+
     public record LogoAsset(String base64, String mimeType, String fileName) {}
+
+    public record EmailInlineLogo(String contentId, byte[] bytes, String mimeType, String fileName) {}
 }

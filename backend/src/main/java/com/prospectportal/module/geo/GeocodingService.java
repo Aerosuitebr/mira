@@ -62,6 +62,7 @@ public class GeocodingService {
     private final ImportJobRepository importJobRepository;
     private final RestClient nominatimClient;
     private final RestClient awesomeCepClient;
+    private final RestClient brasilApiCepClient;
     private final long rateLimitMs;
     private final long cepRateLimitMs;
     private final int cepParallelism;
@@ -74,9 +75,10 @@ public class GeocodingService {
         ImportJobRepository importJobRepository,
         @Value("${app.geocoding.nominatim-url}") String nominatimUrl,
         @Value("${app.geocoding.awesome-cep-url:https://cep.awesomeapi.com.br}") String awesomeCepUrl,
+        @Value("${app.geocoding.brasil-api-cep-url:https://brasilapi.com.br/api/cep/v2}") String brasilApiCepUrl,
         @Value("${app.geocoding.rate-limit-ms:1100}") long rateLimitMs,
-        @Value("${app.geocoding.cep-rate-limit-ms:40}") long cepRateLimitMs,
-        @Value("${app.geocoding.cep-parallelism:24}") int cepParallelism,
+        @Value("${app.geocoding.cep-rate-limit-ms:80}") long cepRateLimitMs,
+        @Value("${app.geocoding.cep-parallelism:8}") int cepParallelism,
         @Value("${app.geocoding.cep-batch-size:3000}") int cepBatchSize
     ) {
         this.jdbcTemplate = jdbcTemplate;
@@ -91,6 +93,9 @@ public class GeocodingService {
             .build();
         this.awesomeCepClient = RestClient.builder()
             .baseUrl(awesomeCepUrl)
+            .build();
+        this.brasilApiCepClient = RestClient.builder()
+            .baseUrl(brasilApiCepUrl)
             .build();
     }
 
@@ -190,7 +195,92 @@ public class GeocodingService {
     }
 
     public void geocodeAllPending(Set<String> states, ImportJob job) throws InterruptedException {
+        int cityApplied = applyCityCoordinatesFromMunicipios(states);
+        if (cityApplied > 0) {
+            log.info("Geocode CITY (SIAFI/lpad): {} empresas", cityApplied);
+            updateJobProgress(job.getId(), countGeocodedCompanies());
+        }
         geocodeAllPendingByCep(states, job);
+        int upgraded = upgradeCityPrecisionFromCepCache(states);
+        if (upgraded > 0) {
+            log.info("Upgrade CITY→CEP a partir do cache: {} empresas", upgraded);
+            updateJobProgress(job.getId(), countGeocodedCompanies());
+        }
+    }
+
+    /** Aplica centroide municipal para pendentes, alinhando SIAFI com/sem zero à esquerda. */
+    public int applyCityCoordinatesFromMunicipios(Set<String> states) {
+        List<String> ordered = orderStates(states);
+        if (ordered.isEmpty()) {
+            return 0;
+        }
+        try {
+            Boolean tableExists = jdbcTemplate.queryForObject(
+                """
+                SELECT EXISTS (
+                  SELECT 1 FROM information_schema.tables
+                  WHERE table_schema = 'public' AND table_name = 'geo_municipios_ibge'
+                )
+                """,
+                Boolean.class
+            );
+            if (!Boolean.TRUE.equals(tableExists)) {
+                log.warn("Tabela geo_municipios_ibge ausente; pulando geocode CITY");
+                return 0;
+            }
+        } catch (Exception ex) {
+            log.warn("Não foi possível verificar geo_municipios_ibge: {}", ex.getMessage());
+            return 0;
+        }
+
+        String placeholders = ordered.stream().map(s -> "?").collect(Collectors.joining(","));
+        Object[] args = ordered.toArray();
+        return jdbcTemplate.update(
+            """
+            UPDATE companies c
+            SET latitude = g.latitude,
+                longitude = g.longitude,
+                location = ST_SetSRID(ST_MakePoint(g.longitude, g.latitude), 4326)::geography,
+                geocoded = TRUE,
+                location_precision = 'CITY',
+                updated_at = NOW()
+            FROM geo_municipios_ibge g
+            WHERE c.geocoded = FALSE
+              AND c.data_source = 'RECEITA_FEDERAL'
+              AND c.state IN (%s)
+              AND c.municipality_code IS NOT NULL
+              AND lpad(trim(g.siafi_id), 4, '0') = lpad(trim(c.municipality_code), 4, '0')
+            """.formatted(placeholders),
+            args
+        );
+    }
+
+    /** Promove CITY→CEP quando o cache já tem coordenada do CEP (não marca UNRESOLVED). */
+    public int upgradeCityPrecisionFromCepCache(Set<String> states) {
+        List<String> ordered = orderStates(states);
+        if (ordered.isEmpty()) {
+            return 0;
+        }
+        String placeholders = ordered.stream().map(s -> "?").collect(Collectors.joining(","));
+        Object[] args = ordered.toArray();
+        return jdbcTemplate.update(
+            """
+            UPDATE companies c
+            SET latitude = gc.latitude,
+                longitude = gc.longitude,
+                location = ST_SetSRID(ST_MakePoint(gc.longitude, gc.latitude), 4326)::geography,
+                geocoded = TRUE,
+                location_precision = 'CEP',
+                updated_at = NOW()
+            FROM geo_cache gc
+            WHERE c.location_precision = 'CITY'
+              AND c.data_source = 'RECEITA_FEDERAL'
+              AND c.state IN (%s)
+              AND c.zip_code IS NOT NULL
+              AND gc.cache_key = 'cep:' || c.zip_code
+            """.formatted(placeholders),
+            args
+        );
     }
 
     public void geocodeAllPendingByCep(Set<String> states, ImportJob job) throws InterruptedException {
@@ -296,6 +386,9 @@ public class GeocodingService {
     private GeocodeResult fetchCepFromApi(String cep) {
         waitCepApiSlot();
         GeocodeResult result = queryAwesomeCep(cep);
+        if (result == null) {
+            result = queryBrasilApiCep(cep);
+        }
         if (result != null) {
             saveCepCache(cep, result);
         }
@@ -446,6 +539,9 @@ public class GeocodingService {
         }
 
         GeocodeResult cep = queryAwesomeCep(zip);
+        if (cep == null) {
+            cep = queryBrasilApiCep(zip);
+        }
         if (cep != null) {
             saveCache(cacheKey, cep);
             return cep;
@@ -591,6 +687,44 @@ public class GeocodingService {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private GeocodeResult queryBrasilApiCep(String zip) {
+        String digits = digits(zip);
+        if (digits.length() != 8) {
+            return null;
+        }
+        try {
+            Map<String, Object> result = brasilApiCepClient.get()
+                .uri("/" + digits)
+                .retrieve()
+                .body(Map.class);
+            if (result == null) {
+                return null;
+            }
+            Object location = result.get("location");
+            if (!(location instanceof Map<?, ?> locationMap)) {
+                return null;
+            }
+            Object coordinates = locationMap.get("coordinates");
+            if (!(coordinates instanceof Map<?, ?> coords)) {
+                return null;
+            }
+            Object lat = coords.get("latitude");
+            Object lng = coords.get("longitude");
+            if (lat == null || lng == null || String.valueOf(lat).isBlank() || String.valueOf(lng).isBlank()) {
+                return null;
+            }
+            return new GeocodeResult(
+                Double.parseDouble(String.valueOf(lat)),
+                Double.parseDouble(String.valueOf(lng)),
+                "CEP"
+            );
+        } catch (Exception ex) {
+            log.debug("BrasilAPI CEP falhou: {}", ex.getMessage());
+            return null;
+        }
+    }
+
     private ParsedStreet parseStreet(String street) {
         if (street == null || street.isBlank()) {
             return null;
@@ -650,11 +784,15 @@ public class GeocodingService {
     }
 
     private String providerForPrecision(String precision) {
-        return "CEP".equals(precision) ? "AWESOME_CEP" : "NOMINATIM";
+        return "CEP".equals(precision) ? "CEP_API" : "NOMINATIM";
     }
 
     private String mapProviderPrecision(String provider) {
-        return "AWESOME_CEP".equals(provider) ? "CEP" : "EXACT";
+        if ("AWESOME_CEP".equals(provider) || "CEP_API".equals(provider) || "BRASIL_API_CEP".equals(provider)
+            || "BANCO_CEPS".equals(provider)) {
+            return "CEP";
+        }
+        return "EXACT";
     }
 
     private record GeocodeResult(double latitude, double longitude, String precision) {

@@ -48,4 +48,69 @@ public interface OutreachMessageRepository extends JpaRepository<OutreachMessage
           AND m.sentAt >= :since
         """)
     long countWhatsAppSentSince(@Param("since") Instant since);
+
+    @Query("""
+        SELECT m FROM OutreachMessage m
+        JOIN FETCH m.lead l
+        JOIN FETCH l.company
+        JOIN FETCH m.campaign c
+        JOIN FETCH c.tenant
+        WHERE m.recipient = :recipient
+          AND m.channel = 'WHATSAPP'
+          AND m.status = 'SENT'
+          AND m.outreachStep = 1
+        ORDER BY m.sentAt DESC
+        """)
+    List<OutreachMessage> findLatestFirstStepSentTo(@Param("recipient") String recipient);
+
+    boolean existsByReplyToMessageIdAndOutreachStep(UUID replyToMessageId, short outreachStep);
+
+    @Query("""
+        SELECT COUNT(m) FROM OutreachMessage m
+        WHERE m.campaign.tenant.id = :tenantId
+          AND m.channel = 'WHATSAPP'
+          AND m.outreachStep = :step
+          AND m.status = :status
+        """)
+    long countByTenantAndStepAndStatus(@Param("tenantId") UUID tenantId, @Param("step") short step, @Param("status") String status);
+
+    @Query("""
+        SELECT COUNT(m) FROM OutreachMessage m
+        WHERE m.campaign.tenant.id = :tenantId
+          AND m.channel = 'WHATSAPP'
+          AND m.outreachStep = 1
+          AND m.repliedAt IS NOT NULL
+        """)
+    long countRepliesByTenant(@Param("tenantId") UUID tenantId);
+
+    @Query("""
+        SELECT m FROM OutreachMessage m
+        JOIN FETCH m.lead l
+        JOIN FETCH l.company
+        JOIN FETCH m.campaign c
+        JOIN FETCH c.tenant
+        WHERE c.tenant.id = :tenantId
+          AND m.outreachStep = 2
+          AND m.status = 'AWAITING_APPROVAL'
+        ORDER BY m.createdAt ASC
+        """)
+    List<OutreachMessage> findFollowUpsAwaitingApproval(@Param("tenantId") UUID tenantId);
+
+    @Query("""
+        SELECT m FROM OutreachMessage m
+        JOIN FETCH m.campaign c
+        JOIN FETCH c.tenant
+        WHERE m.id = :id AND c.tenant.id = :tenantId
+        """)
+    Optional<OutreachMessage> findByIdAndTenantId(@Param("id") UUID id, @Param("tenantId") UUID tenantId);
+
+    @Query("""
+        SELECT m FROM OutreachMessage m
+        JOIN FETCH m.lead l
+        JOIN FETCH l.company
+        JOIN FETCH m.campaign c
+        JOIN FETCH c.tenant
+        WHERE m.approvalToken = :token
+        """)
+    Optional<OutreachMessage> findByApprovalToken(@Param("token") String token);
 }

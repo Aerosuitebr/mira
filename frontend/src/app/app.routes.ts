@@ -184,6 +184,11 @@ export const routes: Routes = [
 
   },
 
+  {
+    path: 'aprovar-abordagem/:token',
+    loadComponent: () => import('./features/public/public-followup-approval.component').then((m) => m.PublicFollowUpApprovalComponent)
+  },
+
   { path: '**', redirectTo: 'escolher-busca' }
 
 ];

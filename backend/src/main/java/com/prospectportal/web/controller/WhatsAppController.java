@@ -35,6 +35,11 @@ public class WhatsAppController {
         return connectionService.refreshQr();
     }
 
+    @PostMapping("/webhook")
+    public WhatsAppConnectionResponse configureWebhook() {
+        return connectionService.configureReplyWebhook();
+    }
+
     @PostMapping("/disconnect")
     public WhatsAppConnectionResponse disconnect() {
         return connectionService.disconnect();

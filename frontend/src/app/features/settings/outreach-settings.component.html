@@ -61,6 +61,21 @@
           <p class="settings-file-name">{{ brandImageFileName }}</p>
         }
       </article>
+
+      <article class="settings-card">
+        <h2>Responsáveis pela aprovação</h2>
+        <p class="settings-hint">
+          Quando um lead responder, estes contatos recebem o link único para revisar e liberar a etapa 2.
+        </p>
+        <label class="settings-field">
+          <span>Responsável 1</span>
+          <input type="tel" [(ngModel)]="approvalRecipient1" placeholder="Ex.: 5511999999999" />
+        </label>
+        <label class="settings-field">
+          <span>Responsável 2 (opcional)</span>
+          <input type="tel" [(ngModel)]="approvalRecipient2" placeholder="Ex.: 5521999999999" />
+        </label>
+      </article>
     </div>
 
     @if (message) {
@@ -71,6 +86,9 @@
     }
 
     <div class="settings-actions">
+      <button type="button" class="pp-btn pp-btn--outline" (click)="testApprovalNotification()" [disabled]="testingApprovalNotification">
+        {{ testingApprovalNotification ? 'Enviando teste…' : 'Testar alerta aos responsáveis' }}
+      </button>
       <button type="button" class="pp-btn pp-btn--primary" (click)="save()" [disabled]="saving">
         {{ saving ? 'Salvando…' : 'Salvar configurações' }}
       </button>

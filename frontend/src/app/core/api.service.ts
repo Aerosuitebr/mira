@@ -182,6 +182,8 @@ export interface OutreachSettings {
   brandImageMime: string | null;
   brandImageFileName: string | null;
   brandImageBase64: string | null;
+  approvalRecipient1: string | null;
+  approvalRecipient2: string | null;
 }
 
 export interface ProspectJob {
@@ -208,6 +210,42 @@ export interface ProspectJob {
   startedAt: string | null;
   completedAt: string | null;
   campaignId: string | null;
+}
+
+export interface OutreachReport {
+  firstStepSent: number;
+  repliesReceived: number;
+  followUpsAwaitingApproval: number;
+  followUpsSent: number;
+  followUpsFailed: number;
+}
+
+export interface FollowUpReviewItem {
+  id: string;
+  companyId: string;
+  companyName: string;
+  recipient: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ApproachVariant {
+  id: string;
+  label: string;
+  description: string;
+  greeting: string;
+  body: string;
+  subject?: string | null;
+}
+
+export interface AiCopyResult {
+  subject: string | null;
+  body: string;
+  channel: string;
+  greeting?: string | null;
+  editableBody?: string | null;
+  selectedApproachId?: string | null;
+  approaches?: ApproachVariant[];
 }
 
 export interface TestEmailResult {
@@ -518,11 +556,33 @@ export class ApiService {
     return this.http.get<Campaign[]>(`${environment.apiUrl}/outreach/campaigns`);
   }
 
-  generateAiCopy(payload: { companyId: string; channel: string; productDescription: string; tone?: string }) {
-    return this.http.post<{ subject: string | null; body: string; channel: string }>(
-      `${environment.apiUrl}/outreach/ai-copy`,
-      payload
+  outreachReport() {
+    return this.http.get<OutreachReport>(`${environment.apiUrl}/outreach/report`);
+  }
+
+  followUpsAwaitingApproval() {
+    return this.http.get<FollowUpReviewItem[]>(`${environment.apiUrl}/outreach/follow-ups`);
+  }
+
+  approveFollowUp(id: string) {
+    return this.http.post<{ id: string; status: string; error: string | null }>(
+      `${environment.apiUrl}/outreach/follow-ups/${id}/approve`,
+      {}
     );
+  }
+
+  publicFollowUp(token: string) {
+    return this.http.get<FollowUpReviewItem>(`${environment.apiUrl}/webhooks/evolution/approvals/${token}`);
+  }
+
+  approvePublicFollowUp(token: string) {
+    return this.http.post<{ id: string; status: string; error: string | null }>(
+      `${environment.apiUrl}/webhooks/evolution/approvals/${token}`, {}
+    );
+  }
+
+  generateAiCopy(payload: { companyId: string; channel: string; productDescription: string; tone?: string }) {
+    return this.http.post<AiCopyResult>(`${environment.apiUrl}/outreach/ai-copy`, payload);
   }
 
   sendBulk(payload: {
@@ -533,6 +593,9 @@ export class ApiService {
     productDescription?: string;
     messages?: Record<string, { subject?: string; body?: string }>;
     emailFallback?: boolean;
+    approachId?: string;
+    editableBody?: string;
+    editableSubject?: string;
   }) {
     return this.http.post<
       Campaign & {
@@ -584,10 +647,22 @@ export class ApiService {
     senderName?: string | null;
     brandImageBase64?: string | null;
     brandImageMime?: string | null;
-    brandImageFileName?: string | null;
-    clearBrandImage?: boolean;
+        brandImageFileName?: string | null;
+        clearBrandImage?: boolean;
+        approvalRecipient1?: string | null;
+        approvalRecipient2?: string | null;
   }) {
     return this.http.put<OutreachSettings>(`${environment.apiUrl}/tenant/outreach-settings`, payload);
+  }
+
+  whatsappConfigureWebhook() {
+    return this.http.post<WhatsAppConnection>(`${environment.apiUrl}/whatsapp/webhook`, {});
+  }
+
+  testApprovalNotification() {
+    return this.http.post<{ configuredCount: number; sentCount: number; error: string | null }>(
+      `${environment.apiUrl}/tenant/outreach-settings/test-approval-notification`, {}
+    );
   }
 
   sendWhatsAppMessage(payload: { phone: string; message: string; clientId?: string }) {

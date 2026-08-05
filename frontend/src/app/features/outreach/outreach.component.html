@@ -87,7 +87,7 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7-6.3-4.6L6 21l2.3-7-6-4.6h7.6z"/>
             </svg>
-            {{ generatingAi ? 'Gerando...' : 'Gerar copy IA' }}
+            {{ generatingAi ? 'Gerando...' : 'Gerar Texto de Prospecção' }}
           </button>
         </div>
 
@@ -123,9 +123,9 @@
         <div class="preview-header">
           <div>
             <h3>2. Revisar prévia</h3>
-            <p class="preview-step-hint">Edite o texto se precisar. O disparo só libera depois da prévia.</p>
+            <p class="preview-step-hint">A saudação fica fixa por empresa. Edite só o restante da mensagem.</p>
           </div>
-          <span class="pp-badge pp-badge--violet pp-badge--ai">GPT-powered</span>
+          <span class="pp-badge pp-badge--violet">Abordagens curadas</span>
         </div>
 
         @if (companies.length > 0) {
@@ -141,6 +141,23 @@
                 <option [value]="company.id">{{ company.tradeName || company.legalName }}</option>
               }
             </select>
+          </div>
+        }
+
+        @if (approaches.length > 0) {
+          <div class="approach-cards" role="list">
+            @for (approach of approaches; track approach.id) {
+              <button
+                type="button"
+                class="approach-card"
+                role="listitem"
+                [class.approach-card--active]="selectedApproachId === approach.id"
+                (click)="selectApproach(approach)"
+              >
+                <strong>{{ approach.label }}</strong>
+                <span>{{ approach.description }}</span>
+              </button>
+            }
           </div>
         }
 
@@ -179,7 +196,12 @@
               </div>
             }
             <div class="pp-field">
-              <label for="preview-body">Mensagem ({{ form.controls.channel.value === 'WHATSAPP' ? 'WhatsApp' : 'E-mail' }})</label>
+              <label>Saudação (automática por empresa)</label>
+              <div class="preview-greeting" aria-readonly="true">{{ aiGreeting }}</div>
+              <small class="preview-greeting-hint">Esta parte muda com o lead e não pode ser editada.</small>
+            </div>
+            <div class="pp-field">
+              <label for="preview-body">Mensagem editável ({{ form.controls.channel.value === 'WHATSAPP' ? 'WhatsApp' : 'E-mail' }})</label>
               <div class="preview-highlight-wrap">
                 <div #bodyHighlight class="preview-highlight-backdrop" aria-hidden="true">
                   @for (seg of previewBodySegments; track $index) {
@@ -213,8 +235,8 @@
               <strong>Pronto para gerar sua abordagem</strong>
               <span>
                 Preencha o contexto do produto à esquerda e clique em
-                <em>Gerar copy IA</em>
-                para ver a mensagem personalizada de
+                <em>Gerar Texto de Prospecção</em>
+                para ver 4 abordagens personalizadas de
                 {{ previewCompany?.tradeName || previewCompany?.legalName || 'cada empresa' }}.
               </span>
             </div>
@@ -232,7 +254,7 @@
             [disabled]="!canSendCampaign"
             [attr.title]="
               !hasPreviewReady
-                ? 'Gere a prévia IA antes de enviar'
+                ? 'Gere o texto de prospecção antes de enviar'
                 : !channelStatus.connected
                   ? 'Conecte o canal antes de enviar'
                   : null
@@ -255,7 +277,7 @@
             @for (company of companies; track company.id) {
               <li [class.active]="company.id === previewCompanyId">
                 {{ company.tradeName || company.legalName }}
-                @if (previewsByCompany[company.id].body) {
+                @if (previewsByCompany[company.id]?.body) {
                   <span class="lead-ready">prévia</span>
                 }
               </li>
@@ -300,7 +322,7 @@
             </p>
             <h2 id="send-overlay-title">{{ sendPhaseLabel }}</h2>
           </div>
-          @if (!isSendBusy) {
+          @if (!isSendBusy || canForceCloseSend) {
             <button type="button" class="send-modal__close" (click)="closeSendProgress()" aria-label="Fechar">
               ✕
             </button>
@@ -320,7 +342,7 @@
                 <span></span>
               </div>
             </div>
-          } @else if (isSendBusy && sendProgress.activeChannel === 'WHATSAPP') {
+          } @else if (isSendBusy) {
             <div class="anim-wa">
               <div class="anim-wa__phone">
                 <div class="anim-wa__screen">
@@ -453,15 +475,26 @@
 
             @if (sendProgress.deliveries.length > 0) {
               <div class="send-summary__deliveries">
-                <h3>Entregas</h3>
+                <h3>Entregas ({{ sendProgress.deliveries.length }})</h3>
                 <ul>
-                  @for (delivery of sendProgress.deliveries; track delivery.companyId) {
+                  @for (delivery of sendProgress.deliveries; track delivery.companyId + '-' + delivery.channel + '-' + delivery.status) {
                     <li>
                       <strong>{{ delivery.companyName }}</strong>
                       <span>{{ delivery.status }} · {{ delivery.channel || '-' }}</span>
                       <small>{{ delivery.recipient || '-' }} · {{ delivery.detail }}</small>
                     </li>
                   }
+                </ul>
+              </div>
+            } @else if (sendProgress.sentCount > 0 || sendProgress.failedCount > 0) {
+              <div class="send-summary__deliveries">
+                <h3>Resumo do disparo</h3>
+                <ul>
+                  <li>
+                    <strong>{{ sendProgress.campaignName || 'Campanha' }}</strong>
+                    <span>{{ sendProgress.sentCount }} sucesso(s) · {{ sendProgress.failedCount }} falha(s)</span>
+                    <small>{{ sendProgress.waSent }} WhatsApp · {{ sendProgress.emailSent }} e-mail</small>
+                  </li>
                 </ul>
               </div>
             }

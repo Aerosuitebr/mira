@@ -8,7 +8,9 @@ import {
   Company,
   CreateAppointmentPayload,
   CreateClientPayload,
-  ProspectJob
+  ProspectJob,
+  OutreachReport,
+  FollowUpReviewItem
 } from '../../core/api.service';
 import { AerosuiteFitAnalysis, AerosuiteFitService, AerosuitePlanId } from '../../core/aerosuite-fit.service';
 
@@ -98,6 +100,9 @@ export class ProspectingComponent implements OnInit {
   sendingTestEmail = false;
   sendingTestWhatsApp = false;
   activeJob: ProspectJob | null = null;
+  outreachReport: OutreachReport | null = null;
+  followUpsAwaitingApproval: FollowUpReviewItem[] = [];
+  approvingFollowUpId: string | null = null;
   private jobPollHandle: ReturnType<typeof setInterval> | null = null;
 
   autoProspect = {
@@ -214,6 +219,8 @@ export class ProspectingComponent implements OnInit {
     }
     this.loadAppointments();
     this.refreshLatestJob();
+    this.loadOutreachReport();
+    this.loadFollowUpsAwaitingApproval();
   }
 
   startAutoProspect(): void {
@@ -233,11 +240,10 @@ export class ProspectingComponent implements OnInit {
       .subscribe({
         next: (job) => {
           this.activeJob = job;
+          this.loadOutreachReport();
           this.startingAutoProspect = false;
           this.activeStep = 3;
-          this.statusMessage = this.autoProspect.testMode
-            ? `Prospecção automática iniciada (${job.status}) em modo seguro (e-mails redirecionados).`
-            : `Prospecção automática iniciada (${job.status}). Envios reais para WhatsApp e e-mail dos leads.`;
+          this.statusMessage = `Fila preparada (${job.status}). Nesta fase, nenhuma mensagem é enviada automaticamente.`;
           this.startJobPolling(job.id);
         },
         error: (err) => {
@@ -332,6 +338,39 @@ export class ProspectingComponent implements OnInit {
     });
   }
 
+  private loadOutreachReport(): void {
+    this.api.outreachReport().subscribe({
+      next: (report) => (this.outreachReport = report)
+    });
+  }
+
+  private loadFollowUpsAwaitingApproval(): void {
+    this.api.followUpsAwaitingApproval().subscribe({
+      next: (items) => (this.followUpsAwaitingApproval = items)
+    });
+  }
+
+  approveFollowUp(id: string): void {
+    this.approvingFollowUpId = id;
+    this.errorMessage = '';
+    this.api.approveFollowUp(id).subscribe({
+      next: (result) => {
+        this.approvingFollowUpId = null;
+        if (result.error) {
+          this.errorMessage = result.error;
+          return;
+        }
+        this.statusMessage = 'Segunda mensagem aprovada e enviada.';
+        this.loadFollowUpsAwaitingApproval();
+        this.loadOutreachReport();
+      },
+      error: (err) => {
+        this.approvingFollowUpId = null;
+        this.errorMessage = err?.error?.message || 'Não foi possível aprovar a mensagem.';
+      }
+    });
+  }
+
   private startJobPolling(jobId: string): void {
     if (this.jobPollHandle) {
       clearInterval(this.jobPollHandle);
@@ -346,7 +385,7 @@ export class ProspectingComponent implements OnInit {
               this.jobPollHandle = null;
             }
             if (job.status === 'COMPLETED') {
-              this.statusMessage = `Prospecção concluída: ${job.waSent} WA · ${job.emailSent} e-mails · ${job.failedCount} falhas.`;
+              this.statusMessage = `Preparação concluída: ${job.queuedCount} mensagens aguardam revisão.`;
             }
           }
         }

@@ -5,6 +5,8 @@ public record OutreachSettingsRequest(
     String brandImageBase64,
     String brandImageMime,
     String brandImageFileName,
-    Boolean clearBrandImage
+    Boolean clearBrandImage,
+    String approvalRecipient1,
+    String approvalRecipient2
 ) {
 }
