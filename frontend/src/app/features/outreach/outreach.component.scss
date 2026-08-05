@@ -1204,6 +1204,52 @@
     }
   }
 
+  &__deliveries {
+    h3 {
+      margin: 0 0 0.45rem;
+      font-size: 0.78rem;
+      color: #86efac;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 0.35rem;
+      max-height: 220px;
+      overflow: auto;
+    }
+
+    li {
+      display: grid;
+      gap: 0.15rem;
+      padding: 0.55rem 0.65rem;
+      border-radius: 10px;
+      background: rgba(34, 197, 94, 0.08);
+      border: 1px solid rgba(74, 222, 128, 0.2);
+      color: #bbf7d0;
+      font-size: 0.8rem;
+      line-height: 1.4;
+
+      strong {
+        color: #ecfdf5;
+        font-weight: 600;
+      }
+
+      span {
+        color: #86efac;
+      }
+
+      small {
+        color: #94a3b8;
+        font-size: 0.74rem;
+      }
+    }
+  }
+
   &__actions {
     display: flex;
     flex-wrap: wrap;

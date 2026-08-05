@@ -156,9 +156,6 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get filteredCompanies(): Company[] {
     const query = this.resultFilter.trim().toLowerCase();
-    if (!query) {
-      return this.allCompanies;
-    }
     const digits = query.replace(/\D/g, '');
     return this.allCompanies.filter((company) =>
       (!this.hideApproached || !this.isApproached(company.id)) &&
@@ -638,13 +635,16 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     this.syncCompaniesFromCache();
     this.persistSession();
+    if (this.hideApproached) {
+      this.loadApproachStatus(companies);
+    }
 
     // Sem filtro e na 1ª página: lista/mapa já mostram o mesmo conteúdo (sem re-render).
-    if (this.hasResultFilter || this.pageIndex > 0) {
+    if (this.hasResultFilter || this.pageIndex > 0 || this.hideApproached) {
       queueMicrotask(() => {
         this.renderMarkers(this.mapCompanies);
         this.fitMapToResults(this.mapCompanies, state);
-        if (this.pageIndex > 0) {
+        if (this.pageIndex > 0 || this.hideApproached) {
           this.refineMapCoordinates(this.visibleCompanies);
         }
       });
@@ -657,7 +657,7 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private refreshPagedView(scroll: boolean): void {
     this.syncCompaniesFromCache();
-    this.loadApproachStatus(this.visibleCompanies);
+    this.loadApproachStatus(this.hideApproached ? this.allCompanies : this.visibleCompanies);
     this.persistSession();
     queueMicrotask(() => {
       this.renderMarkers(this.mapCompanies);
@@ -844,6 +844,9 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
   toggleHideApproached(event: Event): void {
     this.hideApproached = (event.target as HTMLInputElement).checked;
     this.pageIndex = 0;
+    if (this.hideApproached) {
+      this.loadApproachStatus(this.allCompanies);
+    }
     this.refreshPagedView(false);
   }
 
@@ -877,6 +880,14 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
       next: (statuses) => {
         for (const status of statuses) this.approachByCompanyId[status.companyId] = status;
         this.approachByCompanyId = { ...this.approachByCompanyId };
+        if (this.hideApproached) {
+          this.syncCompaniesFromCache();
+          queueMicrotask(() => {
+            this.renderMarkers(this.mapCompanies);
+            this.fitMapToResults(this.mapCompanies, this.filters.getRawValue().state);
+            this.map?.invalidateSize();
+          });
+        }
       }
     });
   }

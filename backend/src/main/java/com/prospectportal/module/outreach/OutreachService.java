@@ -154,7 +154,7 @@ public class OutreachService {
     @Transactional(readOnly = true)
     public List<OutreachMessageHistoryItem> companyMessages(UUID companyId) {
         Lead lead = leadRepository.findByTenantIdAndCompanyId(authContext.tenantId(), companyId)
-            .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Empresa nÃ£o possui histÃ³rico neste tenant"));
+            .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Empresa nao possui historico neste tenant"));
         return messageRepository.findByLeadIdWithCampaignOrderByCreatedAtDesc(lead.getId()).stream()
             .map(message -> new OutreachMessageHistoryItem(
                 message.getId(), message.getCampaign().getId(), message.getCampaign().getName(),
