@@ -6,6 +6,8 @@ import com.prospectportal.module.outreach.OutreachBotQueueService;
 import com.prospectportal.module.outreach.entity.OutreachMessage;
 import com.prospectportal.module.outreach.repository.OutreachMessageRepository;
 import com.prospectportal.module.prospect.ProspectCopyBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ import com.prospectportal.web.dto.FollowUpReviewItem;
 /** Recebe uma resposta legítima e prepara (ou envia, quando explicitamente habilitado) a etapa 2. */
 @Service
 public class WhatsAppReplyAutomationService {
+    private static final Logger log = LoggerFactory.getLogger(WhatsAppReplyAutomationService.class);
 
     private final OutreachMessageRepository messageRepository;
     private final OutreachSettingsService settingsService;
@@ -108,7 +111,12 @@ public class WhatsAppReplyAutomationService {
         java.util.stream.Stream.of(tenant.getOutreachApprovalRecipient1(), tenant.getOutreachApprovalRecipient2())
             .filter(number -> number != null && !number.isBlank())
             .distinct()
-            .forEach(number -> evolutionClient.sendInternalNotification(number, notification));
+            .forEach(number -> {
+                var result = evolutionClient.sendInternalNotification(number, notification);
+                if (!result.success()) {
+                    log.warn("RevisÃ£o da etapa 2 criada, mas o alerta para {} falhou: {}", number, result.error());
+                }
+            });
     }
 
     private static String displayName(OutreachMessage message) {
