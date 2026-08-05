@@ -374,6 +374,7 @@
                   </div>
                   <div class="job-metrics">
                     <span>Na fila {{ outreachBotStatus.queue }}</span>
+                    @if (outreachBotStatus.pendingEvents) { <span>SincronizaÃ§Ãµes pendentes {{ outreachBotStatus.pendingEvents }}</span> }
                     <span>Hoje {{ outreachBotStatus.sentToday }}/{{ outreachBotStatus.cadence.dailyCap }}</span>
                     <span>Aberturas {{ outreachBotStatus.coldOpened }}</span>
                     <span>Respostas {{ outreachBotStatus.repliesReceived }}</span>

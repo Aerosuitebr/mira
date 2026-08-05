@@ -5,6 +5,7 @@ import { canOpenColdConversation, jobStep, nextColdAt, normalizePhone, reportDay
 const port = Number(process.env.PORT || 8090);
 const redis = new Redis(process.env.REDIS_URL || 'redis://redis:6379');
 const queueKey = process.env.OUTREACH_QUEUE_KEY || 'mira:outreach:jobs';
+const eventQueueKey = process.env.OUTREACH_EVENT_QUEUE_KEY || 'mira:outreach:events';
 const stateKey = 'mira:outreach:bot:state';
 const conversationPrefix = 'mira:outreach:conversation:';
 const app = express();
@@ -60,11 +61,13 @@ async function state() {
     });
   }
   const queue = await redis.llen(queueKey);
+  const pendingEvents = await redis.llen(eventQueueKey);
   const sentToday = Number(saved.sentToday || 0);
   return {
     connected: true,
     paused: saved.paused == null ? config.paused : saved.paused === 'true',
     queue,
+    pendingEvents,
     sentToday,
     remainingToday: Math.max(0, config.dailyCap - sentToday),
     restrictionDetected: saved.restrictionDetected === 'true',
@@ -78,16 +81,37 @@ async function state() {
   };
 }
 
+async function postEvent(event) {
+  if (!process.env.MIRA_API_URL || !serviceToken) throw new Error('MIRA API ou token de serviÃ§o nÃ£o configurado');
+  const response = await fetch(`${process.env.MIRA_API_URL.replace(/\/$/, '')}/api/internal/outreach/events`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'X-Mira-Service-Token': serviceToken },
+    body: JSON.stringify(event)
+  });
+  if (!response.ok) throw new Error(`MIRA events HTTP ${response.status}`);
+}
+
 async function emit(type, payload = {}) {
-  if (!process.env.MIRA_API_URL || !serviceToken) return;
+  const event = { type, occurredAt: new Date().toISOString(), ...payload };
   try {
-    await fetch(`${process.env.MIRA_API_URL.replace(/\/$/, '')}/api/internal/outreach/events`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'X-Mira-Service-Token': serviceToken },
-      body: JSON.stringify({ type, occurredAt: new Date().toISOString(), ...payload })
-    });
+    await postEvent(event);
   } catch (error) {
-    console.error(`could not report ${type}`, error.message);
+    await redis.rpush(eventQueueKey, JSON.stringify(event));
+    console.error(`could not report ${type}; queued for retry`, error.message);
+  }
+}
+
+async function flushEvents() {
+  for (let index = 0; index < 25; index += 1) {
+    const raw = await redis.lpop(eventQueueKey);
+    if (!raw) return;
+    try {
+      await postEvent(JSON.parse(raw));
+    } catch (error) {
+      await redis.lpush(eventQueueKey, raw);
+      console.error('could not flush outreach event', error.message);
+      return;
+    }
   }
 }
 
@@ -233,5 +257,6 @@ app.post('/webhooks/evolution', async (req, res) => {
 
 // A entrega é bloqueada em produção por OUTREACH_DELIVERY_ENABLED=false até liberar a conta.
 setInterval(processOne, 1_000).unref();
+setInterval(flushEvents, 15_000).unref();
 setInterval(sendReport, 15 * 60 * 1_000).unref();
 app.listen(port, () => console.log(`outreach-bot listening on ${port}, paused=${config.paused}`));

@@ -224,6 +224,7 @@ export interface OutreachBotStatus {
   connected: boolean;
   paused: boolean;
   queue: number;
+  pendingEvents: number;
   sentToday: number;
   remainingToday: number;
   restrictionDetected: boolean;
