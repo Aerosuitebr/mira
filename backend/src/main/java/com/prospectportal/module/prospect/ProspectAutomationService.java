@@ -38,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -289,7 +290,12 @@ public class ProspectAutomationService {
         Tenant tenant = tenantRepository.findById(tenantId)
             .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Tenant não encontrado"));
 
-        int limit = request.companyLimit() != null ? Math.min(Math.max(request.companyLimit(), 1), 100) : 20;
+        List<UUID> selectedCompanyIds = request.selectedCompanyIds() == null
+            ? List.of()
+            : request.selectedCompanyIds().stream().distinct().limit(100).toList();
+        int limit = !selectedCompanyIds.isEmpty()
+            ? selectedCompanyIds.size()
+            : request.companyLimit() != null ? Math.min(Math.max(request.companyLimit(), 1), 100) : 20;
         boolean testMode = request.testMode() != null ? request.testMode() : defaultTestMode;
         boolean dryRun = Boolean.TRUE.equals(request.dryRun());
 
@@ -312,6 +318,9 @@ public class ProspectAutomationService {
         job.setState(blankToNull(request.state()));
         job.setCity(blankToNull(request.city()));
         job.setKeyword(blankToNull(request.keyword()));
+        job.setSelectedCompanyIds(selectedCompanyIds.isEmpty()
+            ? null
+            : selectedCompanyIds.stream().map(UUID::toString).reduce((left, right) -> left + "," + right).orElse(null));
         job.setCompanyLimit(limit);
         job.setStatus("QUEUED");
         job.setTestMode(testMode);
@@ -357,19 +366,21 @@ public class ProspectAutomationService {
             campaignRepository.save(job.getCampaign());
         }
 
-        PageResponse<CompanyResponse> page = discoveryService.search(
-            job.getKeyword(),
-            job.getCnae(),
-            job.getState(),
-            job.getCity(),
-            null,
-            true,
-            false,
-            0,
-            job.getCompanyLimit()
-        );
-
-        List<UUID> companyIds = page.content().stream().map(CompanyResponse::id).limit(job.getCompanyLimit()).toList();
+        List<UUID> companyIds = selectedCompanyIds(job);
+        if (companyIds.isEmpty()) {
+            PageResponse<CompanyResponse> page = discoveryService.search(
+                job.getKeyword(),
+                job.getCnae(),
+                job.getState(),
+                job.getCity(),
+                null,
+                true,
+                false,
+                0,
+                job.getCompanyLimit()
+            );
+            companyIds = page.content().stream().map(CompanyResponse::id).limit(job.getCompanyLimit()).toList();
+        }
         job.setFoundCount(companyIds.size());
         jobRepository.save(job);
 
@@ -425,6 +436,21 @@ public class ProspectAutomationService {
             jobRepository.save(job);
         }
         log.info("Job {} preparado: {} empresas, {} mensagens na fila", jobId, companyIds.size(), queued);
+    }
+
+    private List<UUID> selectedCompanyIds(ProspectJob job) {
+        if (job.getSelectedCompanyIds() == null || job.getSelectedCompanyIds().isBlank()) {
+            return List.of();
+        }
+        List<UUID> ids = new ArrayList<>();
+        for (String value : job.getSelectedCompanyIds().split(",")) {
+            try {
+                ids.add(UUID.fromString(value));
+            } catch (IllegalArgumentException ignored) {
+                // Ignora ids inválidos de jobs antigos, sem interromper a fila.
+            }
+        }
+        return ids;
     }
 
     @Transactional

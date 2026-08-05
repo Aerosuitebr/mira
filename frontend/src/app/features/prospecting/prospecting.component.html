@@ -265,10 +265,24 @@
               <button type="button" class="pp-btn pp-btn--ghost" (click)="goToStep(2)">Ver lista</button>
             </div>
 
+            <div class="outreach-flow-picker" aria-label="Escolha o fluxo de envio">
+              <button type="button" class="outreach-flow-choice" [class.outreach-flow-choice--active]="outreachFlow === 'TWO_STEP'" [attr.aria-pressed]="outreachFlow === 'TWO_STEP'" (click)="outreachFlow = 'TWO_STEP'">
+                <span>WhatsApp protegido</span>
+                <strong>Conversar em 2 etapas</strong>
+                <small>Abertura curta, resposta do lead, aprovação e proposta completa.</small>
+              </button>
+              <button type="button" class="outreach-flow-choice" [class.outreach-flow-choice--active]="outreachFlow === 'DIRECT'" [attr.aria-pressed]="outreachFlow === 'DIRECT'" (click)="outreachFlow = 'DIRECT'">
+                <span>Campanha direta</span>
+                <strong>Revisar e enviar o lote</strong>
+                <small>Copy, revisão e confirmação em uma única campanha.</small>
+              </button>
+            </div>
+
+            @if (outreachFlow === 'TWO_STEP') {
             <div class="auto-prospect-panel auto-prospect-panel--standalone">
               <div class="auto-prospect-head">
                 <div>
-                  <h3>Preparar fila</h3>
+                  <h3>Preparar etapa 1</h3>
                   <p>
                     Fase 1: sem disparos. A abertura não inclui links e fica na fila para revisão.
                   </p>
@@ -280,16 +294,16 @@
               </div>
               <div class="auto-prospect-actions">
                 <label class="pp-field">
-                  <span>Limite de empresas</span>
-                  <input class="pp-input" type="number" min="1" max="50" [(ngModel)]="autoProspect.limit" name="autoLimit" />
+                  <span>Leads selecionados</span>
+                  <input class="pp-input" type="text" [value]="selectedCompanyIds.size + ' lead(s)'" readonly />
                 </label>
                 <button
                   type="button"
                   class="pp-btn pp-btn--primary"
                   [disabled]="startingAutoProspect"
-                  (click)="startAutoProspect()"
+                  (click)="startSelectedTwoStepQueue()"
                 >
-                  @if (startingAutoProspect) { Preparando... } @else { Preparar fila de abordagem }
+                  @if (startingAutoProspect) { Preparando... } @else { Preparar etapa 1 para {{ selectedCompanyIds.size }} leads }
                 </button>
               </div>
 
@@ -361,6 +375,17 @@
                 </div>
               }
             </div>
+            } @else {
+              <div class="direct-campaign-panel">
+                <span class="pp-eyebrow">Campanha direta</span>
+                <h3>Uma única etapa de envio</h3>
+                <p>Os {{ selectedCompanyIds.size }} leads selecionados irão para a tela de copy e revisão. Este fluxo não usa aprovação após resposta.</p>
+                <div class="direct-campaign-panel__actions">
+                  <button type="button" class="pp-btn pp-btn--ghost" (click)="goToStep(2)">Ajustar lista</button>
+                  <button type="button" class="pp-btn pp-btn--primary" (click)="openDirectCampaign()">Continuar para campanha direta</button>
+                </div>
+              </div>
+            }
           </section>
         }
       </main>

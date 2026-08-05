@@ -701,6 +701,7 @@ export class ApiService {
     companyLimit?: number;
     testMode?: boolean;
     dryRun?: boolean;
+    selectedCompanyIds?: string[];
   }) {
     return this.http.post<ProspectJob>(`${environment.apiUrl}/prospect/jobs`, payload);
   }

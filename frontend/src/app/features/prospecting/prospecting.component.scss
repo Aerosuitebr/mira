@@ -308,6 +308,59 @@
   background: transparent;
 }
 
+.outreach-flow-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.outreach-flow-choice {
+  display: grid;
+  gap: 0.3rem;
+  padding: 1rem;
+  border: 1px solid var(--pp-glass-border);
+  border-radius: var(--pp-radius-md);
+  background: rgba(15, 23, 42, 0.28);
+  color: var(--pp-text-primary);
+  cursor: pointer;
+  text-align: left;
+
+  span {
+    color: var(--pp-cyan);
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  strong { font-size: 1rem; }
+  small { color: var(--pp-text-secondary); line-height: 1.4; }
+
+  &--active {
+    border-color: rgba(129, 140, 248, 0.75);
+    background: rgba(99, 102, 241, 0.14);
+  }
+}
+
+.direct-campaign-panel {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.25rem;
+  border: 1px solid var(--pp-glass-border);
+  border-radius: var(--pp-radius-md);
+  background: rgba(15, 23, 42, 0.28);
+
+  h3, p { margin: 0; }
+  p { color: var(--pp-text-secondary); line-height: 1.5; }
+}
+
+.direct-campaign-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 .reply-report {
   display: grid;
   gap: 0.75rem;
@@ -1338,6 +1391,10 @@
 
   .reply-report__safe {
     align-self: flex-start;
+  }
+
+  .outreach-flow-picker {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -43,6 +43,9 @@ public class ProspectJob {
     private String city;
     private String keyword;
 
+    @Column(name = "selected_company_ids", columnDefinition = "TEXT")
+    private String selectedCompanyIds;
+
     @Column(name = "company_limit", nullable = false)
     private int companyLimit = 20;
 

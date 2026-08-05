@@ -17,6 +17,7 @@ import { AerosuiteFitAnalysis, AerosuiteFitService, AerosuitePlanId } from '../.
 type ProspectMode = 'pj' | 'pf';
 type MetricLensId = 'icp' | 'plans' | 'promo' | 'sources' | 'routes' | 'speed';
 type ProspectStep = 1 | 2 | 3;
+type OutreachFlow = 'TWO_STEP' | 'DIRECT';
 
 interface ProspectPreset {
   id: string;
@@ -67,6 +68,7 @@ export class ProspectingComponent implements OnInit {
 
   mode: ProspectMode = 'pj';
   activeStep: ProspectStep = 1;
+  outreachFlow: OutreachFlow = 'TWO_STEP';
   expandedCompanyId: string | null = null;
   loadingCompanies = false;
   savingPerson = false;
@@ -336,6 +338,40 @@ export class ProspectingComponent implements OnInit {
         }
       }
     });
+  }
+
+  startSelectedTwoStepQueue(): void {
+    if (this.selectedCompanyIds.size === 0) {
+      this.errorMessage = 'Selecione ao menos uma empresa na etapa Lista antes de preparar a etapa 1.';
+      this.activeStep = 2;
+      return;
+    }
+    this.startingAutoProspect = true;
+    this.errorMessage = '';
+    const selectedIds = [...this.selectedCompanyIds];
+    this.api.startProspectJob({
+      name: `WhatsApp 2 etapas · ${selectedIds.length} leads`,
+      companyLimit: selectedIds.length,
+      testMode: this.autoProspect.testMode,
+      dryRun: false,
+      selectedCompanyIds: selectedIds
+    }).subscribe({
+      next: (job) => {
+        this.activeJob = job;
+        this.startingAutoProspect = false;
+        this.statusMessage = `Etapa 1 preparada para ${selectedIds.length} lead(s). Nenhuma mensagem foi enviada automaticamente.`;
+        this.loadOutreachReport();
+        this.startJobPolling(job.id);
+      },
+      error: (err) => {
+        this.startingAutoProspect = false;
+        this.errorMessage = err?.error?.message || 'Não foi possível preparar a etapa 1.';
+      }
+    });
+  }
+
+  openDirectCampaign(): void {
+    this.forwardSelection('/outreach');
   }
 
   private loadOutreachReport(): void {
