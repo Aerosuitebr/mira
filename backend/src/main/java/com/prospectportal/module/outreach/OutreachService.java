@@ -67,6 +67,7 @@ public class OutreachService {
     private final WhatsAppConnectionService whatsAppConnectionService;
     private final MailSenderService mailSenderService;
     private final OutreachSettingsService outreachSettingsService;
+    private final OutreachBotQueueService outreachBotQueueService;
     private final boolean mockAiEnabled;
 
     public OutreachService(
@@ -84,6 +85,7 @@ public class OutreachService {
         WhatsAppConnectionService whatsAppConnectionService,
         MailSenderService mailSenderService,
         OutreachSettingsService outreachSettingsService,
+        OutreachBotQueueService outreachBotQueueService,
         @Value("${app.ai.mock-enabled:true}") boolean mockAiEnabled
     ) {
         this.authContext = authContext;
@@ -100,6 +102,7 @@ public class OutreachService {
         this.whatsAppConnectionService = whatsAppConnectionService;
         this.mailSenderService = mailSenderService;
         this.outreachSettingsService = outreachSettingsService;
+        this.outreachBotQueueService = outreachBotQueueService;
         this.mockAiEnabled = mockAiEnabled;
     }
 
@@ -147,17 +150,11 @@ public class OutreachService {
         if (message.getOutreachStep() != 2 || !"AWAITING_APPROVAL".equals(message.getStatus())) {
             throw new ResponseStatusException(BAD_REQUEST, "Mensagem não está aguardando aprovação");
         }
-        String instance = message.getCampaign().getTenant().getEvolutionInstanceName();
-        var result = evolutionClient.sendText(instance, message.getRecipient(), message.getBody());
-        if (!result.success()) {
-            return new FollowUpApprovalResponse(message.getId(), message.getStatus(), result.error());
-        }
-        message.setStatus("SENT");
-        message.setProvider("evolution");
-        message.setProviderMessageId(result.messageId());
-        message.setSentAt(Instant.now());
+        message.setStatus("QUEUED_BOT");
+        message.setApprovalApprovedAt(Instant.now());
         messageRepository.save(message);
-        return new FollowUpApprovalResponse(message.getId(), message.getStatus(), null);
+        outreachBotQueueService.enqueueApprovedStep2(message);
+        return new FollowUpApprovalResponse(message.getId(), "QUEUED_BOT", null);
     }
 
     @Transactional(readOnly = true)
@@ -301,7 +298,6 @@ public class OutreachService {
         String channel = request.channel() != null ? request.channel().trim().toUpperCase() : "WHATSAPP";
         boolean whatsapp = "WHATSAPP".equals(channel);
         String waInstance = null;
-
         if (whatsapp) {
             if (!evolutionClient.isEnabled()) {
                 throw new ResponseStatusException(BAD_REQUEST, "Evolution API desabilitada. Não é possível enviar WhatsApp.");
@@ -389,6 +385,17 @@ public class OutreachService {
                         continue;
                     }
 
+                    String step2Text = body;
+                    message.setChannel("WHATSAPP");
+                    message.setRecipient(EvolutionClient.cleanPhone(phone));
+                    message.setBody(copyBuilder.whatsappStep1(companyName));
+                    message.setStatus("QUEUED_BOT");
+                    messageRepository.save(message);
+                    outreachBotQueueService.enqueue(message, companyName, step2Text);
+                    deliveries.add(deliveryItem(companyId, companyName, message, "Abertura curta na fila protegida"));
+                    waSent++;
+                    sent++;
+                    if (false) { // Mantido apenas até remover o legado; não há caminho de execução direta.
                     Delivery delivery = sendWhatsApp(waInstance, company, contact, body, brand);
                     if (delivery.notWhatsApp()) {
                         String cleanPhone = delivery.recipient() != null ? delivery.recipient() : EvolutionClient.cleanPhone(phone);
@@ -431,6 +438,7 @@ public class OutreachService {
                     deliveries.add(deliveryItem(companyId, companyName, message, "Enviado no WhatsApp"));
                     waSent++;
                     sent++;
+                    }
                 } else {
                     Delivery delivery = sendEmail(company, contact, companyName, contactName, cityState, segment, subject, brand);
                     if (!delivery.success()) {
