@@ -2,6 +2,7 @@ package com.prospectportal.module.whatsapp;
 
 import com.prospectportal.module.evolution.EvolutionClient;
 import com.prospectportal.module.outreach.OutreachSettingsService;
+import com.prospectportal.module.outreach.OutreachBotQueueService;
 import com.prospectportal.module.outreach.entity.OutreachMessage;
 import com.prospectportal.module.outreach.repository.OutreachMessageRepository;
 import com.prospectportal.module.prospect.ProspectCopyBuilder;
@@ -24,6 +25,7 @@ public class WhatsAppReplyAutomationService {
     private final OutreachSettingsService settingsService;
     private final ProspectCopyBuilder copyBuilder;
     private final EvolutionClient evolutionClient;
+    private final OutreachBotQueueService outreachBotQueueService;
     private final String publicBaseUrl;
 
     public WhatsAppReplyAutomationService(
@@ -31,12 +33,14 @@ public class WhatsAppReplyAutomationService {
         OutreachSettingsService settingsService,
         ProspectCopyBuilder copyBuilder,
         EvolutionClient evolutionClient,
+        OutreachBotQueueService outreachBotQueueService,
         @Value("${app.public-base-url:http://localhost:4201}") String publicBaseUrl
     ) {
         this.messageRepository = messageRepository;
         this.settingsService = settingsService;
         this.copyBuilder = copyBuilder;
         this.evolutionClient = evolutionClient;
+        this.outreachBotQueueService = outreachBotQueueService;
         this.publicBaseUrl = publicBaseUrl.replaceAll("/+$", "");
     }
 
@@ -81,15 +85,11 @@ public class WhatsAppReplyAutomationService {
     @Transactional
     public FollowUpApprovalResponse approveByToken(String token) {
         OutreachMessage message = requirePendingToken(token);
-        var result = evolutionClient.sendText(message.getCampaign().getTenant().getEvolutionInstanceName(), message.getRecipient(), message.getBody());
-        if (!result.success()) return new FollowUpApprovalResponse(message.getId(), message.getStatus(), result.error());
-        message.setStatus("SENT");
-        message.setProvider("evolution");
-        message.setProviderMessageId(result.messageId());
-        message.setSentAt(Instant.now());
+        message.setStatus("QUEUED_BOT");
         message.setApprovalApprovedAt(Instant.now());
         messageRepository.save(message);
-        return new FollowUpApprovalResponse(message.getId(), "SENT", null);
+        outreachBotQueueService.enqueueApprovedStep2(message);
+        return new FollowUpApprovalResponse(message.getId(), "QUEUED_BOT", null);
     }
 
     private OutreachMessage requirePendingToken(String token) {

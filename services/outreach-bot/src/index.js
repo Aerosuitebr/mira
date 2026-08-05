@@ -137,18 +137,29 @@ async function canOpenColdConversation() {
 async function processOne() {
   if (processing || !config.deliveryEnabled) return;
   const current = await state();
-  if (current.paused || !(await canOpenColdConversation())) return;
+  if (current.paused) return;
   processing = true;
   try {
     const raw = await redis.lpop(queueKey);
     if (!raw) return;
     const job = JSON.parse(raw);
-    if (!normalizePhone(job.phone) || !job.step1Text) {
-      await emit('SKIPPED', { messageId: job.messageId, reason: 'Contato sem WhatsApp ou abertura' });
+    const isStep2 = job.type === 'STEP2';
+    const text = isStep2 ? job.step2Text : job.step1Text;
+    if (!isStep2 && !(await canOpenColdConversation())) {
+      await redis.lpush(queueKey, raw);
+      return;
+    }
+    if (!normalizePhone(job.phone) || !text) {
+      await emit('SKIPPED', { messageId: job.messageId, reason: 'Contato sem WhatsApp ou texto' });
       return;
     }
     try {
-      const providerMessageId = await sendText(job.phone, job.step1Text);
+      const providerMessageId = await sendText(job.phone, text);
+      if (isStep2) {
+        await emit('STEP2_SENT', { messageId: job.messageId, phone: normalizePhone(job.phone), providerMessageId, step2Text: job.step2Text });
+        await incrementMetric('STEP2_SENT');
+        return;
+      }
       const interval = Math.floor((config.minIntervalSeconds + Math.random() * (config.maxIntervalSeconds - config.minIntervalSeconds)) * 1000);
       await redis.multi()
         .hset(stateKey, 'sentToday', String(current.sentToday + 1), 'nextColdAt', String(Date.now() + interval))

@@ -44,7 +44,7 @@ public interface OutreachMessageRepository extends JpaRepository<OutreachMessage
     @Query("""
         SELECT COUNT(m) FROM OutreachMessage m
         WHERE m.channel = 'WHATSAPP'
-          AND m.status = 'SENT'
+          AND m.status IN ('SENT', 'WAITING_REPLY', 'REPLIED')
           AND m.sentAt >= :since
         """)
     long countWhatsAppSentSince(@Param("since") Instant since);

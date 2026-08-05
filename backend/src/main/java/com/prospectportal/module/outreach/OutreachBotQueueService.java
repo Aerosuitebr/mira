@@ -38,4 +38,25 @@ public class OutreachBotQueueService {
             throw new IllegalStateException("Não foi possível enfileirar outreach-bot", ex);
         }
     }
+
+    /** Etapa 2 só entra aqui após resposta do lead e aprovação humana. */
+    public void enqueueApprovedStep2(OutreachMessage message) {
+        try {
+            String companyName = java.util.Objects.requireNonNullElse(message.getLead().getCompany().getTradeName(), "");
+            String payload = objectMapper.writeValueAsString(Map.of(
+                "type", "STEP2",
+                "messageId", message.getId().toString(),
+                "campaignId", message.getCampaign().getId().toString(),
+                "leadId", message.getLead().getId().toString(),
+                "companyId", message.getLead().getCompany().getId().toString(),
+                "phone", message.getRecipient() == null ? "" : message.getRecipient(),
+                "companyName", companyName,
+                "step2Text", message.getBody(),
+                "approachId", "APPROVED_FOLLOW_UP"
+            ));
+            redis.opsForList().rightPush(QUEUE, payload);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Não foi possível enfileirar etapa 2 no outreach-bot", ex);
+        }
+    }
 }

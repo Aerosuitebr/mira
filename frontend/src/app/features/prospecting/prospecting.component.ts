@@ -452,7 +452,7 @@ export class ProspectingComponent implements OnInit {
           this.errorMessage = result.error;
           return;
         }
-        this.statusMessage = 'Segunda mensagem aprovada e enviada.';
+        this.statusMessage = 'Segunda mensagem aprovada e entregue à fila protegida do robô.';
         this.loadFollowUpsAwaitingApproval();
         this.loadOutreachReport();
       },

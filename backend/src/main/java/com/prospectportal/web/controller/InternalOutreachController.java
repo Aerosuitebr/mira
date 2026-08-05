@@ -2,6 +2,7 @@ package com.prospectportal.web.controller;
 
 import com.prospectportal.module.outreach.entity.OutreachMessage;
 import com.prospectportal.module.outreach.repository.OutreachMessageRepository;
+import com.prospectportal.module.whatsapp.WhatsAppReplyAutomationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,11 +26,14 @@ public class InternalOutreachController {
     private static final Logger log = LoggerFactory.getLogger(InternalOutreachController.class);
     private final String token;
     private final OutreachMessageRepository messageRepository;
+    private final WhatsAppReplyAutomationService replyAutomationService;
 
     public InternalOutreachController(@Value("${app.outreach.bot-service-token:}") String token,
-                                      OutreachMessageRepository messageRepository) {
+                                      OutreachMessageRepository messageRepository,
+                                      WhatsAppReplyAutomationService replyAutomationService) {
         this.token = token;
         this.messageRepository = messageRepository;
+        this.replyAutomationService = replyAutomationService;
     }
 
     @PostMapping("/events")
@@ -38,6 +42,9 @@ public class InternalOutreachController {
                                        @RequestBody Map<String, Object> payload) {
         authorize(provided);
         applyEvent(payload);
+        if ("REPLY_RECEIVED".equals(payload.get("type")) && payload.get("phone") instanceof String phone) {
+            replyAutomationService.registerReply(phone);
+        }
         log.info("outreach-bot event {}", payload.get("type"));
         return Map.of("accepted", true);
     }
@@ -80,7 +87,13 @@ public class InternalOutreachController {
                 message.setRepliedAt(Instant.now());
             }
             case "STEP2_SENT" -> {
-                message.setStatus("REPLIED");
+                if (message.getOutreachStep() == 2) {
+                    message.setStatus("SENT");
+                    message.setProvider("evolution");
+                    message.setProviderMessageId(stringValue(payload.get("providerMessageId")));
+                    message.setSentAt(Instant.now());
+                } else {
+                    message.setStatus("REPLIED");
                 if (!messageRepository.existsByReplyToMessageIdAndOutreachStep(message.getId(), (short) 2)) {
                     OutreachMessage secondStep = new OutreachMessage();
                     secondStep.setCampaign(message.getCampaign());
@@ -97,6 +110,7 @@ public class InternalOutreachController {
                     secondStep.setSentAt(Instant.now());
                     secondStep.setCreatedAt(Instant.now());
                     messageRepository.save(secondStep);
+                }
                 }
             }
             case "SKIPPED" -> {
