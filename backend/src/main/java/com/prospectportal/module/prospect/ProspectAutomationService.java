@@ -329,6 +329,14 @@ public class ProspectAutomationService {
         job.setUpdatedAt(Instant.now());
         job = jobRepository.save(job);
 
+        // Uma seleção explícita do usuário precisa ficar pronta antes de a UI
+        // confirmar a fila. Isso evita jobs presos em QUEUED sem contagem.
+        if (!selectedCompanyIds.isEmpty()) {
+            prepareJob(job.getId());
+            ProspectJob prepared = jobRepository.findById(job.getId()).orElse(job);
+            return toResponse(prepared);
+        }
+
         jobPreparer.prepareAsync(job.getId());
         return toResponse(job);
     }
