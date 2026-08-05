@@ -121,6 +121,7 @@ app:
     test-fixtures-enabled: ${APP_DISCOVERY_TEST_FIXTURES:false}
   outreach:
     bot-service-token: ${MIRA_SERVICE_TOKEN:}
+    bot-url: ${OUTREACH_BOT_URL:http://mira-outreach-bot:8090}
     # Fase 1: prepara a fila e a copy para revisão, mas nunca dispara contatos.
     # A liberação do worker será feita somente na fase 2, após a integração do webhook.
     dispatch-enabled: ${APP_OUTREACH_DISPATCH_ENABLED:false}

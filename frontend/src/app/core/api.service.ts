@@ -220,6 +220,16 @@ export interface OutreachReport {
   followUpsFailed: number;
 }
 
+export interface OutreachBotStatus {
+  connected: boolean;
+  paused: boolean;
+  queue: number;
+  sentToday: number;
+  remainingToday: number;
+  restrictionDetected: boolean;
+  cadence: { minSeconds: number; maxSeconds: number; dailyCap: number };
+}
+
 export interface FollowUpReviewItem {
   id: string;
   companyId: string;
@@ -558,6 +568,18 @@ export class ApiService {
 
   outreachReport() {
     return this.http.get<OutreachReport>(`${environment.apiUrl}/outreach/report`);
+  }
+
+  outreachBotStatus() {
+    return this.http.get<OutreachBotStatus>(`${environment.apiUrl}/outreach/bot/status`);
+  }
+
+  pauseOutreachBot() {
+    return this.http.post<OutreachBotStatus>(`${environment.apiUrl}/outreach/bot/pause`, {});
+  }
+
+  resumeOutreachBot() {
+    return this.http.post<OutreachBotStatus>(`${environment.apiUrl}/outreach/bot/resume`, {});
   }
 
   followUpsAwaitingApproval() {

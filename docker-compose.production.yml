@@ -48,6 +48,7 @@ services:
       APP_DISCOVERY_TEST_FIXTURES: "false"
       APP_OUTREACH_TEST_MODE: "false"
       MIRA_SERVICE_TOKEN: ${MIRA_SERVICE_TOKEN:-}
+      OUTREACH_BOT_URL: http://mira-outreach-bot:8090
       CORS_ALLOWED_ORIGINS: https://search.aerosuite.com.br,https://search.aerosuite.app
       PUBLIC_BASE_URL: https://search.aerosuite.com.br
       # Default true: este arquivo é só produção. Sem isso, ${...:-false} sobrescreve
@@ -98,6 +99,7 @@ services:
       OUTREACH_DAILY_CAP: ${OUTREACH_DAILY_CAP:-15}
       MIRA_API_URL: http://mira-api:8082
       MIRA_SERVICE_TOKEN: ${MIRA_SERVICE_TOKEN:-}
+      BOT_SERVICE_TOKEN: ${MIRA_SERVICE_TOKEN:-}
     networks:
       - default
       - aerosuite_default

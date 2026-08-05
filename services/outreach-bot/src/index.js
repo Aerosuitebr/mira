@@ -14,6 +14,14 @@ const config = {
   maxIntervalSeconds: Number(process.env.OUTREACH_MAX_INTERVAL_SECONDS || 300),
   dailyCap: Number(process.env.OUTREACH_DAILY_CAP || 15)
 };
+const serviceToken = process.env.BOT_SERVICE_TOKEN || '';
+
+function authorize(req, res, next) {
+  if (!serviceToken || req.get('authorization') !== `Bearer ${serviceToken}`) {
+    return res.status(401).json({ error: 'invalid-service-token' });
+  }
+  return next();
+}
 
 async function state() {
   const saved = await redis.hgetall(stateKey);
@@ -32,10 +40,10 @@ async function state() {
 app.get('/health', async (_req, res) => {
   try { await redis.ping(); res.json({ status: 'ok' }); } catch { res.status(503).json({ status: 'redis-unavailable' }); }
 });
-app.get('/v1/status', async (_req, res) => res.json(await state()));
-app.post('/v1/pause', async (_req, res) => { await redis.hset(stateKey, 'paused', 'true'); res.json(await state()); });
-app.post('/v1/resume', async (_req, res) => { await redis.hset(stateKey, 'paused', 'false'); res.json(await state()); });
-app.get('/v1/conversations', async (req, res) => {
+app.get('/v1/status', authorize, async (_req, res) => res.json(await state()));
+app.post('/v1/pause', authorize, async (_req, res) => { await redis.hset(stateKey, 'paused', 'true'); res.json(await state()); });
+app.post('/v1/resume', authorize, async (_req, res) => { await redis.hset(stateKey, 'paused', 'false'); res.json(await state()); });
+app.get('/v1/conversations', authorize, async (req, res) => {
   const phone = String(req.query.phone || '');
   res.json({ phone, conversations: [] });
 });

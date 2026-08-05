@@ -1,6 +1,7 @@
 package com.prospectportal.web.controller;
 
 import com.prospectportal.module.outreach.OutreachService;
+import com.prospectportal.module.outreach.OutreachBotGatewayService;
 import com.prospectportal.module.prospect.ProspectAutomationService;
 import com.prospectportal.web.dto.AiCopyRequest;
 import com.prospectportal.web.dto.AiCopyResponse;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
 import com.prospectportal.web.dto.OutreachMessageHistoryItem;
 import com.prospectportal.web.dto.OutreachReportResponse;
 import com.prospectportal.web.dto.FollowUpReviewItem;
@@ -33,13 +35,16 @@ public class OutreachController {
 
     private final OutreachService outreachService;
     private final ProspectAutomationService prospectAutomationService;
+    private final OutreachBotGatewayService outreachBotGatewayService;
 
     public OutreachController(
         OutreachService outreachService,
-        ProspectAutomationService prospectAutomationService
+        ProspectAutomationService prospectAutomationService,
+        OutreachBotGatewayService outreachBotGatewayService
     ) {
         this.outreachService = outreachService;
         this.prospectAutomationService = prospectAutomationService;
+        this.outreachBotGatewayService = outreachBotGatewayService;
     }
 
     @GetMapping("/templates")
@@ -85,6 +90,21 @@ public class OutreachController {
     @GetMapping("/channels")
     public ChannelStatusResponse channels() {
         return prospectAutomationService.channels();
+    }
+
+    @GetMapping("/bot/status")
+    public Map<String, Object> botStatus() {
+        return outreachBotGatewayService.status();
+    }
+
+    @PostMapping("/bot/pause")
+    public Map<String, Object> pauseBot() {
+        return outreachBotGatewayService.pause();
+    }
+
+    @PostMapping("/bot/resume")
+    public Map<String, Object> resumeBot() {
+        return outreachBotGatewayService.resume();
     }
 
     @PostMapping("/test-email")

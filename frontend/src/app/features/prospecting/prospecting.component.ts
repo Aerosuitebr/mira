@@ -10,6 +10,7 @@ import {
   CreateClientPayload,
   ProspectJob,
   OutreachReport,
+  OutreachBotStatus,
   FollowUpReviewItem
 } from '../../core/api.service';
 import { AerosuiteFitAnalysis, AerosuiteFitService, AerosuitePlanId } from '../../core/aerosuite-fit.service';
@@ -104,6 +105,8 @@ export class ProspectingComponent implements OnInit {
   sendingTestWhatsApp = false;
   activeJob: ProspectJob | null = null;
   outreachReport: OutreachReport | null = null;
+  outreachBotStatus: OutreachBotStatus | null = null;
+  updatingOutreachBot = false;
   followUpsAwaitingApproval: FollowUpReviewItem[] = [];
   approvingFollowUpId: string | null = null;
   private jobPollHandle: ReturnType<typeof setInterval> | null = null;
@@ -229,6 +232,7 @@ export class ProspectingComponent implements OnInit {
     this.loadAppointments();
     this.refreshLatestJob();
     this.loadOutreachReport();
+    this.loadOutreachBotStatus();
     this.loadFollowUpsAwaitingApproval();
   }
 
@@ -404,6 +408,31 @@ export class ProspectingComponent implements OnInit {
   private loadOutreachReport(): void {
     this.api.outreachReport().subscribe({
       next: (report) => (this.outreachReport = report)
+    });
+  }
+
+  private loadOutreachBotStatus(): void {
+    this.api.outreachBotStatus().subscribe({
+      next: (status) => (this.outreachBotStatus = status),
+      error: () => (this.outreachBotStatus = null)
+    });
+  }
+
+  setOutreachBotPaused(paused: boolean): void {
+    this.updatingOutreachBot = true;
+    const request = paused ? this.api.pauseOutreachBot() : this.api.resumeOutreachBot();
+    request.subscribe({
+      next: (status) => {
+        this.outreachBotStatus = status;
+        this.updatingOutreachBot = false;
+        this.statusMessage = paused
+          ? 'Robô pausado. Nenhuma nova conversa será iniciada.'
+          : 'Robô retomado. Ele respeitará a cadência e o limite diário configurados.';
+      },
+      error: () => {
+        this.updatingOutreachBot = false;
+        this.errorMessage = 'Não foi possível atualizar o estado do robô de outreach.';
+      }
     });
   }
 
