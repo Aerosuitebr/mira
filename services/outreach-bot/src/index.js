@@ -18,12 +18,12 @@ const config = {
   deliveryEnabled: process.env.OUTREACH_DELIVERY_ENABLED === 'true',
   automaticStep2: process.env.OUTREACH_STEP2_AUTOMATIC === 'true'
 };
-const serviceToken = process.env.BOT_SERVICE_TOKEN || '';
-const webhookSecret = process.env.EVOLUTION_WEBHOOK_SECRET || '';
+const serviceToken = process.env.BOT_SERVICE_TOKEN || process.env.MIRA_SERVICE_TOKEN || '';
+const webhookSecret = process.env.EVOLUTION_WEBHOOK_SECRET || process.env.APP_EVOLUTION_WEBHOOK_SECRET || '';
 const evolution = {
-  baseUrl: (process.env.EVOLUTION_API_BASE_URL || '').replace(/\/$/, ''),
-  apiKey: process.env.EVOLUTION_API_KEY || '',
-  instance: process.env.EVOLUTION_INSTANCE || ''
+  baseUrl: (process.env.EVOLUTION_API_BASE_URL || process.env.APP_EVOLUTION_API_BASE_URL || '').replace(/\/$/, ''),
+  apiKey: process.env.EVOLUTION_API_KEY || process.env.APP_EVOLUTION_API_KEY || '',
+  instance: process.env.EVOLUTION_INSTANCE || process.env.APP_EVOLUTION_INSTANCE || ''
 };
 let processing = false;
 

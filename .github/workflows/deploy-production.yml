@@ -102,6 +102,14 @@ jobs:
           SHORT="${SHA:0:7}"
           echo "=== deploying ${SHORT} ==="
 
+          # Um segredo de serviço é obrigatório para API <-> bot. Ele fica apenas
+          # no .env.production do servidor e não aparece nos logs do Actions.
+          touch .env.production
+          if ! grep -qE '^MIRA_SERVICE_TOKEN=.{24,}$' .env.production; then
+            umask 077
+            printf '\nMIRA_SERVICE_TOKEN=%s\n' "$(openssl rand -hex 32)" >> .env.production
+          fi
+
           mkdir -p /opt/mira-backups
           tar -czf "/opt/mira-backups/mira-pre-${SHORT}-$(date +%Y%m%d%H%M%S).tgz" \
             backend/src docker-compose.production.yml frontend/src scripts/deploy/nginx-mira.conf \
