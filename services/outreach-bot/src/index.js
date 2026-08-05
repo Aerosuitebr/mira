@@ -70,6 +70,42 @@ async function emit(type, payload = {}) {
   }
 }
 
+async function incrementMetric(type) {
+  const field = {
+    STEP1_SENT: 'coldOpened',
+    REPLY_RECEIVED: 'repliesReceived',
+    STEP2_SENT: 'step2Sent',
+    FAILED: 'failed',
+    THROTTLED: 'throttled'
+  }[type];
+  if (field) await redis.hincrby(stateKey, field, 1);
+}
+
+async function sendReport() {
+  if (!process.env.MIRA_API_URL || !serviceToken) return;
+  const current = await state();
+  try {
+    await fetch(`${process.env.MIRA_API_URL.replace(/\/$/, '')}/api/internal/outreach/reports`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'X-Mira-Service-Token': serviceToken },
+      body: JSON.stringify({
+        generatedAt: new Date().toISOString(),
+        queue: current.queue,
+        paused: current.paused,
+        sentToday: current.sentToday,
+        remainingToday: current.remainingToday,
+        coldOpened: Number((await redis.hget(stateKey, 'coldOpened')) || 0),
+        repliesReceived: Number((await redis.hget(stateKey, 'repliesReceived')) || 0),
+        step2Sent: Number((await redis.hget(stateKey, 'step2Sent')) || 0),
+        failed: Number((await redis.hget(stateKey, 'failed')) || 0),
+        throttled: Number((await redis.hget(stateKey, 'throttled')) || 0)
+      })
+    });
+  } catch (error) {
+    console.error('could not send outreach report', error.message);
+  }
+}
+
 async function sendText(destination, text) {
   if (!evolution.baseUrl || !evolution.apiKey || !evolution.instance) {
     throw new Error('Evolution não configurada no outreach-bot');
@@ -119,13 +155,16 @@ async function processOne() {
         .set(`${conversationPrefix}${normalizePhone(job.phone)}`, JSON.stringify(job), 'EX', 60 * 60 * 24 * 14)
         .exec();
       await emit('STEP1_SENT', { messageId: job.messageId, phone: normalizePhone(job.phone), providerMessageId });
+      await incrementMetric('STEP1_SENT');
     } catch (error) {
       if (error.rateLimited) {
         await redis.lpush(queueKey, raw);
         await redis.hset(stateKey, 'restrictionDetected', 'true', 'paused', 'true');
         await emit('THROTTLED', { messageId: job.messageId, reason: error.message });
+        await incrementMetric('THROTTLED');
       } else {
         await emit('FAILED', { messageId: job.messageId, reason: error.message });
+        await incrementMetric('FAILED');
       }
     }
   } catch (error) {
@@ -158,12 +197,15 @@ app.post('/webhooks/evolution', async (req, res) => {
   if (!raw) return res.sendStatus(202);
   const job = JSON.parse(raw);
   await emit('REPLY_RECEIVED', { messageId: job.messageId, phone: sender, providerMessageId: evolutionMessageId(payload) });
+  await incrementMetric('REPLY_RECEIVED');
   if (config.automaticStep2 && config.deliveryEnabled && job.step2Text) {
     try {
       const providerMessageId = await sendText(sender, job.step2Text);
-      await emit('STEP2_SENT', { messageId: job.messageId, phone: sender, providerMessageId });
+      await emit('STEP2_SENT', { messageId: job.messageId, phone: sender, providerMessageId, step2Text: job.step2Text });
+      await incrementMetric('STEP2_SENT');
     } catch (error) {
       await emit(error.rateLimited ? 'THROTTLED' : 'FAILED', { messageId: job.messageId, reason: error.message });
+      await incrementMetric(error.rateLimited ? 'THROTTLED' : 'FAILED');
     }
   }
   return res.sendStatus(202);
@@ -171,4 +213,5 @@ app.post('/webhooks/evolution', async (req, res) => {
 
 // A entrega é bloqueada em produção por OUTREACH_DELIVERY_ENABLED=false até liberar a conta.
 setInterval(processOne, 1_000).unref();
+setInterval(sendReport, 15 * 60 * 1_000).unref();
 app.listen(port, () => console.log(`outreach-bot listening on ${port}, paused=${config.paused}`));

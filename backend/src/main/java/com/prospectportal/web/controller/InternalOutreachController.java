@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -32,6 +33,7 @@ public class InternalOutreachController {
     }
 
     @PostMapping("/events")
+    @Transactional
     public Map<String, Boolean> event(@RequestHeader(value = "X-Mira-Service-Token", required = false) String provided,
                                        @RequestBody Map<String, Object> payload) {
         authorize(provided);
@@ -77,7 +79,26 @@ public class InternalOutreachController {
                 message.setStatus("REPLIED");
                 message.setRepliedAt(Instant.now());
             }
-            case "STEP2_SENT" -> message.setStatus("STEP2_SENT");
+            case "STEP2_SENT" -> {
+                message.setStatus("REPLIED");
+                if (!messageRepository.existsByReplyToMessageIdAndOutreachStep(message.getId(), (short) 2)) {
+                    OutreachMessage secondStep = new OutreachMessage();
+                    secondStep.setCampaign(message.getCampaign());
+                    secondStep.setLead(message.getLead());
+                    secondStep.setChannel("WHATSAPP");
+                    secondStep.setRecipient(message.getRecipient());
+                    secondStep.setBody(java.util.Objects.requireNonNullElse(stringValue(payload.get("step2Text")), ""));
+                    secondStep.setStatus("SENT");
+                    secondStep.setProvider("evolution");
+                    secondStep.setProviderMessageId(stringValue(payload.get("providerMessageId")));
+                    secondStep.setOutreachStep((short) 2);
+                    secondStep.setReplyToMessageId(message.getId());
+                    secondStep.setProspectJobId(message.getProspectJobId());
+                    secondStep.setSentAt(Instant.now());
+                    secondStep.setCreatedAt(Instant.now());
+                    messageRepository.save(secondStep);
+                }
+            }
             case "SKIPPED" -> {
                 message.setStatus("SKIPPED");
                 message.setErrorDetail(stringValue(payload.get("reason")));

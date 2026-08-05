@@ -121,7 +121,8 @@ public class OutreachService {
     public OutreachReportResponse report() {
         UUID tenantId = authContext.tenantId();
         return new OutreachReportResponse(
-            messageRepository.countByTenantAndStepAndStatus(tenantId, (short) 1, "SENT"),
+            messageRepository.countByTenantAndStepAndStatusIn(tenantId, (short) 1,
+                List.of("SENT", "WAITING_REPLY", "REPLIED")),
             messageRepository.countRepliesByTenant(tenantId),
             messageRepository.countByTenantAndStepAndStatus(tenantId, (short) 2, "AWAITING_APPROVAL"),
             messageRepository.countByTenantAndStepAndStatus(tenantId, (short) 2, "SENT"),

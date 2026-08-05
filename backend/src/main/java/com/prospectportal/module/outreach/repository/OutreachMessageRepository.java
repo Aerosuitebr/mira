@@ -78,6 +78,16 @@ public interface OutreachMessageRepository extends JpaRepository<OutreachMessage
         SELECT COUNT(m) FROM OutreachMessage m
         WHERE m.campaign.tenant.id = :tenantId
           AND m.channel = 'WHATSAPP'
+          AND m.outreachStep = :step
+          AND m.status IN :statuses
+        """)
+    long countByTenantAndStepAndStatusIn(@Param("tenantId") UUID tenantId, @Param("step") short step,
+                                         @Param("statuses") List<String> statuses);
+
+    @Query("""
+        SELECT COUNT(m) FROM OutreachMessage m
+        WHERE m.campaign.tenant.id = :tenantId
+          AND m.channel = 'WHATSAPP'
           AND m.outreachStep = 1
           AND m.repliedAt IS NOT NULL
         """)
