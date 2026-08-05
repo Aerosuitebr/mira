@@ -184,8 +184,12 @@ public class OutreachService {
         int emailSent = 0;
         int failed = 0;
         List<String> failures = new ArrayList<>();
+        List<String> nonWhatsApp = new ArrayList<>();
         Map<String, BulkOutreachRequest.MessageOverride> overrides =
             request.messages() != null ? request.messages() : Map.of();
+
+        // Fallback e-mail é a regra padrão quando o canal é WhatsApp.
+        boolean emailFallback = request.emailFallbackEnabled();
 
         for (UUID companyId : request.companyIds()) {
             Company company = companyRepository.findById(companyId)
@@ -223,24 +227,18 @@ public class OutreachService {
                     boolean hasPhone = phone != null && !phone.isBlank();
 
                     if (!hasPhone) {
-                        if (!request.emailFallbackEnabled()) {
+                        if (!emailFallback) {
                             throw new IllegalStateException("Sem telefone/WhatsApp cadastrado para este lead");
                         }
-                        Delivery emailFallback = sendEmail(company, contact, companyName, contactName, cityState, segment, subject, brand);
-                        if (!emailFallback.success()) {
+                        Delivery emailDelivery = sendEmail(company, contact, companyName, contactName, cityState, segment, subject, brand);
+                        if (!emailDelivery.success()) {
                             throw new IllegalStateException(
-                                emailFallback.error() != null
-                                    ? "Sem telefone e e-mail falhou: " + emailFallback.error()
+                                emailDelivery.error() != null
+                                    ? "Sem telefone e e-mail falhou: " + emailDelivery.error()
                                     : "Sem telefone e sem e-mail para fallback"
                             );
                         }
-                        message.setChannel("EMAIL");
-                        message.setRecipient(emailFallback.recipient());
-                        message.setProvider("smtp-fallback");
-                        message.setProviderMessageId(emailFallback.messageId());
-                        message.setStatus("SENT");
-                        message.setSentAt(Instant.now());
-                        message.setErrorDetail("Sem telefone; enviado por e-mail");
+                        markEmailFallback(message, emailDelivery, "Sem telefone; enviado por e-mail");
                         messageRepository.save(message);
                         crmAutomationService.onMessageSent(lead, companyName);
                         emailSent++;
@@ -249,21 +247,30 @@ public class OutreachService {
                     }
 
                     Delivery delivery = sendWhatsApp(waInstance, company, contact, body, brand);
-                    if (!delivery.success() && request.emailFallbackEnabled()) {
-                        Delivery emailFallback = sendEmail(company, contact, companyName, contactName, cityState, segment, subject, brand);
-                        if (emailFallback.success()) {
-                            message.setChannel("EMAIL");
-                            message.setRecipient(emailFallback.recipient());
-                            message.setProvider("smtp-fallback");
-                            message.setProviderMessageId(emailFallback.messageId());
-                            message.setStatus("SENT");
-                            message.setSentAt(Instant.now());
-                            message.setErrorDetail("WhatsApp falhou (" + delivery.error() + "); enviado por e-mail");
+                    if (delivery.notWhatsApp()) {
+                        String cleanPhone = delivery.recipient() != null ? delivery.recipient() : EvolutionClient.cleanPhone(phone);
+                        nonWhatsApp.add(companyName + ": " + cleanPhone);
+                    }
+
+                    if (!delivery.success() && emailFallback) {
+                        Delivery emailDelivery = sendEmail(company, contact, companyName, contactName, cityState, segment, subject, brand);
+                        if (emailDelivery.success()) {
+                            String reason = delivery.notWhatsApp()
+                                ? "Número sem WhatsApp; enviado por e-mail"
+                                : "WhatsApp falhou (" + delivery.error() + "); enviado por e-mail";
+                            markEmailFallback(message, emailDelivery, reason);
                             messageRepository.save(message);
                             crmAutomationService.onMessageSent(lead, companyName);
                             emailSent++;
                             sent++;
                             continue;
+                        }
+                        if (delivery.notWhatsApp()) {
+                            throw new IllegalStateException(
+                                emailDelivery.error() != null
+                                    ? "Número sem WhatsApp e e-mail falhou: " + emailDelivery.error()
+                                    : "Número sem WhatsApp e sem e-mail para fallback"
+                            );
                         }
                     }
                     if (!delivery.success()) {
@@ -312,7 +319,7 @@ public class OutreachService {
         tenant.setCreditsUsed(tenant.getCreditsUsed() + sent);
         tenantRepository.save(tenant);
 
-        String detail = buildDetail(waSent, emailSent, failed, failures);
+        String detail = buildDetail(waSent, emailSent, failed, failures, nonWhatsApp);
         return new BulkCampaignResponse(
             campaign.getId(),
             campaign.getName(),
@@ -323,8 +330,19 @@ public class OutreachService {
             emailSent,
             failed,
             detail,
-            campaign.getCreatedAt()
+            campaign.getCreatedAt(),
+            List.copyOf(nonWhatsApp)
         );
+    }
+
+    private void markEmailFallback(OutreachMessage message, Delivery emailDelivery, String reason) {
+        message.setChannel("EMAIL");
+        message.setRecipient(emailDelivery.recipient());
+        message.setProvider("smtp-fallback");
+        message.setProviderMessageId(emailDelivery.messageId());
+        message.setStatus("SENT");
+        message.setSentAt(Instant.now());
+        message.setErrorDetail(reason);
     }
 
     @Transactional
@@ -357,6 +375,9 @@ public class OutreachService {
             return Delivery.fail(null, "Sem telefone/WhatsApp cadastrado para este lead");
         }
         String clean = EvolutionClient.cleanPhone(phone);
+        if (!evolutionClient.isWhatsAppNumber(instance, clean)) {
+            return Delivery.notWhatsApp(clean);
+        }
         String outbound = ProspectCopyBuilder.normalizeWhatsAppCopy(body);
         var logo = copyBuilder.resolveWhatsAppLogo(brand);
         if (logo.isPresent()) {
@@ -365,11 +386,17 @@ public class OutreachService {
             if (media.success()) {
                 return Delivery.ok(clean, media.messageId());
             }
+            if (isNotWhatsAppError(media.error())) {
+                return Delivery.notWhatsApp(clean);
+            }
             log.warn("Mídia WA falhou ({}), tentando texto", media.error());
         }
         var text = evolutionClient.sendText(instance, clean, outbound);
         if (text.success()) {
             return Delivery.ok(clean, text.messageId());
+        }
+        if (isNotWhatsAppError(text.error())) {
+            return Delivery.notWhatsApp(clean);
         }
         return Delivery.fail(clean, text.error());
     }
@@ -473,14 +500,39 @@ public class OutreachService {
         return company.getEmail();
     }
 
-    private static String buildDetail(int waSent, int emailSent, int failed, List<String> failures) {
+    private static String buildDetail(
+        int waSent,
+        int emailSent,
+        int failed,
+        List<String> failures,
+        List<String> nonWhatsApp
+    ) {
         int sent = waSent + emailSent;
         String breakdown = waSent + " WhatsApp · " + emailSent + " e-mail";
+        StringBuilder detail = new StringBuilder();
         if (failed == 0) {
-            return sent + " mensagem(ns) entregue(s): " + breakdown + ".";
+            detail.append(sent).append(" mensagem(ns) entregue(s): ").append(breakdown).append('.');
+        } else {
+            String sample = failures.stream().limit(3).reduce((a, b) -> a + " | " + b).orElse("");
+            detail.append(sent).append(" entregue(s) (").append(breakdown).append("), ")
+                .append(failed).append(" falha(s). ").append(sample);
         }
-        String sample = failures.stream().limit(3).reduce((a, b) -> a + " | " + b).orElse("");
-        return sent + " entregue(s) (" + breakdown + "), " + failed + " falha(s). " + sample;
+        if (!nonWhatsApp.isEmpty()) {
+            detail.append(' ')
+                .append(nonWhatsApp.size())
+                .append(" número(s) sem WhatsApp (ver relatório).");
+        }
+        return detail.toString().trim();
+    }
+
+    private static boolean isNotWhatsAppError(String error) {
+        if (error == null || error.isBlank()) {
+            return false;
+        }
+        String lower = error.toLowerCase(java.util.Locale.ROOT);
+        return lower.contains("sem whatsapp")
+            || lower.contains("\"exists\":false")
+            || lower.contains("\"exists\": false");
     }
 
     private Lead createLead(Tenant tenant, Company company) {
@@ -494,13 +546,17 @@ public class OutreachService {
         return leadRepository.save(lead);
     }
 
-    private record Delivery(boolean success, String recipient, String messageId, String error) {
+    private record Delivery(boolean success, String recipient, String messageId, String error, boolean notWhatsApp) {
         static Delivery ok(String recipient, String messageId) {
-            return new Delivery(true, recipient, messageId, null);
+            return new Delivery(true, recipient, messageId, null, false);
         }
 
         static Delivery fail(String recipient, String error) {
-            return new Delivery(false, recipient, null, error);
+            return new Delivery(false, recipient, null, error, false);
+        }
+
+        static Delivery notWhatsApp(String phone) {
+            return new Delivery(false, phone, null, "Número sem WhatsApp (não encontrado na rede)", true);
         }
     }
 }

@@ -437,6 +437,20 @@
               </div>
             }
 
+            @if (sendProgress.nonWhatsAppLines.length > 0) {
+              <div class="send-summary__nonwa">
+                <h3>Números sem WhatsApp ({{ sendProgress.nonWhatsAppLines.length }})</h3>
+                <p class="send-summary__nonwa-hint">
+                  Estes telefones da base não existem no WhatsApp. Quando havia e-mail, o disparo usou SMTP automaticamente.
+                </p>
+                <ul>
+                  @for (line of sendProgress.nonWhatsAppLines; track line) {
+                    <li>{{ line }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
             <div class="send-summary__actions">
               <button type="button" class="pp-btn pp-btn--primary" (click)="closeSendProgress()">
                 Entendi

@@ -39,6 +39,7 @@ interface SendProgressState {
   failedCount: number;
   detail: string;
   failureLines: string[];
+  nonWhatsAppLines: string[];
   statusMessage: string;
 }
 
@@ -412,7 +413,8 @@ export class OutreachComponent implements OnInit, OnDestroy {
             waSent,
             emailSent,
             failed,
-            detail
+            detail,
+            nonWhatsApp: campaign.nonWhatsApp ?? []
           });
           this.loading = false;
         },
@@ -426,7 +428,8 @@ export class OutreachComponent implements OnInit, OnDestroy {
             emailSent: 0,
             failed: this.companyIds.length,
             detail,
-            hardError: true
+            hardError: true,
+            nonWhatsApp: []
           });
           this.loading = false;
         }
@@ -454,6 +457,7 @@ export class OutreachComponent implements OnInit, OnDestroy {
       failedCount: 0,
       detail: '',
       failureLines: [],
+      nonWhatsAppLines: [],
       statusMessage:
         channel === 'WHATSAPP'
           ? 'Validando sessão WhatsApp e montando mensagens…'
@@ -539,9 +543,11 @@ export class OutreachComponent implements OnInit, OnDestroy {
     failed: number;
     detail: string;
     hardError?: boolean;
+    nonWhatsApp?: string[];
   }): void {
     this.clearProgressTimer();
     const failureLines = this.parseFailureLines(result.detail, result.failed);
+    const nonWhatsAppLines = (result.nonWhatsApp ?? []).filter((line) => !!line?.trim());
     let phase: SendPhase = 'success';
     let statusMessage = '';
 
@@ -574,6 +580,7 @@ export class OutreachComponent implements OnInit, OnDestroy {
       failedCount: result.failed,
       detail: result.detail,
       failureLines,
+      nonWhatsAppLines,
       statusMessage
     };
 
@@ -615,6 +622,7 @@ export class OutreachComponent implements OnInit, OnDestroy {
       failedCount: 0,
       detail: '',
       failureLines: [],
+      nonWhatsAppLines: [],
       statusMessage: ''
     };
   }

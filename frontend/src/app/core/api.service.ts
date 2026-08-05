@@ -499,6 +499,7 @@ export class ApiService {
         detail?: string;
         waSent?: number;
         emailSent?: number;
+        nonWhatsApp?: string[];
       }
     >(`${environment.apiUrl}/outreach/campaigns/bulk`, payload);
   }

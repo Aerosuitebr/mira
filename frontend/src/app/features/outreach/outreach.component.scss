@@ -1157,12 +1157,50 @@
 
     li {
       padding: 0.5rem 0.65rem;
-      border-radius: 8px;
-      background: rgba(251, 113, 133, 0.1);
-      border: 1px solid rgba(251, 113, 133, 0.2);
+      border-radius: 10px;
+      background: rgba(244, 63, 94, 0.08);
+      border: 1px solid rgba(251, 113, 133, 0.18);
       color: #fecdd3;
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+  }
+
+  &__nonwa {
+    h3 {
+      margin: 0 0 0.35rem;
       font-size: 0.78rem;
-      line-height: 1.35;
+      color: #fcd34d;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    &-hint {
+      margin: 0 0 0.55rem;
+      color: #94a3b8;
+      font-size: 0.78rem;
+      line-height: 1.4;
+    }
+
+    ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 0.35rem;
+      max-height: 180px;
+      overflow: auto;
+    }
+
+    li {
+      padding: 0.5rem 0.65rem;
+      border-radius: 10px;
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(251, 191, 36, 0.2);
+      color: #fde68a;
+      font-size: 0.8rem;
+      line-height: 1.4;
+      font-family: ui-monospace, 'Cascadia Code', monospace;
     }
   }
 
