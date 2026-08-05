@@ -860,6 +860,43 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  /** CNAE principal: código + descrição oficial RF (pode repetir no mesmo segmento). */
+  activityLabel(company: Company): string {
+    const code = (company.cnaeMain || '').trim();
+    const desc = (company.cnaeDescription || '').trim();
+    if (code && desc) {
+      return `${code} · ${desc}`;
+    }
+    if (desc) {
+      return desc;
+    }
+    return code ? `CNAE ${code}` : 'Atividade não informada';
+  }
+
+  /** Diferencia empresas do mesmo CNAE principal via secundários. */
+  secondaryActivityLabel(company: Company): string | null {
+    const codes = (company.cnaeSecondary || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+    if (codes.length === 0) {
+      return null;
+    }
+    if (codes.length <= 3) {
+      return `Secundários: ${codes.join(', ')}`;
+    }
+    return `Secundários: ${codes.slice(0, 3).join(', ')} +${codes.length - 3}`;
+  }
+
+  locationLabel(company: Company): string {
+    const cityState = [company.city, company.state].filter(Boolean).join('/');
+    const neighborhood = (company.neighborhood || '').trim();
+    if (neighborhood && cityState) {
+      return `${neighborhood} · ${cityState}`;
+    }
+    return cityState || neighborhood || 'Local não informado';
+  }
+
   private applyResultFilterView(): void {
     this.pageIndex = 0;
     this.syncCompaniesFromCache();

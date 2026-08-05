@@ -302,8 +302,11 @@
                   <span class="pp-badge" [class]="revenueBadge(company.estimatedRevenue)">{{ company.estimatedRevenue }}</span>
                 </div>
                 <span class="company-cnpj">{{ company.cnpj }}</span>
-                <span class="company-meta">{{ company.cnaeDescription }}</span>
-                <span class="company-location">{{ company.city }}/{{ company.state }}</span>
+                <span class="company-meta">{{ activityLabel(company) }}</span>
+                @if (secondaryActivityLabel(company); as secondary) {
+                  <span class="company-meta company-meta--secondary">{{ secondary }}</span>
+                }
+                <span class="company-location">{{ locationLabel(company) }}</span>
               </div>
               <div class="card-actions">
                 <button

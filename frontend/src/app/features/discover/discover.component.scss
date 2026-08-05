@@ -732,6 +732,11 @@
   font-size: 0.8rem;
   color: var(--pp-text-secondary);
   line-height: 1.4;
+
+  &--secondary {
+    font-size: 0.74rem;
+    color: var(--pp-text-hint);
+  }
 }
 
 .company-location {

@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -456,7 +457,7 @@ public class EvolutionClient {
             throw new RateLimitedException("Rate limit Evolution HTTP " + code + ": " + truncate(body));
         }
         if (code < 200 || code >= 300) {
-            throw new IllegalStateException("Evolution HTTP " + code + ": " + truncate(body));
+            throw new IllegalStateException(friendlyHttpError(code, body));
         }
         if (body == null || body.isBlank()) {
             return null;
@@ -479,7 +480,16 @@ public class EvolutionClient {
         if (value == null) {
             return "";
         }
-        return value.length() > 300 ? value.substring(0, 300) : value;
+        return value.length() <= 280 ? value : value.substring(0, 280) + "…";
+    }
+
+    private static String friendlyHttpError(int code, String body) {
+        String raw = body == null ? "" : body;
+        String lower = raw.toLowerCase(Locale.ROOT);
+        if (lower.contains("\"exists\":false") || lower.contains("\"exists\": false")) {
+            return "Número sem WhatsApp (não encontrado na rede)";
+        }
+        return "Evolution HTTP " + code + ": " + truncate(raw);
     }
 
     public record ChannelStatus(boolean connected, String label, String rawState, String phone) {
