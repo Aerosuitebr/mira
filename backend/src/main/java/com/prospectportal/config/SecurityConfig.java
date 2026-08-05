@@ -112,7 +112,9 @@ public class SecurityConfig {
 
                     "/actuator/health",
 
-                    "/actuator/info"
+                    "/actuator/info",
+
+                    "/error"
 
                 ).permitAll()
 
