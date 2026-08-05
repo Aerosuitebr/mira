@@ -257,7 +257,11 @@
             <div class="panel-heading">
               <div>
                 <span class="pp-eyebrow">Etapa 3 · Automação</span>
-                <h2>Fila de abordagem WhatsApp</h2>
+                @if (outreachFlow === 'TWO_STEP') {
+                  <h2>WhatsApp em 2 etapas</h2>
+                } @else {
+                  <h2>Campanha direta</h2>
+                }
                 <p class="panel-lead">
                   Enriquecer contatos e preparar a primeira mensagem curta para revisão.
                 </p>
