@@ -458,8 +458,8 @@
                   @for (delivery of sendProgress.deliveries; track delivery.companyId) {
                     <li>
                       <strong>{{ delivery.companyName }}</strong>
-                      <span>{{ delivery.status }} · {{ delivery.channel || '—' }}</span>
-                      <small>{{ delivery.recipient || '—' }} · {{ delivery.detail }}</small>
+                      <span>{{ delivery.status }} · {{ delivery.channel || '-' }}</span>
+                      <small>{{ delivery.recipient || '-' }} · {{ delivery.detail }}</small>
                     </li>
                   }
                 </ul>
