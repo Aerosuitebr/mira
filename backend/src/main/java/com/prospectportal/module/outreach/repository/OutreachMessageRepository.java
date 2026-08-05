@@ -57,7 +57,7 @@ public interface OutreachMessageRepository extends JpaRepository<OutreachMessage
         JOIN FETCH c.tenant
         WHERE m.recipient = :recipient
           AND m.channel = 'WHATSAPP'
-          AND m.status = 'SENT'
+          AND m.status IN ('SENT', 'WAITING_REPLY', 'REPLIED')
           AND m.outreachStep = 1
         ORDER BY m.sentAt DESC
         """)
