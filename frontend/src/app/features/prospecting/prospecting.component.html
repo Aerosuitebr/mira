@@ -260,7 +260,7 @@
                 @if (outreachFlow === 'TWO_STEP') {
                   <h2>WhatsApp em 2 etapas</h2>
                 } @else {
-                  <h2>Campanha direta</h2>
+                  <h2>Campanha por e-mail</h2>
                 }
                 <p class="panel-lead">
                   Enriquecer contatos e preparar a primeira mensagem curta para revisão.
@@ -276,7 +276,7 @@
                 <small>Abertura curta, resposta do lead, aprovação e proposta completa.</small>
               </button>
               <button type="button" class="outreach-flow-choice" [class.outreach-flow-choice--active]="outreachFlow === 'DIRECT'" [attr.aria-pressed]="outreachFlow === 'DIRECT'" (click)="outreachFlow = 'DIRECT'">
-                <span>Campanha direta</span>
+                <span>E-mail direto</span>
                 <strong>Revisar e enviar o lote</strong>
                 <small>Copy, revisão e confirmação em uma única campanha.</small>
               </button>
@@ -402,7 +402,7 @@
                         [disabled]="approvingFollowUpId === followUp.id"
                         (click)="approveFollowUp(followUp.id)"
                       >
-                        @if (approvingFollowUpId === followUp.id) { Enviando... } @else { Aprovar envio }
+                        @if (approvingFollowUpId === followUp.id) { Colocando na fila... } @else { Aprovar etapa 2 }
                       </button>
                     </div>
                   }
@@ -411,12 +411,12 @@
             </div>
             } @else {
               <div class="direct-campaign-panel">
-                <span class="pp-eyebrow">Campanha direta</span>
+                <span class="pp-eyebrow">E-mail direto</span>
                 <h3>Uma única etapa de envio</h3>
                 <p>Os {{ selectedCompanyIds.size }} leads selecionados irão para a tela de copy e revisão. Este fluxo não usa aprovação após resposta.</p>
                 <div class="direct-campaign-panel__actions">
                   <button type="button" class="pp-btn pp-btn--ghost" (click)="goToStep(2)">Ajustar lista</button>
-                  <button type="button" class="pp-btn pp-btn--primary" (click)="openDirectCampaign()">Continuar para campanha direta</button>
+                  <button type="button" class="pp-btn pp-btn--primary" (click)="openDirectCampaign()">Continuar para campanha de e-mail</button>
                 </div>
               </div>
             }
