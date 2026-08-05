@@ -1,7 +1,9 @@
 package com.prospectportal.web.controller;
 
 import com.prospectportal.module.outreach.entity.OutreachMessage;
+import com.prospectportal.module.outreach.repository.OutreachCampaignRepository;
 import com.prospectportal.module.outreach.repository.OutreachMessageRepository;
+import com.prospectportal.common.repository.TenantRepository;
 import com.prospectportal.module.whatsapp.WhatsAppReplyAutomationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,13 +28,19 @@ public class InternalOutreachController {
     private static final Logger log = LoggerFactory.getLogger(InternalOutreachController.class);
     private final String token;
     private final OutreachMessageRepository messageRepository;
+    private final OutreachCampaignRepository campaignRepository;
+    private final TenantRepository tenantRepository;
     private final WhatsAppReplyAutomationService replyAutomationService;
 
     public InternalOutreachController(@Value("${app.outreach.bot-service-token:}") String token,
                                       OutreachMessageRepository messageRepository,
+                                      OutreachCampaignRepository campaignRepository,
+                                      TenantRepository tenantRepository,
                                       WhatsAppReplyAutomationService replyAutomationService) {
         this.token = token;
         this.messageRepository = messageRepository;
+        this.campaignRepository = campaignRepository;
+        this.tenantRepository = tenantRepository;
         this.replyAutomationService = replyAutomationService;
     }
 
@@ -77,12 +85,22 @@ public class InternalOutreachController {
 
         switch (type) {
             case "STEP1_SENT" -> {
+                boolean firstConfirmation = message.getSentAt() == null;
                 message.setStatus("WAITING_REPLY");
                 message.setSentAt(Instant.now());
                 message.setProvider("evolution");
                 message.setProviderMessageId(stringValue(payload.get("providerMessageId")));
                 String actualText = stringValue(payload.get("step1Text"));
                 if (actualText != null && !actualText.isBlank()) message.setBody(actualText);
+                if (firstConfirmation) {
+                    var campaign = message.getCampaign();
+                    campaign.setSentCount(campaign.getSentCount() + 1);
+                    if ("QUEUED".equals(campaign.getStatus())) campaign.setStatus("SENDING");
+                    campaignRepository.save(campaign);
+                    var tenant = campaign.getTenant();
+                    tenant.setCreditsUsed(java.util.Objects.requireNonNullElse(tenant.getCreditsUsed(), 0) + 1);
+                    tenantRepository.save(tenant);
+                }
             }
             case "REPLY_RECEIVED" -> {
                 message.setStatus("REPLIED");
