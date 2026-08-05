@@ -124,6 +124,11 @@ jobs:
           echo "outreach_webhook_http=$webhook_code"
           test "$webhook_code" = "401"
 
+          bot_health="$(docker exec mira-outreach-bot node -e 'fetch("http://127.0.0.1:8090/health").then(r => r.json()).then(x => process.stdout.write(x.status)).catch(() => process.exit(1))')"
+          echo "outreach_bot_health=$bot_health"
+          test "$bot_health" = "ok"
+          docker inspect mira-outreach-bot --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -qx 'OUTREACH_DELIVERY_ENABLED=false'
+
           if ! docker inspect mira-api --format '{{json .NetworkSettings.Networks}}' | grep -q aerosuite_default; then
             docker network connect aerosuite_default mira-api || true
           fi
