@@ -41,10 +41,10 @@ public class CrmAutomationService {
             .orElseThrow();
 
         CrmStage proposalStage = stageRepository.findByPipelineIdOrderByPositionAsc(pipeline.getId()).stream()
-            .filter(stage -> "PROPOSAL_SENT".equals(stage.getAutoTrigger()))
+            .filter(stage -> "MESSAGE_SENT".equals(stage.getAutoTrigger()))
             .findFirst()
             .orElse(stageRepository.findByPipelineIdOrderByPositionAsc(pipeline.getId()).stream()
-                .filter(stage -> "MESSAGE_SENT".equals(stage.getAutoTrigger()))
+                .filter(stage -> "PROPOSAL_SENT".equals(stage.getAutoTrigger()))
                 .findFirst()
                 .orElse(stageRepository.findByPipelineIdOrderByPositionAsc(pipeline.getId()).get(1)));
 

@@ -111,6 +111,47 @@ export interface Campaign {
   createdAt: string;
 }
 
+export interface ApproachStatus {
+  companyId: string;
+  leadId: string | null;
+  leadStatus: string | null;
+  approached: boolean;
+  lastChannel: string | null;
+  lastProvider: string | null;
+  lastRecipient: string | null;
+  lastSentAt: string | null;
+  lastErrorDetail: string | null;
+  wasFallback: boolean;
+  lastCampaignName: string | null;
+}
+
+export interface OutreachMessageHistoryItem {
+  id: string;
+  campaignId: string;
+  campaignName: string;
+  channel: string;
+  provider: string;
+  recipient: string;
+  status: string;
+  subject: string | null;
+  bodyPreview: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  errorDetail: string | null;
+  wasFallback: boolean;
+}
+
+export interface DeliveryItem {
+  companyId: string;
+  companyName: string;
+  status: string;
+  channel: string | null;
+  provider: string | null;
+  recipient: string | null;
+  fallback: boolean;
+  detail: string | null;
+}
+
 export interface ChannelStatus {
   emailConfigured: boolean;
   emailTestMode: boolean;
@@ -500,8 +541,19 @@ export class ApiService {
         waSent?: number;
         emailSent?: number;
         nonWhatsApp?: string[];
+        deliveries?: DeliveryItem[];
       }
     >(`${environment.apiUrl}/outreach/campaigns/bulk`, payload);
+  }
+
+  approachStatus(companyIds: string[]) {
+    return this.http.get<ApproachStatus[]>(`${environment.apiUrl}/crm/approach-status`, {
+      params: { companyIds: companyIds.join(',') }
+    });
+  }
+
+  companyOutreachMessages(companyId: string) {
+    return this.http.get<OutreachMessageHistoryItem[]>(`${environment.apiUrl}/outreach/companies/${companyId}/messages`);
   }
 
   outreachChannels() {

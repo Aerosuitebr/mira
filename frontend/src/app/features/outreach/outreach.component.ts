@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ApiService, ChannelStatus, Company, Template } from '../../core/api.service';
+import { ApiService, ChannelStatus, Company, DeliveryItem, Template } from '../../core/api.service';
 
 interface AiPreviewCopy {
   subject: string;
@@ -40,6 +40,7 @@ interface SendProgressState {
   detail: string;
   failureLines: string[];
   nonWhatsAppLines: string[];
+  deliveries: DeliveryItem[];
   statusMessage: string;
 }
 
@@ -414,7 +415,8 @@ export class OutreachComponent implements OnInit, OnDestroy {
             emailSent,
             failed,
             detail,
-            nonWhatsApp: campaign.nonWhatsApp ?? []
+            nonWhatsApp: campaign.nonWhatsApp ?? [],
+            deliveries: campaign.deliveries ?? []
           });
           this.loading = false;
         },
@@ -429,7 +431,8 @@ export class OutreachComponent implements OnInit, OnDestroy {
             failed: this.companyIds.length,
             detail,
             hardError: true,
-            nonWhatsApp: []
+            nonWhatsApp: [],
+            deliveries: []
           });
           this.loading = false;
         }
@@ -458,6 +461,7 @@ export class OutreachComponent implements OnInit, OnDestroy {
       detail: '',
       failureLines: [],
       nonWhatsAppLines: [],
+      deliveries: [],
       statusMessage:
         channel === 'WHATSAPP'
           ? 'Validando sessão WhatsApp e montando mensagens…'
@@ -544,6 +548,7 @@ export class OutreachComponent implements OnInit, OnDestroy {
     detail: string;
     hardError?: boolean;
     nonWhatsApp?: string[];
+    deliveries?: DeliveryItem[];
   }): void {
     this.clearProgressTimer();
     const failureLines = this.parseFailureLines(result.detail, result.failed);
@@ -581,6 +586,7 @@ export class OutreachComponent implements OnInit, OnDestroy {
       detail: result.detail,
       failureLines,
       nonWhatsAppLines,
+      deliveries: result.deliveries ?? [],
       statusMessage
     };
 
@@ -623,6 +629,7 @@ export class OutreachComponent implements OnInit, OnDestroy {
       detail: '',
       failureLines: [],
       nonWhatsAppLines: [],
+      deliveries: [],
       statusMessage: ''
     };
   }

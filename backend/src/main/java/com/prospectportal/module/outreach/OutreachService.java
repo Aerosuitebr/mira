@@ -24,6 +24,9 @@ import com.prospectportal.web.dto.AiCopyResponse;
 import com.prospectportal.web.dto.BulkCampaignResponse;
 import com.prospectportal.web.dto.BulkOutreachRequest;
 import com.prospectportal.web.dto.CampaignResponse;
+import com.prospectportal.web.dto.ApproachStatusResponse;
+import com.prospectportal.web.dto.DeliveryItem;
+import com.prospectportal.web.dto.OutreachMessageHistoryItem;
 import com.prospectportal.web.dto.TemplateResponse;
 import com.prospectportal.web.mapper.DtoMapper;
 import org.slf4j.Logger;
@@ -111,6 +114,57 @@ public class OutreachService {
             .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<ApproachStatusResponse> approachStatus(List<UUID> companyIds) {
+        if (companyIds == null || companyIds.isEmpty()) {
+            return List.of();
+        }
+        UUID tenantId = authContext.tenantId();
+        Map<UUID, Lead> leads = leadRepository.findByTenantIdAndCompanyIdIn(tenantId, companyIds).stream()
+            .collect(java.util.stream.Collectors.toMap(lead -> lead.getCompany().getId(), lead -> lead));
+        List<UUID> leadIds = leads.values().stream().map(Lead::getId).toList();
+        Map<UUID, OutreachMessage> latestSent = leadIds.isEmpty() ? Map.of() :
+            messageRepository.findByLeadIdInWithCampaignOrderByCreatedAtDesc(leadIds).stream()
+                .filter(message -> "SENT".equals(message.getStatus()))
+                .collect(java.util.stream.Collectors.toMap(
+                    message -> message.getLead().getId(),
+                    message -> message,
+                    (first, ignored) -> first
+                ));
+
+        return companyIds.stream().distinct().map(companyId -> {
+            Lead lead = leads.get(companyId);
+            OutreachMessage message = lead == null ? null : latestSent.get(lead.getId());
+            return new ApproachStatusResponse(
+                companyId,
+                lead != null ? lead.getId() : null,
+                lead != null ? lead.getStatus() : null,
+                message != null,
+                message != null ? message.getChannel() : null,
+                message != null ? message.getProvider() : null,
+                message != null ? message.getRecipient() : null,
+                message != null ? message.getSentAt() : null,
+                message != null ? message.getErrorDetail() : null,
+                message != null && isFallback(message),
+                message != null ? message.getCampaign().getName() : null
+            );
+        }).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<OutreachMessageHistoryItem> companyMessages(UUID companyId) {
+        Lead lead = leadRepository.findByTenantIdAndCompanyId(authContext.tenantId(), companyId)
+            .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Empresa nÃ£o possui histÃ³rico neste tenant"));
+        return messageRepository.findByLeadIdWithCampaignOrderByCreatedAtDesc(lead.getId()).stream()
+            .map(message -> new OutreachMessageHistoryItem(
+                message.getId(), message.getCampaign().getId(), message.getCampaign().getName(),
+                message.getChannel(), message.getProvider(), message.getRecipient(), message.getStatus(),
+                message.getSubject(), preview(message.getBody()), message.getSentAt(), message.getCreatedAt(),
+                message.getErrorDetail(), isFallback(message)
+            ))
+            .toList();
+    }
+
     public AiCopyResponse generateCopy(AiCopyRequest request) {
         Company company = companyRepository.findById(request.companyId())
             .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Empresa não encontrada"));
@@ -185,6 +239,7 @@ public class OutreachService {
         int failed = 0;
         List<String> failures = new ArrayList<>();
         List<String> nonWhatsApp = new ArrayList<>();
+        List<DeliveryItem> deliveries = new ArrayList<>();
         Map<String, BulkOutreachRequest.MessageOverride> overrides =
             request.messages() != null ? request.messages() : Map.of();
 
@@ -241,6 +296,7 @@ public class OutreachService {
                         markEmailFallback(message, emailDelivery, "Sem telefone; enviado por e-mail");
                         messageRepository.save(message);
                         crmAutomationService.onMessageSent(lead, companyName);
+                        deliveries.add(deliveryItem(companyId, companyName, message, "Fallback: sem telefone; enviado por e-mail"));
                         emailSent++;
                         sent++;
                         continue;
@@ -261,6 +317,7 @@ public class OutreachService {
                             markEmailFallback(message, emailDelivery, reason);
                             messageRepository.save(message);
                             crmAutomationService.onMessageSent(lead, companyName);
+                            deliveries.add(deliveryItem(companyId, companyName, message, "Fallback: " + reason));
                             emailSent++;
                             sent++;
                             continue;
@@ -284,6 +341,7 @@ public class OutreachService {
                     message.setSentAt(Instant.now());
                     messageRepository.save(message);
                     crmAutomationService.onMessageSent(lead, companyName);
+                    deliveries.add(deliveryItem(companyId, companyName, message, "Enviado no WhatsApp"));
                     waSent++;
                     sent++;
                 } else {
@@ -299,6 +357,7 @@ public class OutreachService {
                     message.setSentAt(Instant.now());
                     messageRepository.save(message);
                     crmAutomationService.onMessageSent(lead, companyName);
+                    deliveries.add(deliveryItem(companyId, companyName, message, "Enviado por e-mail"));
                     emailSent++;
                     sent++;
                 }
@@ -309,6 +368,7 @@ public class OutreachService {
                 message.setStatus("FAILED");
                 message.setErrorDetail(reason);
                 messageRepository.save(message);
+                deliveries.add(deliveryItem(companyId, companyName, message, reason));
                 log.warn("Falha ao enviar para {}: {}", companyName, reason);
             }
         }
@@ -331,8 +391,24 @@ public class OutreachService {
             failed,
             detail,
             campaign.getCreatedAt(),
-            List.copyOf(nonWhatsApp)
+            List.copyOf(nonWhatsApp),
+            List.copyOf(deliveries)
         );
+    }
+
+    private static DeliveryItem deliveryItem(UUID companyId, String companyName, OutreachMessage message, String detail) {
+        return new DeliveryItem(companyId, companyName, message.getStatus(), message.getChannel(), message.getProvider(),
+            message.getRecipient(), isFallback(message), detail);
+    }
+
+    private static boolean isFallback(OutreachMessage message) {
+        return "smtp-fallback".equalsIgnoreCase(message.getProvider());
+    }
+
+    private static String preview(String body) {
+        if (body == null) return null;
+        String compact = body.replaceAll("\\s+", " ").trim();
+        return compact.length() <= 220 ? compact : compact.substring(0, 217) + "...";
     }
 
     private void markEmailFallback(OutreachMessage message, Delivery emailDelivery, String reason) {

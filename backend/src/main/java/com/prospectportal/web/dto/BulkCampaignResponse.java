@@ -14,7 +14,8 @@ public record BulkCampaignResponse(
     int failedCount,
     String detail,
     Instant createdAt,
-    java.util.List<String> nonWhatsApp
+    java.util.List<String> nonWhatsApp,
+    java.util.List<DeliveryItem> deliveries
 ) {
     public BulkCampaignResponse(
         UUID id,
@@ -28,6 +29,6 @@ public record BulkCampaignResponse(
         String detail,
         Instant createdAt
     ) {
-        this(id, name, channel, status, sentCount, waSent, emailSent, failedCount, detail, createdAt, java.util.List.of());
+        this(id, name, channel, status, sentCount, waSent, emailSent, failedCount, detail, createdAt, java.util.List.of(), java.util.List.of());
     }
 }

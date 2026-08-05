@@ -16,6 +16,22 @@ public interface OutreachMessageRepository extends JpaRepository<OutreachMessage
 
     @Query("""
         SELECT m FROM OutreachMessage m
+        JOIN FETCH m.campaign
+        WHERE m.lead.id = :leadId
+        ORDER BY m.createdAt DESC
+        """)
+    List<OutreachMessage> findByLeadIdWithCampaignOrderByCreatedAtDesc(@Param("leadId") UUID leadId);
+
+    @Query("""
+        SELECT m FROM OutreachMessage m
+        JOIN FETCH m.campaign
+        WHERE m.lead.id IN :leadIds
+        ORDER BY m.createdAt DESC
+        """)
+    List<OutreachMessage> findByLeadIdInWithCampaignOrderByCreatedAtDesc(@Param("leadIds") List<UUID> leadIds);
+
+    @Query("""
+        SELECT m FROM OutreachMessage m
         JOIN FETCH m.lead l
         JOIN FETCH l.company
         WHERE m.prospectJobId = :jobId AND m.status = 'PENDING'

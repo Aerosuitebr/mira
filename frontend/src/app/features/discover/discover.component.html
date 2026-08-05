@@ -233,6 +233,10 @@
               {{ filteredCompanies.length }} de {{ allCompanies.length }} no resultado
             </small>
           }
+          <label class="select-page">
+            <input type="checkbox" [checked]="hideApproached" (change)="toggleHideApproached($event)" />
+            <span>Ocultar já abordadas</span>
+          </label>
           @if (visibleCompanies.length > 0) {
             <label class="select-page">
               <input
@@ -301,6 +305,11 @@
                   <strong>{{ company.tradeName || company.legalName }}</strong>
                   <span class="pp-badge" [class]="revenueBadge(company.estimatedRevenue)">{{ company.estimatedRevenue }}</span>
                 </div>
+                @if (isApproached(company.id)) {
+                  <button type="button" class="approach-badge" (click)="openApproachHistory(company, $event)">
+                    {{ approachLabel(company.id) }} · Ver abordagem
+                  </button>
+                }
                 <span class="company-cnpj">{{ company.cnpj }}</span>
                 <span class="company-meta">{{ activityLabel(company) }}</span>
                 @if (secondaryActivityLabel(company); as secondary) {
@@ -425,5 +434,36 @@
         <button type="button" class="pp-btn pp-btn--primary" (click)="openStreetViewExternal()">Abrir no Google Maps</button>
       </footer>
     </div>
+  </div>
+}
+
+@if (approachDrawerOpen && approachDrawerCompany) {
+  <div class="approach-overlay" (click)="closeApproachHistory()" role="dialog" aria-modal="true" aria-labelledby="approach-history-title">
+    <aside class="approach-drawer pp-glass" (click)="$event.stopPropagation()">
+      <header>
+        <div>
+          <span class="pp-eyebrow">Histórico de abordagem</span>
+          <h2 id="approach-history-title">{{ approachDrawerCompany.tradeName || approachDrawerCompany.legalName }}</h2>
+        </div>
+        <button type="button" (click)="closeApproachHistory()" aria-label="Fechar">×</button>
+      </header>
+      @if (approachHistoryLoading) {
+        <p>Carregando histórico…</p>
+      } @else if (approachHistory.length === 0) {
+        <p>Nenhuma mensagem encontrada.</p>
+      } @else {
+        <ol>
+          @for (message of approachHistory; track message.id) {
+            <li>
+              <strong>{{ message.status }} · {{ message.channel }}</strong>
+              <span>{{ message.campaignName }} · {{ (message.sentAt || message.createdAt) | date:'short' }}</span>
+              <small>{{ message.recipient }} · {{ message.provider }} @if (message.wasFallback) { <span>· Fallback</span> }</small>
+              @if (message.subject || message.bodyPreview) { <p>{{ message.subject || message.bodyPreview }}</p> }
+              @if (message.errorDetail) { <em>{{ message.errorDetail }}</em> }
+            </li>
+          }
+        </ol>
+      }
+    </aside>
   </div>
 }

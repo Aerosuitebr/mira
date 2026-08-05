@@ -16,9 +16,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.UUID;
+import com.prospectportal.web.dto.OutreachMessageHistoryItem;
 
 @RestController
 @RequestMapping("/api/outreach")
@@ -43,6 +46,11 @@ public class OutreachController {
     @GetMapping("/campaigns")
     public List<CampaignResponse> campaigns() {
         return outreachService.listCampaigns();
+    }
+
+    @GetMapping("/companies/{companyId}/messages")
+    public List<OutreachMessageHistoryItem> companyMessages(@PathVariable UUID companyId) {
+        return outreachService.companyMessages(companyId);
     }
 
     @PostMapping("/ai-copy")

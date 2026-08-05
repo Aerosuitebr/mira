@@ -20,4 +20,15 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
         """)
     List<Lead> findByTenantWithCompany(@Param("tenantId") UUID tenantId);
     Optional<Lead> findByTenantIdAndCompanyId(UUID tenantId, UUID companyId);
+
+    @Query("""
+        SELECT l FROM Lead l
+        JOIN FETCH l.company
+        WHERE l.tenant.id = :tenantId
+          AND l.company.id IN :companyIds
+        """)
+    List<Lead> findByTenantIdAndCompanyIdIn(
+        @Param("tenantId") UUID tenantId,
+        @Param("companyIds") List<UUID> companyIds
+    );
 }

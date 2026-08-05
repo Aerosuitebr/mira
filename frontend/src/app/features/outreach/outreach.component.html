@@ -451,6 +451,21 @@
               </div>
             }
 
+            @if (sendProgress.deliveries.length > 0) {
+              <div class="send-summary__deliveries">
+                <h3>Entregas</h3>
+                <ul>
+                  @for (delivery of sendProgress.deliveries; track delivery.companyId) {
+                    <li>
+                      <strong>{{ delivery.companyName }}</strong>
+                      <span>{{ delivery.status }} · {{ delivery.channel || '—' }}</span>
+                      <small>{{ delivery.recipient || '—' }} · {{ delivery.detail }}</small>
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+
             <div class="send-summary__actions">
               <button type="button" class="pp-btn pp-btn--primary" (click)="closeSendProgress()">
                 Entendi

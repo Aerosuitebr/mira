@@ -1,11 +1,12 @@
 import { AfterViewInit, Component, ElementRef, HostListener, NgZone, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Subscription, forkJoin, timeout } from 'rxjs';
 import { L } from '../../core/leaflet';
-import { ApiService, Company } from '../../core/api.service';
+import { ApiService, ApproachStatus, Company, OutreachMessageHistoryItem } from '../../core/api.service';
 import {
   DISCOVER_IMPORTED_STATES,
   clearDiscoverSession,
@@ -96,7 +97,7 @@ const createCompanyMarkerIcon = (opts: {
 @Component({
   selector: 'app-discover',
   standalone: true,
-  imports: [ReactiveFormsModule, CnaePickerComponent],
+  imports: [ReactiveFormsModule, CnaePickerComponent, DatePipe],
   templateUrl: './discover.component.html',
   styleUrl: './discover.component.scss'
 })
@@ -125,6 +126,12 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
   allCompanies: Company[] = [];
   resultCacheComplete = false;
   resultFilter = '';
+  hideApproached = false;
+  approachByCompanyId: Record<string, ApproachStatus> = {};
+  approachDrawerOpen = false;
+  approachDrawerCompany: Company | null = null;
+  approachHistory: OutreachMessageHistoryItem[] = [];
+  approachHistoryLoading = false;
   selected = new Set<string>();
   loading = false;
   searchError = '';
@@ -153,7 +160,10 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
       return this.allCompanies;
     }
     const digits = query.replace(/\D/g, '');
-    return this.allCompanies.filter((company) => this.matchesResultFilter(company, query, digits));
+    return this.allCompanies.filter((company) =>
+      (!this.hideApproached || !this.isApproached(company.id)) &&
+      (!query || this.matchesResultFilter(company, query, digits))
+    );
   }
 
   get mappedCompaniesCount(): number {
@@ -495,6 +505,7 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
     // Limpa lista imediatamente (evita “Cancelar busca” com resultado antigo).
     this.companies = [];
     this.allCompanies = [];
+    this.approachByCompanyId = {};
     this.resultCacheComplete = false;
     this.totalElements = 0;
     this.pageIndex = 0;
@@ -514,6 +525,7 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
         this.filtersCollapsed = true;
         this.searchSubscription = undefined;
         this.syncCompaniesFromCache();
+        this.loadApproachStatus(this.visibleCompanies);
         this.persistSession();
         queueMicrotask(() => {
           this.renderMarkers(this.mapCompanies);
@@ -645,6 +657,7 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private refreshPagedView(scroll: boolean): void {
     this.syncCompaniesFromCache();
+    this.loadApproachStatus(this.visibleCompanies);
     this.persistSession();
     queueMicrotask(() => {
       this.renderMarkers(this.mapCompanies);
@@ -675,6 +688,8 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
     this.pageIndex = 0;
     this.selected.clear();
     this.hoveredCompanyId = null;
+    this.approachByCompanyId = {};
+    this.hideApproached = false;
     this.filtersCollapsed = false;
     this.searchError = '';
     this.hasSearched = false;
@@ -813,6 +828,57 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
     sessionStorage.setItem('selected-companies', JSON.stringify([companyId]));
     this.persistSession();
     void this.router.navigate(['/outreach']);
+  }
+
+  isApproached(companyId: string): boolean {
+    return this.approachByCompanyId[companyId]?.approached === true;
+  }
+
+  approachLabel(companyId: string): string {
+    const status = this.approachByCompanyId[companyId];
+    if (!status?.lastSentAt) return 'Abordada';
+    const channel = status.lastChannel === 'WHATSAPP' ? 'WhatsApp' : 'E-mail';
+    return `Abordada · ${channel} · ${new Date(status.lastSentAt).toLocaleDateString('pt-BR')}`;
+  }
+
+  toggleHideApproached(event: Event): void {
+    this.hideApproached = (event.target as HTMLInputElement).checked;
+    this.pageIndex = 0;
+    this.refreshPagedView(false);
+  }
+
+  openApproachHistory(company: Company, event: Event): void {
+    event.stopPropagation();
+    this.approachDrawerOpen = true;
+    this.approachDrawerCompany = company;
+    this.approachHistory = [];
+    this.approachHistoryLoading = true;
+    this.api.companyOutreachMessages(company.id).subscribe({
+      next: (history) => {
+        this.approachHistory = history;
+        this.approachHistoryLoading = false;
+      },
+      error: () => {
+        this.approachHistoryLoading = false;
+      }
+    });
+  }
+
+  closeApproachHistory(): void {
+    this.approachDrawerOpen = false;
+    this.approachDrawerCompany = null;
+    this.approachHistory = [];
+  }
+
+  private loadApproachStatus(companies: Company[]): void {
+    const ids = companies.map((company) => company.id).filter((id) => !this.approachByCompanyId[id]);
+    if (ids.length === 0) return;
+    this.api.approachStatus(ids).subscribe({
+      next: (statuses) => {
+        for (const status of statuses) this.approachByCompanyId[status.companyId] = status;
+        this.approachByCompanyId = { ...this.approachByCompanyId };
+      }
+    });
   }
 
   sendToAgenda(company: Company): void {
