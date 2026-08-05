@@ -1,5 +1,6 @@
 import express from 'express';
 import Redis from 'ioredis';
+import { canOpenColdConversation, jobStep, nextColdAt, normalizePhone, selectStep1Text } from './state.js';
 
 const port = Number(process.env.PORT || 8090);
 const redis = new Redis(process.env.REDIS_URL || 'redis://redis:6379');
@@ -33,27 +34,18 @@ function authorize(req, res, next) {
   return next();
 }
 
-function normalizePhone(value) {
-  return String(value || '').replace(/@.+$/, '').replace(/\D/g, '');
-}
-
-function step1Text(job) {
-  const company = String(job.companyName || '').trim();
-  if (!company) return job.step1Text;
-  const variants = [
-    `Olá, boa tarde! Tudo bem? Neste contato falo com o responsável comercial da ${company}?`,
-    `Boa tarde! Poderia confirmar se este é o melhor contato para falar com o responsável comercial da ${company}?`,
-    `Olá! Tudo bem? Posso falar com quem cuida da área comercial da ${company}?`
-  ];
-  return variants[Math.floor(Math.random() * variants.length)];
-}
-
 function evolutionMessageId(payload) {
   return payload?.key?.id || payload?.data?.key?.id || payload?.message?.key?.id || null;
 }
 
 async function state() {
   const saved = await redis.hgetall(stateKey);
+  const today = new Date().toISOString().slice(0, 10);
+  if (saved.day !== today) {
+    saved.day = today;
+    saved.sentToday = '0';
+    await redis.hset(stateKey, { day: today, sentToday: '0' });
+  }
   const queue = await redis.llen(queueKey);
   const sentToday = Number(saved.sentToday || 0);
   return {
@@ -136,13 +128,11 @@ async function sendText(destination, text) {
   return body?.key?.id || body?.key?.messageId || body?.messageId || body?.id || null;
 }
 
-async function canOpenColdConversation() {
+async function canOpenNextColdConversation() {
   const today = new Date().toISOString().slice(0, 10);
   const current = await redis.hgetall(stateKey);
   if (current.day !== today) await redis.hset(stateKey, { day: today, sentToday: '0' });
-  const sentToday = Number(current.day === today ? current.sentToday || 0 : 0);
-  if (sentToday >= config.dailyCap) return false;
-  return Date.now() >= Number(current.nextColdAt || 0);
+  return canOpenColdConversation(current.day === today ? current : {}, config);
 }
 
 async function processOne() {
@@ -154,9 +144,9 @@ async function processOne() {
     const raw = await redis.lpop(queueKey);
     if (!raw) return;
     const job = JSON.parse(raw);
-    const isStep2 = job.type === 'STEP2';
-    const text = isStep2 ? job.step2Text : step1Text(job);
-    if (!isStep2 && !(await canOpenColdConversation())) {
+    const isStep2 = jobStep(job) === 'STEP2';
+    const text = isStep2 ? job.step2Text : selectStep1Text(job);
+  if (!isStep2 && !(await canOpenNextColdConversation())) {
       await redis.lpush(queueKey, raw);
       return;
     }
@@ -171,9 +161,8 @@ async function processOne() {
         await incrementMetric('STEP2_SENT');
         return;
       }
-      const interval = Math.floor((config.minIntervalSeconds + Math.random() * (config.maxIntervalSeconds - config.minIntervalSeconds)) * 1000);
       await redis.multi()
-        .hset(stateKey, 'sentToday', String(current.sentToday + 1), 'nextColdAt', String(Date.now() + interval))
+        .hset(stateKey, 'sentToday', String(current.sentToday + 1), 'nextColdAt', String(nextColdAt(config)))
         .set(`${conversationPrefix}${normalizePhone(job.phone)}`, JSON.stringify(job), 'EX', 60 * 60 * 24 * 14)
         .exec();
       await emit('STEP1_SENT', { messageId: job.messageId, phone: normalizePhone(job.phone), providerMessageId, step1Text: text });
