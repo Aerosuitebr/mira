@@ -111,6 +111,8 @@ jobs:
           docker compose -f docker-compose.yml -f docker-compose.production.yml build mira-api mira-frontend mira-outreach-bot
           docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --no-deps mira-api mira-frontend mira-outreach-bot
 
+          docker exec mira-tunnel-proxy nginx -s reload 2>/dev/null || true
+
           if ! docker inspect mira-api --format '{{json .NetworkSettings.Networks}}' | grep -q aerosuite_default; then
             docker network connect aerosuite_default mira-api || true
           fi

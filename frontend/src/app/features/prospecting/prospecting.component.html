@@ -365,11 +365,12 @@
                     <div>
                       <strong>Robô de envio</strong>
                       <p>
-                        @if (outreachBotStatus.paused) { Pausado: a fila é preservada e nenhum novo contato é chamado. }
+                        @if (!outreachBotStatus.deliveryEnabled) { Entrega bloqueada por segurança: a fila é preservada, sem abrir conversas. }
+                        @else if (outreachBotStatus.paused) { Pausado: a fila é preservada e nenhum novo contato é chamado. }
                         @else { Ativo: envia somente dentro da cadência protegida. }
                       </p>
                     </div>
-                    <span class="reply-report__safe">{{ outreachBotStatus.paused ? 'Pausado' : 'Ativo' }}</span>
+                    <span class="reply-report__safe">{{ outreachBotStatus.deliveryEnabled ? (outreachBotStatus.paused ? 'Pausado' : 'Ativo') : 'Entrega bloqueada' }}</span>
                   </div>
                   <div class="job-metrics">
                     <span>Na fila {{ outreachBotStatus.queue }}</span>
@@ -377,7 +378,9 @@
                     <span>Intervalo {{ outreachBotStatus.cadence.minSeconds }}–{{ outreachBotStatus.cadence.maxSeconds }} s</span>
                   </div>
                   <div class="job-actions">
-                    @if (outreachBotStatus.paused) {
+                    @if (!outreachBotStatus.deliveryEnabled) {
+                      <small>Para liberar envios após a conta WhatsApp ser liberada, um administrador deve habilitar a entrega no ambiente.</small>
+                    } @else if (outreachBotStatus.paused) {
                       <button type="button" class="pp-btn pp-btn--secondary" [disabled]="updatingOutreachBot" (click)="setOutreachBotPaused(false)">Retomar robô</button>
                     } @else {
                       <button type="button" class="pp-btn pp-btn--secondary" [disabled]="updatingOutreachBot" (click)="setOutreachBotPaused(true)">Pausar robô</button>

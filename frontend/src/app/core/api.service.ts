@@ -227,6 +227,7 @@ export interface OutreachBotStatus {
   sentToday: number;
   remainingToday: number;
   restrictionDetected: boolean;
+  deliveryEnabled: boolean;
   cadence: { minSeconds: number; maxSeconds: number; dailyCap: number };
 }
 

@@ -254,7 +254,7 @@ public class EvolutionClient {
         try {
             Map<String, Object> body = new HashMap<>();
             body.put("enabled", true);
-            body.put("url", publicBaseUrl + "/api/webhooks/evolution");
+            body.put("url", publicBaseUrl + "/webhooks/outreach-bot");
             body.put("events", List.of("MESSAGES_UPSERT"));
             body.put("headers", Map.of("X-Webhook-Secret", webhookSecret));
             body.put("base64", false);
