@@ -81,6 +81,8 @@ public class InternalOutreachController {
                 message.setSentAt(Instant.now());
                 message.setProvider("evolution");
                 message.setProviderMessageId(stringValue(payload.get("providerMessageId")));
+                String actualText = stringValue(payload.get("step1Text"));
+                if (actualText != null && !actualText.isBlank()) message.setBody(actualText);
             }
             case "REPLY_RECEIVED" -> {
                 message.setStatus("REPLIED");

@@ -37,6 +37,17 @@ function normalizePhone(value) {
   return String(value || '').replace(/@.+$/, '').replace(/\D/g, '');
 }
 
+function step1Text(job) {
+  const company = String(job.companyName || '').trim();
+  if (!company) return job.step1Text;
+  const variants = [
+    `Olá, boa tarde! Tudo bem? Neste contato falo com o responsável comercial da ${company}?`,
+    `Boa tarde! Poderia confirmar se este é o melhor contato para falar com o responsável comercial da ${company}?`,
+    `Olá! Tudo bem? Posso falar com quem cuida da área comercial da ${company}?`
+  ];
+  return variants[Math.floor(Math.random() * variants.length)];
+}
+
 function evolutionMessageId(payload) {
   return payload?.key?.id || payload?.data?.key?.id || payload?.message?.key?.id || null;
 }
@@ -144,7 +155,7 @@ async function processOne() {
     if (!raw) return;
     const job = JSON.parse(raw);
     const isStep2 = job.type === 'STEP2';
-    const text = isStep2 ? job.step2Text : job.step1Text;
+    const text = isStep2 ? job.step2Text : step1Text(job);
     if (!isStep2 && !(await canOpenColdConversation())) {
       await redis.lpush(queueKey, raw);
       return;
@@ -165,7 +176,7 @@ async function processOne() {
         .hset(stateKey, 'sentToday', String(current.sentToday + 1), 'nextColdAt', String(Date.now() + interval))
         .set(`${conversationPrefix}${normalizePhone(job.phone)}`, JSON.stringify(job), 'EX', 60 * 60 * 24 * 14)
         .exec();
-      await emit('STEP1_SENT', { messageId: job.messageId, phone: normalizePhone(job.phone), providerMessageId });
+      await emit('STEP1_SENT', { messageId: job.messageId, phone: normalizePhone(job.phone), providerMessageId, step1Text: text });
       await incrementMetric('STEP1_SENT');
     } catch (error) {
       if (error.rateLimited) {
