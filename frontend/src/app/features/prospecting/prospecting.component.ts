@@ -11,7 +11,9 @@ import {
   ProspectJob,
   OutreachReport,
   OutreachBotStatus,
-  FollowUpReviewItem
+  FollowUpReviewItem,
+  WhatsAppConnection,
+  OutreachSettings
 } from '../../core/api.service';
 import { AerosuiteFitAnalysis, AerosuiteFitService, AerosuitePlanId } from '../../core/aerosuite-fit.service';
 
@@ -106,6 +108,9 @@ export class ProspectingComponent implements OnInit, OnDestroy {
   activeJob: ProspectJob | null = null;
   outreachReport: OutreachReport | null = null;
   outreachBotStatus: OutreachBotStatus | null = null;
+  whatsappConnection: WhatsAppConnection | null = null;
+  outreachSettings: OutreachSettings | null = null;
+  loadingReadiness = true;
   updatingOutreachBot = false;
   followUpsAwaitingApproval: FollowUpReviewItem[] = [];
   approvingFollowUpId: string | null = null;
@@ -127,6 +132,11 @@ export class ProspectingComponent implements OnInit, OnDestroy {
   get openingPreviewCompanyName(): string {
     const company = this.selectedCompanies[0];
     return company ? (company.tradeName || company.legalName) : 'um lead';
+  }
+
+  get approvalAdminCount(): number {
+    return [this.outreachSettings?.approvalRecipient1, this.outreachSettings?.approvalRecipient2]
+      .filter((recipient) => !!recipient?.trim()).length;
   }
 
   private saoPauloGreeting(): string {
@@ -257,6 +267,7 @@ export class ProspectingComponent implements OnInit, OnDestroy {
     this.refreshLatestJob();
     this.loadOutreachReport();
     this.loadOutreachBotStatus();
+    this.loadSendingReadiness();
     this.loadFollowUpsAwaitingApproval();
     this.startOutreachPolling();
   }
@@ -453,6 +464,23 @@ export class ProspectingComponent implements OnInit, OnDestroy {
     });
   }
 
+  private loadSendingReadiness(): void {
+    this.loadingReadiness = true;
+    let pending = 2;
+    const completeOne = () => {
+      pending -= 1;
+      if (pending === 0) this.loadingReadiness = false;
+    };
+    this.api.whatsappStatus().subscribe({
+      next: (status) => { this.whatsappConnection = status; completeOne(); },
+      error: () => { this.whatsappConnection = null; completeOne(); }
+    });
+    this.api.getOutreachSettings().subscribe({
+      next: (settings) => { this.outreachSettings = settings; completeOne(); },
+      error: () => { this.outreachSettings = null; completeOne(); }
+    });
+  }
+
   setOutreachBotPaused(paused: boolean): void {
     this.updatingOutreachBot = true;
     const request = paused ? this.api.pauseOutreachBot() : this.api.resumeOutreachBot();
@@ -481,6 +509,7 @@ export class ProspectingComponent implements OnInit, OnDestroy {
     this.outreachPollHandle = setInterval(() => {
       if (this.activeStep !== 3) return;
       this.loadOutreachBotStatus();
+      this.loadSendingReadiness();
       this.loadOutreachReport();
       this.loadFollowUpsAwaitingApproval();
     }, 15_000);

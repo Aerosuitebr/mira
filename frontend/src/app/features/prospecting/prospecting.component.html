@@ -18,6 +18,43 @@
     </div>
   </header>
 
+  <section class="sending-readiness" aria-label="Condições para envio">
+    <div class="sending-readiness__title">
+      <span>Envios do tenant</span>
+      <small>{{ loadingReadiness ? 'Verificando configurações...' : 'Status atualizado automaticamente' }}</small>
+    </div>
+    <a
+      routerLink="/whatsapp"
+      class="readiness-item"
+      [class.readiness-item--ready]="whatsappConnection?.connected"
+      [class.readiness-item--attention]="!loadingReadiness && !whatsappConnection?.connected"
+    >
+      <span class="readiness-item__light" aria-hidden="true"></span>
+      <span class="readiness-item__copy">
+        <small>WhatsApp</small>
+        <strong>{{ loadingReadiness ? 'Verificando...' : (whatsappConnection?.connected ? 'Conectado' : 'Não conectado') }}</strong>
+      </span>
+      <span class="readiness-item__action">{{ whatsappConnection?.connected ? 'Gerenciar' : 'Conectar' }} →</span>
+    </a>
+    <a
+      routerLink="/settings/envio"
+      class="readiness-item"
+      [class.readiness-item--ready]="approvalAdminCount > 0"
+      [class.readiness-item--attention]="!loadingReadiness && approvalAdminCount === 0"
+    >
+      <span class="readiness-item__light" aria-hidden="true"></span>
+      <span class="readiness-item__copy">
+        <small>Administradores de envio</small>
+        <strong>
+          @if (loadingReadiness) { Verificando... }
+          @else if (approvalAdminCount > 0) { {{ approvalAdminCount }} {{ approvalAdminCount === 1 ? 'cadastrado' : 'cadastrados' }} }
+          @else { Nenhum cadastrado }
+        </strong>
+      </span>
+      <span class="readiness-item__action">Configurar →</span>
+    </a>
+  </section>
+
   @if (statusMessage) {
     <div class="pp-banner pp-banner--success" role="status" aria-live="polite" [class.pp-banner--pf]="mode === 'pf'">{{ statusMessage }}</div>
   }
