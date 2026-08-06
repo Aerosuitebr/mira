@@ -49,6 +49,9 @@ public class OutreachCampaign {
     @Column(name = "sent_count", nullable = false)
     private int sentCount;
 
+    @Column(name = "follow_up_body", columnDefinition = "TEXT")
+    private String followUpBody;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 }

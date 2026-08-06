@@ -243,6 +243,72 @@
           }
         </div>
 
+        @if (form.controls.channel.value === 'WHATSAPP' && hasPreviewReady) {
+          <section class="followup-builder" aria-labelledby="followup-title">
+            <header class="followup-builder__header">
+              <div class="followup-builder__step">2</div>
+              <div>
+                <span class="followup-builder__eyebrow">Após uma resposta real</span>
+                <h3 id="followup-title">Defina agora a mensagem da etapa 2</h3>
+                <p>Ela ficará pronta e só será liberada quando o lead responder à abertura.</p>
+              </div>
+              <span class="followup-builder__status" [class.followup-builder__status--ready]="followUpBody.trim()">
+                <span aria-hidden="true"></span>{{ followUpBody.trim() ? 'Configurada' : 'Pendente' }}
+              </span>
+            </header>
+
+            <div class="followup-templates" role="list" aria-label="Templates sugeridos para a etapa 2">
+              @for (template of followUpTemplates; track template.id) {
+                <button type="button" role="listitem" class="followup-template"
+                  [class.followup-template--active]="selectedFollowUpTemplateId === template.id"
+                  (click)="selectFollowUpTemplate(template)">
+                  <span class="followup-template__check" aria-hidden="true">✓</span>
+                  <strong>{{ template.label }}</strong><small>{{ template.description }}</small>
+                </button>
+              }
+            </div>
+
+            <div class="followup-editor-grid">
+              <div class="followup-editor">
+                <div class="followup-editor__label"><label for="followup-body">Conteúdo editável</label><span>{{ followUpBody.length }} caracteres</span></div>
+                <div class="variable-tags" aria-label="Variáveis da mensagem da etapa 2">
+                  <button type="button" class="variable-tag" (click)="insertFollowUpVariable('{{companyName}}')">Empresa</button>
+                  <button type="button" class="variable-tag" (click)="insertFollowUpVariable('{{senderName}}')">Remetente</button>
+                </div>
+                <textarea id="followup-body" class="pp-textarea followup-textarea" rows="9"
+                  [value]="followUpBody" (input)="onFollowUpBodyInput($event)"
+                  placeholder="Escreva o conteúdo que será enviado depois da resposta do lead..."></textarea>
+                <small class="followup-editor__hint">A saudação é personalizada automaticamente e não precisa ser repetida aqui.</small>
+              </div>
+
+              <div class="followup-phone" aria-label="Prévia da mensagem da etapa 2">
+                <div class="followup-phone__bar">
+                  <span class="followup-phone__avatar">{{ (previewCompany?.tradeName || previewCompany?.legalName || 'E').charAt(0) }}</span>
+                  <span><strong>{{ previewCompany?.tradeName || previewCompany?.legalName || 'Empresa' }}</strong><small>online</small></span><i aria-hidden="true">•••</i>
+                </div>
+                <div class="followup-phone__conversation">
+                  <div class="followup-phone__reply">Sim, pode falar.</div>
+                  <div class="followup-phone__message">
+                    <strong>{{ followUpGreeting }}</strong>
+                    <span>
+                      @for (seg of followUpBodySegments; track $index) {
+                        @if (seg.kind === 'token') {
+                          <mark>{{ seg.text }}</mark>
+                        } @else {
+                          {{ seg.text }}
+                        }
+                      }
+                    </span>
+                    <time>10:42 ✓✓</time>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <footer class="followup-builder__safety"><span aria-hidden="true">✓</span><p><strong>Fluxo protegido.</strong> A etapa 2 usa esta versão revisada, com saudação dinâmica, e continua sujeita à aprovação antes do envio.</p></footer>
+          </section>
+        }
+
         <div class="preview-actions">
           <button
             type="button"

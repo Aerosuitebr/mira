@@ -65,7 +65,11 @@ public class WhatsAppReplyAutomationService {
             followUp.setCampaign(firstStep.getCampaign());
             followUp.setLead(firstStep.getLead());
             followUp.setChannel("WHATSAPP");
-            followUp.setBody(copyBuilder.whatsappFollowUp(firstStep.getLead().getCompany().getTradeName(), brand));
+            String companyName = displayName(firstStep);
+            String configuredBody = firstStep.getCampaign().getFollowUpBody();
+            followUp.setBody(configuredBody != null && !configuredBody.isBlank()
+                ? copyBuilder.whatsappFollowUpFromTemplate(companyName, configuredBody, brand)
+                : copyBuilder.whatsappFollowUp(companyName, brand));
             followUp.setRecipient(recipient);
             followUp.setProspectJobId(firstStep.getProspectJobId());
             followUp.setReplyToMessageId(firstStep.getId());

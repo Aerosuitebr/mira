@@ -297,6 +297,12 @@ public class OutreachService {
 
         String channel = request.channel() != null ? request.channel().trim().toUpperCase() : "WHATSAPP";
         boolean whatsapp = "WHATSAPP".equals(channel);
+        if (whatsapp && (request.followUpBody() == null || request.followUpBody().isBlank())) {
+            throw new ResponseStatusException(BAD_REQUEST, "Defina a mensagem da etapa 2 antes de iniciar o disparo.");
+        }
+        if (request.followUpBody() != null && request.followUpBody().length() > 2000) {
+            throw new ResponseStatusException(BAD_REQUEST, "A mensagem da etapa 2 deve ter no máximo 2.000 caracteres.");
+        }
         String waInstance = null;
         if (whatsapp) {
             if (!evolutionClient.isEnabled()) {
@@ -314,7 +320,7 @@ public class OutreachService {
             throw new ResponseStatusException(BAD_REQUEST, "SMTP não configurado para envio de e-mail.");
         }
 
-        OutreachCampaign campaign = createCampaign(tenant, request.campaignName(), channel, template);
+        OutreachCampaign campaign = createCampaign(tenant, request.campaignName(), channel, template, request.followUpBody());
         var brand = outreachSettingsService.resolveBrand(tenant.getId());
 
         int sent = 0;
@@ -521,7 +527,8 @@ public class OutreachService {
         Tenant tenant,
         String name,
         String channel,
-        OutreachTemplate template
+        OutreachTemplate template,
+        String followUpBody
     ) {
         OutreachCampaign campaign = new OutreachCampaign();
         campaign.setTenant(tenant);
@@ -530,6 +537,7 @@ public class OutreachService {
         campaign.setTemplate(template);
         campaign.setStatus("SENDING");
         campaign.setSentCount(0);
+        campaign.setFollowUpBody(followUpBody != null ? followUpBody.trim() : null);
         campaign.setCreatedAt(Instant.now());
         return campaignRepository.save(campaign);
     }

@@ -24,6 +24,13 @@ interface PreviewSegment {
   kind: 'text' | 'token' | 'dynamic';
 }
 
+interface FollowUpTemplate {
+  id: string;
+  label: string;
+  description: string;
+  body: string;
+}
+
 type SendPhase = 'idle' | 'preparing' | 'sending' | 'success' | 'partial' | 'error';
 
 interface SendProgressState {
@@ -84,6 +91,34 @@ export class OutreachComponent implements OnInit, OnDestroy {
   /** Corpo editável da mensagem. */
   aiPreview = '';
   aiSubject = '';
+  readonly followUpTemplates: FollowUpTemplate[] = [
+    {
+      id: 'CONSULTIVE',
+      label: 'Consultiva',
+      description: 'Convida para uma conversa sem pressionar.',
+      body: 'Sou da {{senderName}}. Ajudamos operações como a {{companyName}} a integrar comercial, estoque e ordens de serviço com mais rastreabilidade.\n\nSe fizer sentido, posso entender rapidamente o cenário de vocês e mostrar onde a plataforma pode ajudar.'
+    },
+    {
+      id: 'VALUE',
+      label: 'Foco em valor',
+      description: 'Apresenta ganhos concretos e próximos passos.',
+      body: 'Na {{senderName}}, centralizamos comercial, estoque FIFO e ordens de serviço para reduzir retrabalho e dar visibilidade à operação.\n\nPosso enviar um resumo objetivo dos ganhos mais relevantes para a {{companyName}}?'
+    },
+    {
+      id: 'DEMO',
+      label: 'Demonstração',
+      description: 'Direciona a conversa para uma apresentação rápida.',
+      body: 'A {{senderName}} conecta toda a jornada operacional em um só lugar, do primeiro contato à rastreabilidade do estoque.\n\nQue tal uma demonstração breve, adaptada à realidade da {{companyName}}?'
+    },
+    {
+      id: 'DIRECT',
+      label: 'Direta',
+      description: 'Mensagem curta para contatos mais objetivos.',
+      body: 'Sou da {{senderName}} e ajudamos empresas como a {{companyName}} a organizar comercial, estoque e serviços no mesmo fluxo.\n\nPosso explicar em uma conversa rápida?'
+    }
+  ];
+  selectedFollowUpTemplateId = 'CONSULTIVE';
+  followUpBody = this.followUpTemplates[0].body;
   loading = false;
   generatingAi = false;
   sendingTestEmail = false;
@@ -198,8 +233,34 @@ export class OutreachComponent implements OnInit, OnDestroy {
       this.form.controls.templateId.value.trim().length > 0 &&
       this.channelStatus.connected &&
       this.hasPreviewReady &&
+      (this.form.controls.channel.value !== 'WHATSAPP' || this.followUpBody.trim().length > 0) &&
       !this.loading
     );
+  }
+
+  get followUpGreeting(): string {
+    const company = this.previewCompany?.tradeName || this.previewCompany?.legalName || '{{companyName}}';
+    return `Obrigado pelo retorno, pessoal da ${company}!`;
+  }
+
+  get followUpBodySegments(): PreviewSegment[] {
+    return this.segmentPreviewText(this.followUpBody);
+  }
+
+  selectFollowUpTemplate(template: FollowUpTemplate): void {
+    this.selectedFollowUpTemplateId = template.id;
+    this.followUpBody = template.body;
+  }
+
+  onFollowUpBodyInput(event: Event): void {
+    this.followUpBody = (event.target as HTMLTextAreaElement).value;
+    this.selectedFollowUpTemplateId = '';
+  }
+
+  insertFollowUpVariable(token: string): void {
+    const current = this.followUpBody.trimEnd();
+    this.followUpBody = current ? `${current} ${token}` : token;
+    this.selectedFollowUpTemplateId = '';
   }
 
   get channelStatus(): ChannelUiStatus {
@@ -528,7 +589,8 @@ export class OutreachComponent implements OnInit, OnDestroy {
         emailFallback: emailFallback === null ? true : emailFallback === 'true',
         approachId: this.selectedApproachId || 'DIRECT',
         editableBody: this.aiPreview.trim() || undefined,
-        editableSubject: channel === 'EMAIL' ? this.aiSubject.trim() || undefined : undefined
+        editableSubject: channel === 'EMAIL' ? this.aiSubject.trim() || undefined : undefined,
+        followUpBody: channel === 'WHATSAPP' ? this.followUpBody.trim() : undefined
       })
       .pipe(timeout({ first: 300_000 }))
       .subscribe({

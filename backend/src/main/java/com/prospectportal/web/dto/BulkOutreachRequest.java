@@ -14,7 +14,8 @@ public record BulkOutreachRequest(
     Boolean emailFallback,
     String approachId,
     String editableBody,
-    String editableSubject
+    String editableSubject,
+    String followUpBody
 ) {
     public record MessageOverride(String subject, String body) {
     }

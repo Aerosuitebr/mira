@@ -626,6 +626,7 @@ export class ApiService {
     approachId?: string;
     editableBody?: string;
     editableSubject?: string;
+    followUpBody?: string;
   }) {
     return this.http.post<
       Campaign & {

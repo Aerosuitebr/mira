@@ -168,6 +168,17 @@ public class ProspectCopyBuilder {
             + "Site: " + productUrl;
     }
 
+    /** Aplica a saudacao contextual da etapa 2 ao corpo definido antes do disparo. */
+    public String whatsappFollowUpFromTemplate(String companyName, String template, BrandProfile brand) {
+        String company = shortCompanyName(companyName);
+        String sender = brand != null ? brand.senderName() : BrandProfile.DEFAULT_SENDER;
+        String body = template
+            .replace("{{companyName}}", company)
+            .replace("{{senderName}}", sender)
+            .trim();
+        return "Obrigado pelo retorno, pessoal da " + company + "!\n\n" + body;
+    }
+
     /** Entrada curta, sem URL: única copy permitida na primeira mensagem fria. */
     public String whatsappStep1(String companyName) {
         return saoPauloGreeting() + "! Tudo bem? Nesse contato falo com o responsável comercial da "
