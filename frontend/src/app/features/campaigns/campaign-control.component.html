@@ -53,9 +53,18 @@
           <div class="message-list">
             @for (message of filteredMessages; track message.id) {
               <article class="message-row" [attr.data-status]="message.status">
-                <div class="message-company"><span class="step-badge">E{{ message.step }}</span><div><strong>{{ message.companyName }}</strong><small>{{ message.cnpj }} · {{ message.city }}/{{ message.state }}</small></div></div>
+                <div class="message-company"><span class="step-badge">Etapa {{ message.step }}</span><div><strong>{{ message.companyName }}</strong><small>{{ message.cnpj }} · {{ message.city }}/{{ message.state }}</small></div></div>
                 <div class="message-contact"><strong>{{ message.contactName || 'Contato não identificado' }}</strong><small>{{ message.contactRole || 'Cargo não informado' }}</small><span>{{ message.recipient || message.email || 'Sem destinatário' }}</span></div>
-                <div class="message-state"><span class="state-chip">{{ statusLabel(message.status) }}</span><small>@if (message.sentAt) { Enviada {{ message.sentAt | date:'dd/MM HH:mm' }} } @else { Criada {{ message.createdAt | date:'dd/MM HH:mm' }} }</small>@if (message.errorDetail) { <em>{{ message.errorDetail }}</em> }</div>
+                <div class="message-state">
+                  <span class="state-chip">Etapa {{ message.step }} · {{ statusLabel(message.status) }}</span>
+                  @if (message.sentAt) {
+                    <small class="delivery-meta delivery-meta--sent">Enviada em {{ message.sentAt | date:'dd/MM/yyyy' }} às {{ message.sentAt | date:'HH:mm:ss' }}</small>
+                  } @else {
+                    <small class="delivery-meta">Ainda não enviada · criada em {{ message.createdAt | date:'dd/MM/yyyy' }} às {{ message.createdAt | date:'HH:mm:ss' }}</small>
+                  }
+                  @if (message.repliedAt) { <small class="delivery-meta delivery-meta--reply">Resposta recebida em {{ message.repliedAt | date:'dd/MM/yyyy' }} às {{ message.repliedAt | date:'HH:mm:ss' }}</small> }
+                  @if (message.errorDetail) { <em>{{ message.errorDetail }}</em> }
+                </div>
                 <div class="message-preview"><p>{{ message.body }}</p>@if (message.providerMessageId) { <small>ID provedor: {{ message.providerMessageId }}</small> }</div>
                 <div class="message-actions">
                   @if (message.editable) { <button type="button" (click)="openEdit(message)">Editar</button> }
