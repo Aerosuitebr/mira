@@ -172,6 +172,13 @@ public class ProspectCopyBuilder {
             + shortCompanyName(companyName) + "?";
     }
 
+    public String whatsappStep1(String companyName, String template) {
+        if (template == null || template.isBlank()) {
+            return whatsappStep1(companyName);
+        }
+        return template.trim().replace("{{empresa}}", shortCompanyName(companyName));
+    }
+
     public String whatsappBody(String companyName, String contactName, String cityState, String segment) {
         return whatsappCaption(companyName, contactName, cityState, segment);
     }

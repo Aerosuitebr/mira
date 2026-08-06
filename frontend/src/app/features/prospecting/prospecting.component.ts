@@ -114,8 +114,20 @@ export class ProspectingComponent implements OnInit, OnDestroy {
 
   autoProspect = {
     limit: 5,
-    testMode: false
+    testMode: false,
+    openingMessage: 'Olá, boa tarde! Tudo bem? Nesse contato falo com o responsável comercial da {{empresa}}?'
   };
+
+  get openingMessagePreview(): string {
+    const company = this.selectedCompanies[0];
+    const companyName = company ? (company.tradeName || company.legalName) : 'Empresa selecionada';
+    return this.autoProspect.openingMessage.replaceAll('{{empresa}}', companyName);
+  }
+
+  get openingPreviewCompanyName(): string {
+    const company = this.selectedCompanies[0];
+    return company ? (company.tradeName || company.legalName) : 'um lead';
+  }
 
   readonly presets: ProspectPreset[] = [
     {
@@ -384,6 +396,10 @@ export class ProspectingComponent implements OnInit, OnDestroy {
       this.activeStep = 2;
       return;
     }
+    if (!this.autoProspect.openingMessage.trim()) {
+      this.errorMessage = 'Escreva a primeira mensagem antes de preparar a fila.';
+      return;
+    }
     this.startingAutoProspect = true;
     this.errorMessage = '';
     const selectedIds = [...this.selectedCompanyIds];
@@ -392,7 +408,8 @@ export class ProspectingComponent implements OnInit, OnDestroy {
       companyLimit: selectedIds.length,
       testMode: this.autoProspect.testMode,
       dryRun: false,
-      selectedCompanyIds: selectedIds
+      selectedCompanyIds: selectedIds,
+      openingMessage: this.autoProspect.openingMessage.trim()
     }).subscribe({
       next: (job) => {
         this.activeJob = job;

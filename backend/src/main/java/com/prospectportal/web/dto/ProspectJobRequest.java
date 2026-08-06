@@ -12,6 +12,7 @@ public record ProspectJobRequest(
     Integer companyLimit,
     Boolean testMode,
     Boolean dryRun,
-    List<UUID> selectedCompanyIds
+    List<UUID> selectedCompanyIds,
+    String openingMessage
 ) {
 }

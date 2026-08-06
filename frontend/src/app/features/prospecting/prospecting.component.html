@@ -314,15 +314,34 @@
             <div class="auto-prospect-panel auto-prospect-panel--standalone">
               <div class="auto-prospect-head">
                 <div>
-                  <h3>Preparar primeira mensagem</h3>
+                  <h3>Primeira mensagem</h3>
                   <p>
-                    Fase 1: sem disparos. A abertura não inclui links e fica na fila para revisão.
+                    Esta é a abertura que cada lead receberá. Revise antes de preparar a fila.
                   </p>
                 </div>
                 <label class="test-toggle" title="Se marcado, e-mails são redirecionados e WhatsApp em massa fica omitido">
                   <input type="checkbox" [(ngModel)]="autoProspect.testMode" name="autoTestMode" />
                   Preparação segura
                 </label>
+              </div>
+              <div class="opening-editor">
+                <label class="pp-field opening-editor__field">
+                  <span>Mensagem de abertura</span>
+                  <textarea
+                    class="pp-input"
+                    name="openingMessage"
+                    [(ngModel)]="autoProspect.openingMessage"
+                    rows="4"
+                    maxlength="500"
+                    placeholder="Escreva uma abertura curta e sem links"
+                  ></textarea>
+                  <small><b>{{ autoProspect.openingMessage.length }}/500</b> Use <code>{{ '{{empresa}}' }}</code> para personalizar o nome. Links não são permitidos nesta etapa.</small>
+                </label>
+                <div class="opening-preview" aria-live="polite">
+                  <span>Prévia para {{ openingPreviewCompanyName }}</span>
+                  <p>{{ openingMessagePreview }}</p>
+                  <small>WhatsApp · mensagem 1 de 2</small>
+                </div>
               </div>
               <div class="auto-prospect-actions">
                 <label class="pp-field">
@@ -332,10 +351,10 @@
                 <button
                   type="button"
                   class="pp-btn pp-btn--primary"
-                  [disabled]="startingAutoProspect"
+                  [disabled]="startingAutoProspect || !autoProspect.openingMessage.trim() || selectedCompanyIds.size === 0"
                   (click)="startSelectedTwoStepQueue()"
                 >
-                  @if (startingAutoProspect) { Preparando... } @else { Revisar abertura para {{ selectedCompanyIds.size }} leads }
+                  @if (startingAutoProspect) { Preparando... } @else { Preparar fila para {{ selectedCompanyIds.size }} leads }
                 </button>
               </div>
 

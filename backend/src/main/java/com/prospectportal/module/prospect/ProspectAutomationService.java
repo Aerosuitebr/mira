@@ -302,6 +302,13 @@ public class ProspectAutomationService {
             : request.companyLimit() != null ? Math.min(Math.max(request.companyLimit(), 1), 100) : 20;
         boolean testMode = request.testMode() != null ? request.testMode() : defaultTestMode;
         boolean dryRun = Boolean.TRUE.equals(request.dryRun());
+        String openingMessage = blankToNull(request.openingMessage());
+        if (openingMessage != null && openingMessage.length() > 500) {
+            throw new ResponseStatusException(BAD_REQUEST, "A primeira mensagem deve ter no máximo 500 caracteres.");
+        }
+        if (openingMessage != null && openingMessage.toLowerCase().matches("(?s).*(https?://|www\\.).*")) {
+            throw new ResponseStatusException(BAD_REQUEST, "A primeira mensagem não pode conter links.");
+        }
 
         OutreachCampaign campaign = new OutreachCampaign();
         campaign.setTenant(tenant);
@@ -336,7 +343,7 @@ public class ProspectAutomationService {
         // Uma seleção explícita do usuário precisa ficar pronta antes de a UI
         // confirmar a fila. Isso evita jobs presos em QUEUED sem contagem.
         if (!selectedCompanyIds.isEmpty()) {
-            prepareJob(job.getId());
+            prepareJob(job.getId(), openingMessage);
             ProspectJob prepared = jobRepository.findById(job.getId()).orElse(job);
             return toResponse(prepared);
         }
@@ -362,6 +369,10 @@ public class ProspectAutomationService {
 
     @Transactional
     public void prepareJob(UUID jobId) {
+        prepareJob(jobId, null);
+    }
+
+    private void prepareJob(UUID jobId, String openingMessage) {
         ProspectJob job = jobRepository.findById(jobId)
             .orElseThrow(() -> new IllegalStateException("Job não encontrado: " + jobId));
 
@@ -431,7 +442,7 @@ public class ProspectAutomationService {
             message.setLead(lead);
             message.setChannel("AUTO");
             message.setSubject(copyBuilder.emailSubject(companyName, brand));
-            message.setBody(copyBuilder.whatsappStep1(companyName));
+            message.setBody(copyBuilder.whatsappStep1(companyName, openingMessage));
             message.setStatus("QUEUED_BOT");
             message.setProspectJobId(job.getId());
             message.setRecipient(preferredPhone(contact, company));
