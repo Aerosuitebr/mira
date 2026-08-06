@@ -63,6 +63,24 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
     if (!this.detail || !this.uniqueCompanies) return 0;
     return Math.round(((this.detail.sent + this.detail.failed + this.detail.skipped) / this.uniqueCompanies) * 100);
   }
+  get processedCount(): number { return this.detail ? this.detail.sent + this.detail.failed + this.detail.skipped : 0; }
+
+  get hasWhatsAppConnectionIssue(): boolean {
+    return (this.detail?.messages || []).some(message => this.isConnectionError(message.errorDetail));
+  }
+
+  friendlyDeliveryIssue(message: CampaignMessageDetail): string {
+    const detail = message.errorDetail || '';
+    if (this.isConnectionError(detail)) return 'WhatsApp desconectado. Reconecte a conta para continuar o envio.';
+    if (/sem whatsapp|sem destinat[aá]rio|telefone|n[uú]mero inv[aá]lido/i.test(detail)) return 'Este contato precisa de um número de WhatsApp válido.';
+    if (/limit|thrott|rate|restri[cç][aã]o/i.test(detail)) return 'Envio temporariamente pausado para proteger sua conta.';
+    return 'Não foi possível concluir este envio. Verifique a conexão e tente novamente.';
+  }
+
+  campaignStatusLabel(campaign: Campaign): string {
+    if (campaign.id === this.selectedId && (this.hasWhatsAppConnectionIssue || !this.bot?.deliveryEnabled || this.bot?.paused)) return 'PAUSADA';
+    return ({QUEUED:'NA FILA',SENDING:'EM ANDAMENTO',RUNNING:'EM ANDAMENTO',SENT:'CONCLUÍDA',COMPLETED:'CONCLUÍDA',FAILED:'REQUER ATENÇÃO',PAUSED:'PAUSADA'} as Record<string,string>)[campaign.status] || campaign.status;
+  }
 
   loadCampaigns(): void {
     this.loading = true;
@@ -131,7 +149,8 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
     error: e => { this.busy = false; this.error = e?.error?.message || 'Falha ao reenfileirar.'; }
   }); }
 
-  statusLabel(status: string): string { return ({QUEUED_BOT:'Na fila',WAITING_REPLY:'Aguardando resposta',REPLIED:'Respondeu',AWAITING_APPROVAL:'Aguardando aprovação',SENT:'Enviada',FAILED:'Falhou',SKIPPED:'Ignorada',THROTTLED:'Pausada por limite',PENDING:'Pendente'} as Record<string,string>)[status] || status; }
+  statusLabel(status: string): string { return ({QUEUED_BOT:'Na fila',WAITING_REPLY:'Aguardando resposta',REPLIED:'Respondeu',AWAITING_APPROVAL:'Aguardando aprovação',SENT:'Enviada',FAILED:'Não enviado',SKIPPED:'Requer contato',THROTTLED:'Pausada por segurança',PENDING:'Pendente'} as Record<string,string>)[status] || status; }
+  private isConnectionError(detail: string | null): boolean { return /connection\s*closed|disconnected|conex[aã]o.*fechada|evolution\s*http/i.test(detail || ''); }
   private replaceMessage(updated: CampaignMessageDetail): void { if (this.detail) this.detail = { ...this.detail, messages: this.detail.messages.map(m => m.id === updated.id ? updated : m) }; }
   private clearFeedback(): void { this.feedback = ''; this.error = ''; }
 }

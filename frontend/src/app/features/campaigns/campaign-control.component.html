@@ -6,7 +6,8 @@
 
   @if (error) { <div class="pp-banner campaign-alert campaign-alert--error">{{ error }}</div> }
   @if (feedback) { <div class="pp-banner pp-banner--success campaign-alert">{{ feedback }}</div> }
-  @if (bot && !bot.deliveryEnabled) { <div class="delivery-blocked-banner" role="alert"><span aria-hidden="true">!</span><div><strong>Envios bloqueados</strong><p>A campanha e suas mensagens estão preservadas, mas nenhum contato será iniciado até um administrador liberar o robô de envio.</p></div></div> }
+  @if (hasWhatsAppConnectionIssue) { <div class="delivery-blocked-banner delivery-blocked-banner--connection" role="alert"><span aria-hidden="true">!</span><div><strong>WhatsApp precisa ser reconectado</strong><p>Os envios estão preservados. Reconecte a conta para continuar de onde a campanha parou.</p></div><a class="pp-btn pp-btn--secondary" routerLink="/whatsapp">Reconectar WhatsApp</a></div> }
+  @else if (bot && !bot.deliveryEnabled) { <div class="delivery-blocked-banner" role="alert"><span aria-hidden="true">!</span><div><strong>Envios temporariamente pausados</strong><p>A campanha e suas mensagens estão preservadas. A entrega será retomada com segurança após a validação da conta.</p></div></div> }
   @else if (bot?.paused) { <div class="delivery-blocked-banner delivery-blocked-banner--paused" role="alert"><span aria-hidden="true">Ⅱ</span><div><strong>Robô de envio pausado</strong><p>A fila está preservada e voltará a avançar quando o robô for retomado.</p></div></div> }
 
   <div class="campaign-layout">
@@ -15,7 +16,7 @@
       @for (campaign of campaigns; track campaign.id) {
         <button type="button" class="campaign-card" data-tooltip="Clique para ver os detalhes da campanha" [attr.aria-label]="'Ver detalhes da campanha ' + campaign.name" [class.active]="campaign.id === selectedId" (click)="selectCampaign(campaign.id, true)">
           <span><strong>{{ campaign.name }}</strong><small>{{ campaign.createdAt | date:'dd/MM/yyyy HH:mm' }}</small></span>
-          <i [attr.data-status]="campaign.status">{{ campaign.status }}</i>
+          <i [attr.data-status]="campaignStatusLabel(campaign)">{{ campaignStatusLabel(campaign) }}</i>
         </button>
       } @empty { <p>Nenhuma campanha encontrada.</p> }
     </aside>
@@ -24,9 +25,10 @@
       @if (detail) {
         <section class="campaign-summary pp-glass">
           <header><div><span class="pp-eyebrow">{{ detail.channel }} · {{ uniqueCompanies }} empresas</span><h2>{{ detail.name }}</h2><p>Criada em {{ detail.createdAt | date:'dd/MM/yyyy HH:mm' }}</p></div>
-            <button type="button" class="pp-btn" [class.pp-btn--primary]="detail.status === 'PAUSED'" [class.pp-btn--secondary]="detail.status !== 'PAUSED'" (click)="toggleCampaign()" [disabled]="busy">{{ detail.status === 'PAUSED' ? 'Retomar campanha' : 'Pausar campanha' }}</button>
+            @if (hasWhatsAppConnectionIssue || !bot?.deliveryEnabled) { <button type="button" class="pp-btn pp-btn--secondary" disabled>Campanha interrompida</button> }
+            @else { <button type="button" class="pp-btn" [class.pp-btn--primary]="detail.status === 'PAUSED'" [class.pp-btn--secondary]="detail.status !== 'PAUSED'" (click)="toggleCampaign()" [disabled]="busy">{{ detail.status === 'PAUSED' ? 'Retomar campanha' : 'Pausar campanha' }}</button> }
           </header>
-          <div class="campaign-progress-row"><div class="campaign-progress" role="progressbar" aria-label="Progresso da campanha" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="completionPercent"><span [style.width.%]="completionPercent"></span></div><strong>{{ completionPercent }}%</strong></div><small>{{ completionPercent }}% processado · atualização automática a cada 10 segundos</small>
+          <div class="campaign-progress-row"><div class="campaign-progress" role="progressbar" aria-label="Registros verificados na campanha" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="completionPercent"><span [style.width.%]="completionPercent"></span></div><strong>{{ processedCount }}/{{ uniqueCompanies }}</strong></div><small>{{ processedCount }} registros verificados · {{ detail.sent }} enviados com sucesso · atualização automática a cada 10 segundos</small>
           <div class="metric-grid">
             <article [class.zero]="uniqueCompanies === 0"><span>Empresas</span><strong>{{ uniqueCompanies }}</strong></article><article class="pending" [class.zero]="detail.queued === 0"><span>Etapa 1 na fila</span><strong>{{ detail.queued }}</strong></article>
             <article class="ok" [class.zero]="detail.sent === 0"><span>Etapa 1 enviadas</span><strong>{{ detail.sent }}</strong></article><article [class.zero]="detail.waitingReply === 0"><span>Aguardando resposta</span><strong>{{ detail.waitingReply }}</strong></article>
@@ -66,7 +68,7 @@
                     <small class="delivery-meta">Ainda não enviada · criada em {{ message.createdAt | date:'dd/MM/yyyy' }} às {{ message.createdAt | date:'HH:mm:ss' }}</small>
                   }
                   @if (message.repliedAt) { <small class="delivery-meta delivery-meta--reply">Resposta recebida em {{ message.repliedAt | date:'dd/MM/yyyy' }} às {{ message.repliedAt | date:'HH:mm:ss' }}</small> }
-                  @if (message.errorDetail) { <em>{{ message.errorDetail }}</em> }
+                  @if (message.errorDetail) { <div class="delivery-issue"><strong>Ação necessária</strong><span>{{ friendlyDeliveryIssue(message) }}</span></div> }
                 </div>
                 <div class="message-preview"><p>{{ message.body }}</p>@if (message.providerMessageId) { <small>ID provedor: {{ message.providerMessageId }}</small> }</div>
                 <div class="message-actions">
