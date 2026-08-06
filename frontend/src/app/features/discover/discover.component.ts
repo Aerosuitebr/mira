@@ -219,11 +219,19 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get totalElementsLabel(): string {
+    if (this.hasResultFilter || this.hideApproached) {
+      return this.filteredCompanies.length.toLocaleString('pt-BR');
+    }
     const state = this.filters.getRawValue().state.trim();
     if (!state && this.allCompanies.length > 0 && this.allCompanies.length >= 50) {
       return `${this.totalElements.toLocaleString('pt-BR')}+`;
     }
     return this.totalElements.toLocaleString('pt-BR');
+  }
+
+  get hiddenApproachedCount(): number {
+    if (!this.hideApproached) return 0;
+    return this.allCompanies.filter((company) => this.isApproached(company.id)).length;
   }
 
   get totalPages(): number {
@@ -238,7 +246,7 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     const from = this.pageIndex * this.pageSize + 1;
     const to = this.pageIndex * this.pageSize + this.visibleCompanies.length;
-    if (this.hasResultFilter) {
+    if (this.hasResultFilter || this.hideApproached) {
       return `${from}-${to} de ${filtered.toLocaleString('pt-BR')} filtradas`;
     }
     const span = Math.min(this.totalElements, Math.max(this.allCompanies.length, to));

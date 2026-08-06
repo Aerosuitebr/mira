@@ -185,7 +185,7 @@
         <div class="list-header__top">
           <div>
             <strong>{{ totalElementsLabel }}</strong>
-            <span>empresas encontradas</span>
+            <span>{{ hideApproached || hasResultFilter ? 'empresas visíveis' : 'empresas encontradas' }}</span>
             @if (isNationalSearch && hasSearched) {
               <small class="list-header__hint">Busca nacional - informe UF ou CNPJ completo para resultado instantâneo</small>
             }
@@ -219,9 +219,12 @@
               </button>
             }
           </div>
-          @if (hasResultFilter) {
+          @if (hasResultFilter || hideApproached) {
             <small class="list-header__filter-count">
               {{ filteredCompanies.length }} de {{ allCompanies.length }} no resultado
+              @if (hideApproached) {
+                · {{ hiddenApproachedCount }} já abordada(s) oculta(s)
+              }
             </small>
           }
           <label class="select-page">
@@ -267,8 +270,13 @@
           </div>
         } @else if (visibleCompanies.length === 0 && allCompanies.length > 0) {
           <div class="pp-empty">
-            <strong>Nenhuma correspondência</strong>
-            <span>Nenhuma empresa no resultado corresponde a “{{ resultFilter.trim() }}”. Limpe o filtro ou refine a busca principal.</span>
+            @if (hideApproached && !hasResultFilter) {
+              <strong>Todas já foram abordadas</strong>
+              <span>As {{ hiddenApproachedCount }} empresa(s) deste resultado foram ocultadas para evitar contato duplicado.</span>
+            } @else {
+              <strong>Nenhuma correspondência</strong>
+              <span>Nenhuma empresa no resultado corresponde a “{{ resultFilter.trim() }}”. Limpe o filtro ou refine a busca principal.</span>
+            }
           </div>
         } @else {
           @for (company of visibleCompanies; track company.id; let i = $index) {
