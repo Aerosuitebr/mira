@@ -123,6 +123,10 @@ public class WhatsAppConnectionService {
         var live = evolutionClient.connectionStatus(instance);
         if (live.connected()) {
             persistLiveState(tenant, "open", live.phone(), true);
+            var webhook = evolutionClient.configureReplyWebhook(instance);
+            if (!webhook.success()) {
+                log.warn("WhatsApp conectado, mas o webhook de respostas nÃ£o foi configurado: {}", webhook.error());
+            }
             return response(
                 tenant,
                 true,
