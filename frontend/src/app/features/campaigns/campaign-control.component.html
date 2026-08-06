@@ -11,7 +11,7 @@
     <aside class="campaign-list pp-glass">
       <div class="campaign-list__title"><strong>Campanhas</strong><span>{{ campaigns.length }}</span></div>
       @for (campaign of campaigns; track campaign.id) {
-        <button type="button" [class.active]="campaign.id === selectedId" (click)="selectCampaign(campaign.id)">
+        <button type="button" class="campaign-card" data-tooltip="Clique para ver os detalhes da campanha" [attr.aria-label]="'Ver detalhes da campanha ' + campaign.name" [class.active]="campaign.id === selectedId" (click)="selectCampaign(campaign.id, true)">
           <span><strong>{{ campaign.name }}</strong><small>{{ campaign.createdAt | date:'dd/MM/yyyy HH:mm' }}</small></span>
           <i [attr.data-status]="campaign.status">{{ campaign.status }}</i>
         </button>
@@ -81,4 +81,40 @@
   </div>
 
   @if (editing) { <div class="edit-overlay" role="dialog" aria-modal="true" aria-labelledby="edit-title"><form class="edit-modal pp-glass" (submit)="$event.preventDefault(); saveMessage()"><header><div><span class="pp-eyebrow">{{ editing.companyName }} · etapa {{ editing.step }}</span><h2 id="edit-title">Editar mensagem pendente</h2></div><button type="button" aria-label="Fechar" (click)="closeEdit()">×</button></header>@if (editing.channel === 'EMAIL') { <label>Assunto<input class="pp-input" [(ngModel)]="editSubject" name="subject"/></label> }<label>Mensagem<textarea class="pp-textarea" rows="12" [(ngModel)]="editBody" name="body"></textarea></label><small>{{ editBody.length }}/2.000 caracteres · a alteração será aplicada ao item ainda na fila.</small><footer><button type="button" class="pp-btn pp-btn--ghost" (click)="closeEdit()">Cancelar</button><button type="submit" class="pp-btn pp-btn--primary" [disabled]="busy || !editBody.trim() || editBody.length > 2000">Salvar na fila</button></footer></form></div> }
+
+  @if (detailModalOpen && detail) {
+    <div class="campaign-detail-overlay" (click)="closeDetailModal()">
+      <section class="campaign-detail-modal pp-glass" role="dialog" aria-modal="true" aria-labelledby="campaign-detail-title" (click)="$event.stopPropagation()">
+        <header>
+          <div><span class="pp-eyebrow">Detalhes da campanha</span><h2 id="campaign-detail-title">{{ detail.name }}</h2><p>Criada em {{ detail.createdAt | date:'dd/MM/yyyy' }} às {{ detail.createdAt | date:'HH:mm:ss' }} · {{ detail.channel }}</p></div>
+          <button type="button" class="campaign-detail-close" aria-label="Fechar detalhes" (click)="closeDetailModal()">×</button>
+        </header>
+
+        <div class="campaign-detail-metrics">
+          <article><span>Empresas</span><strong>{{ uniqueCompanies }}</strong></article>
+          <article><span>Etapa 1 na fila</span><strong>{{ detail.queued }}</strong></article>
+          <article><span>Etapa 1 enviadas</span><strong>{{ detail.sent }}</strong></article>
+          <article><span>Responderam</span><strong>{{ detail.replied }}</strong></article>
+          <article><span>Etapa 2 aguardando</span><strong>{{ detail.awaitingApproval + detail.step2Queued }}</strong></article>
+          <article><span>Etapa 2 enviadas</span><strong>{{ detail.step2Sent }}</strong></article>
+          <article class="fail"><span>Falhas</span><strong>{{ detail.failed }}</strong></article>
+        </div>
+
+        <div class="campaign-company-summary">
+          <div class="campaign-company-summary__head"><strong>Resumo por empresa</strong><span>{{ detail.messages.length }} registros</span></div>
+          <div class="campaign-company-summary__list">
+            @for (message of detail.messages; track message.id) {
+              <article [attr.data-status]="message.status">
+                <div><strong>{{ message.companyName }}</strong><small>{{ message.cnpj }} · {{ message.city }}/{{ message.state }}</small></div>
+                <span class="modal-step">Etapa {{ message.step }}</span>
+                <div class="modal-status"><strong>{{ statusLabel(message.status) }}</strong>@if (message.sentAt) { <small>Enviada em {{ message.sentAt | date:'dd/MM/yyyy' }} às {{ message.sentAt | date:'HH:mm:ss' }}</small> } @else { <small>Aguardando envio · criada {{ message.createdAt | date:'dd/MM/yyyy HH:mm' }}</small> }</div>
+              </article>
+            }
+          </div>
+        </div>
+
+        <footer><button type="button" class="pp-btn pp-btn--primary" (click)="closeDetailModal()">Fechar e continuar nesta tela</button></footer>
+      </section>
+    </div>
+  }
 </section>

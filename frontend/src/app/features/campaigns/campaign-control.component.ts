@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -26,6 +26,8 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
   editSubject = '';
   editFollowUp = false;
   followUpDraft = '';
+  detailModalOpen = false;
+  private openModalAfterLoad = false;
   private poll: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void { this.loadCampaigns(); this.poll = setInterval(() => this.refresh(false), 10_000); }
@@ -54,15 +56,24 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
     }, error: () => { this.loading = false; this.error = 'Não foi possível carregar as campanhas.'; } });
   }
 
-  selectCampaign(id: string): void { this.selectedId = id; this.refresh(true); }
+  selectCampaign(id: string, openModal = false): void {
+    this.selectedId = id;
+    this.openModalAfterLoad = openModal;
+    this.refresh(true);
+  }
   refresh(showLoading = true): void {
     if (!this.selectedId) return;
     if (showLoading) this.loading = true;
     this.api.campaignDetail(this.selectedId).subscribe({ next: detail => {
       this.detail = detail; this.followUpDraft = detail.followUpBody || ''; this.loading = false;
+      if (this.openModalAfterLoad) { this.detailModalOpen = true; this.openModalAfterLoad = false; }
     }, error: e => { this.loading = false; this.error = e?.error?.message || 'Falha ao consultar a campanha.'; } });
     this.api.outreachBotStatus().subscribe({ next: status => this.bot = status, error: () => this.bot = null });
   }
+
+  closeDetailModal(): void { this.detailModalOpen = false; }
+  @HostListener('document:keydown.escape')
+  closeModalWithEscape(): void { if (this.detailModalOpen) this.closeDetailModal(); }
 
   toggleCampaign(): void {
     if (!this.detail) return; this.busy = true; this.clearFeedback();
