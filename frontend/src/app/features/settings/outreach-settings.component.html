@@ -69,11 +69,23 @@
         </p>
         <label class="settings-field">
           <span>Responsável 1</span>
-          <input type="tel" [(ngModel)]="approvalRecipient1" placeholder="Ex.: 5511999999999" />
+          <input type="tel" inputmode="numeric" autocomplete="tel" maxlength="16"
+            [ngModel]="approvalRecipient1" (ngModelChange)="onApprovalPhoneInput(1, $event)"
+            placeholder="(11) 99999-9999" />
+          @if (approvalPhoneError(approvalRecipient1); as phoneError) {
+            <small class="settings-field__error">{{ phoneError }}</small>
+          } @else {
+            <small>O código +55 é adicionado automaticamente.</small>
+          }
         </label>
         <label class="settings-field">
           <span>Responsável 2 (opcional)</span>
-          <input type="tel" [(ngModel)]="approvalRecipient2" placeholder="Ex.: 5521999999999" />
+          <input type="tel" inputmode="numeric" autocomplete="tel" maxlength="16"
+            [ngModel]="approvalRecipient2" (ngModelChange)="onApprovalPhoneInput(2, $event)"
+            placeholder="(21) 99999-9999" />
+          @if (approvalPhoneError(approvalRecipient2); as phoneError) {
+            <small class="settings-field__error">{{ phoneError }}</small>
+          }
         </label>
       </article>
     </div>

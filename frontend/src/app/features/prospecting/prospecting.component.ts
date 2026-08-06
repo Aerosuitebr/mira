@@ -16,6 +16,7 @@ import {
   OutreachSettings
 } from '../../core/api.service';
 import { AerosuiteFitAnalysis, AerosuiteFitService, AerosuitePlanId } from '../../core/aerosuite-fit.service';
+import { formatBrazilPhoneDisplay } from '../../core/phone.util';
 
 type ProspectMode = 'pj' | 'pf';
 type MetricLensId = 'icp' | 'plans' | 'promo' | 'sources' | 'routes' | 'speed';
@@ -141,12 +142,14 @@ export class ProspectingComponent implements OnInit, OnDestroy {
   get approvalAdmins(): string[] {
     return [this.outreachSettings?.approvalRecipient1, this.outreachSettings?.approvalRecipient2]
       .filter((recipient): recipient is string => !!recipient?.trim())
-      .map((recipient) => recipient.trim());
+      .map((recipient) => formatBrazilPhoneDisplay(recipient));
   }
 
   get connectedWhatsAppLabel(): string {
     if (!this.whatsappConnection?.connected) return 'Não conectado';
-    return this.whatsappConnection.phone?.trim() || this.whatsappConnection.instanceName?.trim() || 'Conectado';
+    return formatBrazilPhoneDisplay(this.whatsappConnection.phone)
+      || this.whatsappConnection.instanceName?.trim()
+      || 'Conectado';
   }
 
   private saoPauloGreeting(): string {

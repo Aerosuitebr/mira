@@ -2,6 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService, OutreachSettings } from '../../core/api.service';
+import { brazilPhoneValidationMessage, formatBrazilPhoneInput, isValidBrazilPhone, toWhatsAppPhone } from '../../core/phone.util';
 
 @Component({
   selector: 'app-outreach-settings',
@@ -88,7 +89,24 @@ export class OutreachSettingsComponent implements OnInit {
     this.clearBrandImage = true;
   }
 
+  onApprovalPhoneInput(field: 1 | 2, value: string): void {
+    const formatted = formatBrazilPhoneInput(value);
+    if (field === 1) this.approvalRecipient1 = formatted;
+    else this.approvalRecipient2 = formatted;
+    this.error = '';
+  }
+
+  approvalPhoneError(value: string): string | null {
+    return brazilPhoneValidationMessage(value);
+  }
+
   save(): void {
+    const invalidRecipient = [this.approvalRecipient1, this.approvalRecipient2]
+      .find((recipient) => recipient.trim() && !isValidBrazilPhone(recipient));
+    if (invalidRecipient) {
+      this.error = brazilPhoneValidationMessage(invalidRecipient) || 'Revise o número do responsável.';
+      return;
+    }
     this.saving = true;
     this.message = '';
     this.error = '';
@@ -99,8 +117,8 @@ export class OutreachSettingsComponent implements OnInit {
         brandImageMime: this.clearBrandImage ? null : this.brandImageMime,
         brandImageFileName: this.clearBrandImage ? null : this.brandImageFileName,
         clearBrandImage: this.clearBrandImage,
-        approvalRecipient1: this.approvalRecipient1.trim() || null,
-        approvalRecipient2: this.approvalRecipient2.trim() || null
+        approvalRecipient1: toWhatsAppPhone(this.approvalRecipient1) || null,
+        approvalRecipient2: toWhatsAppPhone(this.approvalRecipient2) || null
       })
       .subscribe({
         next: (settings) => {
@@ -133,8 +151,8 @@ export class OutreachSettingsComponent implements OnInit {
 
   private applySettings(settings: OutreachSettings): void {
     this.senderName = settings.senderName || '';
-    this.approvalRecipient1 = settings.approvalRecipient1 || '';
-    this.approvalRecipient2 = settings.approvalRecipient2 || '';
+    this.approvalRecipient1 = formatBrazilPhoneInput(settings.approvalRecipient1);
+    this.approvalRecipient2 = formatBrazilPhoneInput(settings.approvalRecipient2);
     this.clearBrandImage = false;
     if (settings.hasBrandImage && settings.brandImageBase64) {
       const mime = settings.brandImageMime || 'image/png';
