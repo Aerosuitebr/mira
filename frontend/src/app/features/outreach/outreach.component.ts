@@ -755,6 +755,10 @@ export class OutreachComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
+  queuedDeliveryCount(): number {
+    return this.sendProgress.deliveries.filter((delivery) => delivery.status === 'QUEUED_BOT').length;
+  }
+
   private parseFailureLines(detail: string, failedCount: number): string[] {
     if (!detail || failedCount <= 0) {
       return [];

@@ -434,6 +434,12 @@
                 <span>WhatsApp</span>
                 <strong>{{ sendProgress.waSent }}</strong>
               </article>
+              @if (queuedDeliveryCount() > 0) {
+                <article class="send-summary__wa">
+                  <span>Na fila protegida</span>
+                  <strong>{{ queuedDeliveryCount() }}</strong>
+                </article>
+              }
               <article class="send-summary__email">
                 <span>E-mail</span>
                 <strong>{{ sendProgress.emailSent }}</strong>
