@@ -120,7 +120,7 @@ export class EnrichComponent implements OnInit {
     const selected = this.companies.filter((company) => this.selectedIds.has(company.id));
     sessionStorage.setItem('selected-companies', JSON.stringify([...this.selectedIds]));
     sessionStorage.setItem('selected-companies-cache', JSON.stringify(selected));
-    void this.router.navigate(['/prospecting'], { queryParams: { step: 3 } });
+    void this.router.navigate(['/outreach']);
   }
 
   importCsv(event: Event): void {

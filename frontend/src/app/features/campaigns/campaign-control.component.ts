@@ -1,10 +1,11 @@
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { ApiService, Campaign, CampaignDetail, CampaignMessageDetail, OutreachBotStatus } from '../../core/api.service';
 
 @Component({
-  selector: 'app-campaign-control', standalone: true, imports: [FormsModule, DatePipe],
+  selector: 'app-campaign-control', standalone: true, imports: [FormsModule, DatePipe, RouterLink],
   templateUrl: './campaign-control.component.html', styleUrl: './campaign-control.component.scss'
 })
 export class CampaignControlComponent implements OnInit, OnDestroy {

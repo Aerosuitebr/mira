@@ -57,7 +57,12 @@
                 <div class="message-contact"><strong>{{ message.contactName || 'Contato não identificado' }}</strong><small>{{ message.contactRole || 'Cargo não informado' }}</small><span>{{ message.recipient || message.email || 'Sem destinatário' }}</span></div>
                 <div class="message-state"><span class="state-chip">{{ statusLabel(message.status) }}</span><small>@if (message.sentAt) { Enviada {{ message.sentAt | date:'dd/MM HH:mm' }} } @else { Criada {{ message.createdAt | date:'dd/MM HH:mm' }} }</small>@if (message.errorDetail) { <em>{{ message.errorDetail }}</em> }</div>
                 <div class="message-preview"><p>{{ message.body }}</p>@if (message.providerMessageId) { <small>ID provedor: {{ message.providerMessageId }}</small> }</div>
-                <div class="message-actions">@if (message.editable) { <button type="button" (click)="openEdit(message)">Editar</button> } @if (message.status === 'AWAITING_APPROVAL') { <button type="button" class="approve" (click)="approve(message)" [disabled]="busy">Aprovar</button> } @if (message.retryable) { <button type="button" class="retry" (click)="retry(message)" [disabled]="busy">Reenfileirar</button> }</div>
+                <div class="message-actions">
+                  @if (message.editable) { <button type="button" (click)="openEdit(message)">Editar</button> }
+                  @if (message.status === 'AWAITING_APPROVAL') { <button type="button" class="approve" (click)="approve(message)" [disabled]="busy">Aprovar</button> }
+                  @if (message.retryable) { <button type="button" class="retry" (click)="retry(message)" [disabled]="busy">Reenfileirar</button> }
+                  @if (message.status === 'REPLIED' || message.status === 'SENT') { <a [routerLink]="['/crm']" [queryParams]="{ company: message.companyName }">Continuar no CRM</a> }
+                </div>
               </article>
             } @empty { <div class="empty-state">Nenhum envio corresponde aos filtros.</div> }
           </div>

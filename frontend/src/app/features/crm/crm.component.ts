@@ -1,9 +1,10 @@
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { ApiService, KanbanBoard, KanbanCard, KanbanStage } from '../../core/api.service';
+import { stashAppointmentPrefill } from '../../core/appointment-prefill';
 
 type ValueFilter = 'ALL' | '10K' | '100K';
 type DateFilter = 'ALL' | '7D' | '30D' | 'NEWEST' | 'OLDEST';
@@ -17,6 +18,8 @@ type DateFilter = 'ALL' | '7D' | '30D' | 'NEWEST' | 'OLDEST';
 })
 export class CrmComponent implements OnInit {
   private readonly api = inject(ApiService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   board?: KanbanBoard;
   displayStages: KanbanStage[] = [];
@@ -30,7 +33,18 @@ export class CrmComponent implements OnInit {
   dateFilter: DateFilter = 'ALL';
 
   ngOnInit(): void {
+    this.searchQuery = this.route.snapshot.queryParamMap.get('company') || '';
     this.loadBoard();
+  }
+
+  schedule(card: KanbanCard): void {
+    stashAppointmentPrefill({ clientName: card.companyName, clientCompany: card.companyName,
+      title: `Reunião comercial · ${card.companyName}`, openForm: true });
+    void this.router.navigate(['/agenda']);
+  }
+
+  createProposal(card: KanbanCard): void {
+    void this.router.navigate(['/proposals'], { queryParams: { leadId: card.leadId, company: card.companyName } });
   }
 
   loadBoard(): void {

@@ -811,7 +811,7 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
     sessionStorage.setItem('selected-companies', JSON.stringify([...this.selected]));
     sessionStorage.setItem('selected-companies-cache', JSON.stringify(selectedCompanies));
     this.persistSession();
-    void this.router.navigate(['/enrich']);
+    void this.router.navigate(['/discover/enrich']);
   }
 
   sendToEnrich(companyId: string, event: Event): void {
@@ -820,7 +820,7 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
     sessionStorage.setItem('selected-companies', JSON.stringify([companyId]));
     sessionStorage.setItem('selected-companies-cache', JSON.stringify(company ? [company] : []));
     this.persistSession();
-    void this.router.navigate(['/enrich']);
+    void this.router.navigate(['/discover/enrich']);
   }
 
   sendToOutreach(companyId: string, event: Event): void {

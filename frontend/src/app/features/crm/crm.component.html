@@ -1,9 +1,9 @@
 <section class="pp-page">
   <header class="pp-page-header">
     <div>
-      <span class="pp-eyebrow">Etapa 04 · CRM</span>
-      <h1 class="pp-title">Pipeline Kanban</h1>
-      <p class="pp-subtitle">Arraste os cards entre colunas para atualizar o funil em tempo real.</p>
+      <span class="pp-eyebrow">Etapa 03 · Contato e fechamento</span>
+      <h1 class="pp-title">Pipeline comercial</h1>
+      <p class="pp-subtitle">Acompanhe cada contato, agende o próximo passo e conduza a oportunidade até virar cliente.</p>
     </div>
     <div class="header-actions">
       <div class="crm-toolbar">
@@ -56,6 +56,18 @@
       </button>
     </div>
   </header>
+
+  <nav class="lifecycle-nav" aria-label="Fluxo comercial integrado">
+    <a routerLink="/campaigns"><span>1</span><strong>Contato</strong><small>Campanhas e respostas</small></a>
+    <div aria-hidden="true">→</div>
+    <a routerLink="/crm" class="is-current"><span>2</span><strong>Negociação</strong><small>Agenda e acompanhamento</small></a>
+    <div aria-hidden="true">→</div>
+    <a routerLink="/proposals"><span>3</span><strong>Fechamento</strong><small>Proposta e aprovação</small></a>
+    <div aria-hidden="true">→</div>
+    <a routerLink="/clients"><span>4</span><strong>Cliente</strong><small>Carteira e entrega</small></a>
+  </nav>
+
+  <p class="automation-note">Ao mover uma oportunidade para <strong>Ganho</strong> ou receber a aprovação da proposta, o cadastro do cliente e o início da entrega são criados automaticamente.</p>
 
   @if (moveError) {
     <div class="pp-banner pp-banner--info">{{ moveError }}</div>
@@ -120,6 +132,10 @@
                   @if (card.valueAmount > 0) {
                     <span class="card-value">R$ {{ card.valueAmount | number:'1.0-0' }}</span>
                   }
+                  <div class="card-next-actions">
+                    <button type="button" (click)="$event.stopPropagation(); schedule(card)">Agendar</button>
+                    <button type="button" (click)="$event.stopPropagation(); createProposal(card)">Criar proposta</button>
+                  </div>
                 </div>
               </article>
             }

@@ -9,6 +9,7 @@ import {
   ProposalRecipientOption
 } from '../../core/api.service';
 import { formatBrMoney, moneyFromDigits } from '../../core/currency-br.util';
+import { ActivatedRoute } from '@angular/router';
 
 function integerQuantityValidator(control: AbstractControl): ValidationErrors | null {
   const raw = control.value;
@@ -32,6 +33,7 @@ function integerQuantityValidator(control: AbstractControl): ValidationErrors | 
 export class ProposalsComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly fb = inject(FormBuilder);
+  private readonly route = inject(ActivatedRoute);
 
   proposals: Proposal[] = [];
   recipients: ProposalRecipientOption[] = [];
@@ -121,8 +123,22 @@ export class ProposalsComponent implements OnInit {
       next: (recipients) => {
         this.recipients = this.mergeRecipients(recipients, this.recentDiscoveries);
         this.filterRecipients();
+        this.applyRouteRecipient();
       }
     });
+  }
+
+  private applyRouteRecipient(): void {
+    if (this.selectedRecipient) return;
+    const leadId = this.route.snapshot.queryParamMap.get('leadId');
+    const company = this.route.snapshot.queryParamMap.get('company') || '';
+    const match = this.recipients.find(item => (leadId && item.key === `LEAD:${leadId}`) ||
+      (!!company && `${item.label} ${item.subtitle}`.toLocaleLowerCase('pt-BR').includes(company.toLocaleLowerCase('pt-BR'))));
+    if (match) {
+      this.selectedRecipient = match;
+      this.recipientQuery = match.label;
+      this.form.patchValue({ title: `Proposta comercial · ${match.label}` });
+    }
   }
 
   loadRecentDiscoveries(): void {
@@ -147,6 +163,7 @@ export class ProposalsComponent implements OnInit {
         }));
         this.recipients = this.mergeRecipients(this.recipients, this.recentDiscoveries);
         this.filterRecipients();
+        this.applyRouteRecipient();
       }
     });
   }

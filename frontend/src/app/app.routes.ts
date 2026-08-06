@@ -49,21 +49,24 @@ export const routes: Routes = [
         data: { animation: 'DashboardPage' }
       },
       {
+        path: 'discover/enrich',
+        loadComponent: () => import('./features/enrich/enrich.component').then((m) => m.EnrichComponent),
+        data: { animation: 'DiscoverEnrichPage' }
+      },
+      {
         path: 'discover',
         loadComponent: () => import('./features/discover/discover.component').then((m) => m.DiscoverComponent),
         data: { animation: 'DiscoverPage' }
       },
       {
         path: 'prospecting',
-        canActivate: [staffGuard],
-        loadComponent: () => import('./features/prospecting/prospecting.component').then((m) => m.ProspectingComponent),
-        data: { animation: 'ProspectingPage' }
+        redirectTo: 'discover',
+        pathMatch: 'full'
       },
       {
         path: 'enrich',
-        canActivate: [staffGuard],
-        loadComponent: () => import('./features/enrich/enrich.component').then((m) => m.EnrichComponent),
-        data: { animation: 'EnrichPage' }
+        redirectTo: 'discover/enrich',
+        pathMatch: 'full'
       },
       {
         path: 'outreach',
