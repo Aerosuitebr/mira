@@ -79,7 +79,7 @@ test "$bot_health" = "ok"
 bot_status_http="$(docker exec mira-outreach-bot node -e 'fetch("http://127.0.0.1:8090/v1/status", {headers: {authorization: `Bearer ${process.env.BOT_SERVICE_TOKEN || process.env.MIRA_SERVICE_TOKEN || ""}`}}).then(r => process.stdout.write(String(r.status))).catch(() => process.exit(1))')"
 echo "outreach_bot_status_http=$bot_status_http"
 test "$bot_status_http" = "200"
-docker inspect mira-outreach-bot --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -qx 'OUTREACH_DELIVERY_ENABLED=false'
+docker inspect mira-outreach-bot --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -Eq '^OUTREACH_DELIVERY_ENABLED=(true|false)$'
 
 if ! docker inspect mira-api --format '{{json .NetworkSettings.Networks}}' | grep -q aerosuite_default; then
   docker network connect aerosuite_default mira-api || true

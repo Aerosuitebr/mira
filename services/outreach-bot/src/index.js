@@ -83,6 +83,7 @@ async function state() {
     sentToday,
     remainingToday: Math.max(0, config.dailyCap - sentToday),
     restrictionDetected: saved.restrictionDetected === 'true',
+    pausedReason: saved.pausedReason || null,
     deliveryEnabled: config.deliveryEnabled,
     stage2ApprovalRequired: true,
     coldOpened: Number(saved.coldOpened || 0),
@@ -180,6 +181,7 @@ async function sendText(destination, text, requestedInstance) {
     const detail = JSON.stringify(body);
     const error = new Error(`Evolution HTTP ${response.status}: ${detail}`);
     error.rateLimited = response.status === 429 || detail.toLowerCase().includes('rate');
+    error.connectionUnavailable = response.status >= 500 && /connection\s*closed|disconnected|not connected|instance.*close/i.test(detail);
     throw error;
   }
   return body?.key?.id || body?.key?.messageId || body?.messageId || body?.id || null;
@@ -234,9 +236,13 @@ async function processOne() {
     } catch (error) {
       if (error.rateLimited) {
         await requeueProcessing(processingKey, sourceKey, raw, job);
-        await redis.hset(stateKey, 'restrictionDetected', 'true', 'paused', 'true');
+        await redis.hset(stateKey, 'restrictionDetected', 'true', 'paused', 'true', 'pausedReason', 'RESTRICTION');
         await emit('THROTTLED', { messageId: job.messageId, reason: error.message });
         await incrementMetric('THROTTLED');
+      } else if (error.connectionUnavailable) {
+        await requeueProcessing(processingKey, sourceKey, raw, job);
+        await redis.hset(stateKey, 'paused', 'true', 'pausedReason', 'CONNECTION');
+        await emit('RETRYING', { messageId: job.messageId, reason: 'WhatsApp temporariamente indisponível; retomada automática aguardando conexão.' });
       } else {
         const attempts = Number(job.attempts || 0) + 1;
         if (attempts < 3) {
@@ -286,12 +292,37 @@ async function recoverProcessing() {
   }
 }
 
+async function recoverConnectionPause() {
+  if (!config.deliveryEnabled) return;
+  const saved = await redis.hgetall(stateKey);
+  if (saved.pausedReason !== 'CONNECTION') return;
+  const raw = await redis.lindex(priorityQueueKey, 0) || await redis.lindex(queueKey, 0);
+  if (!raw) return;
+  try {
+    const job = JSON.parse(raw);
+    const instance = String(job.evolutionInstance || evolution.instance || '').trim();
+    if (!instance || !evolution.baseUrl || !evolution.apiKey) return;
+    const response = await fetch(`${evolution.baseUrl}/instance/connectionState/${encodeURIComponent(instance)}`, {
+      headers: { accept: 'application/json', apikey: evolution.apiKey }
+    });
+    const body = await response.json().catch(() => ({}));
+    const connectionState = String(body?.instance?.state || body?.state || '').toLowerCase();
+    if (response.ok && ['open', 'connected'].includes(connectionState)) {
+      await redis.hset(stateKey, 'paused', 'false', 'restrictionDetected', 'false');
+      await redis.hdel(stateKey, 'pausedReason');
+      console.log(`delivery resumed automatically for ${instance}`);
+    }
+  } catch (error) {
+    console.error('automatic connection recovery check failed', error.message);
+  }
+}
+
 app.get('/health', async (_req, res) => {
   try { await redis.ping(); res.json({ status: 'ok' }); } catch { res.status(503).json({ status: 'redis-unavailable' }); }
 });
 app.get('/v1/status', authorize, async (_req, res) => res.json(await state()));
-app.post('/v1/pause', authorize, async (_req, res) => { await redis.hset(stateKey, 'paused', 'true'); res.json(await state()); });
-app.post('/v1/resume', authorize, async (_req, res) => { await redis.hset(stateKey, 'paused', 'false'); res.json(await state()); });
+app.post('/v1/pause', authorize, async (_req, res) => { await redis.hset(stateKey, 'paused', 'true', 'pausedReason', 'MANUAL'); res.json(await state()); });
+app.post('/v1/resume', authorize, async (_req, res) => { await redis.hset(stateKey, 'paused', 'false'); await redis.hdel(stateKey, 'pausedReason'); res.json(await state()); });
 app.post('/v1/campaigns/:id/pause', authorize, async (req, res) => { await redis.sadd(pausedCampaignsKey, req.params.id); res.json({ campaignId: req.params.id, paused: true }); });
 app.post('/v1/campaigns/:id/resume', authorize, async (req, res) => { await redis.srem(pausedCampaignsKey, req.params.id); res.json({ campaignId: req.params.id, paused: false }); });
 app.get('/v1/conversations', authorize, async (req, res) => {
@@ -319,6 +350,7 @@ app.post('/webhooks/evolution', async (req, res) => {
 // A entrega é bloqueada em produção por OUTREACH_DELIVERY_ENABLED=false até liberar a conta.
 await recoverProcessing();
 setInterval(processOne, 1_000).unref();
+setInterval(recoverConnectionPause, 15_000).unref();
 setInterval(flushEvents, 15_000).unref();
 setInterval(sendReport, 15 * 60 * 1_000).unref();
 app.listen(port, () => console.log(`outreach-bot listening on ${port}, paused=${config.paused}`));

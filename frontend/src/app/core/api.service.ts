@@ -237,6 +237,7 @@ export interface CampaignDetail extends Campaign {
 export interface OutreachBotStatus {
   connected: boolean;
   paused: boolean;
+  pausedReason: 'CONNECTION' | 'RESTRICTION' | 'MANUAL' | null;
   queue: number;
   step1Queue: number;
   step2Queue: number;
