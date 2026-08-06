@@ -44,8 +44,8 @@
       <button type="button" class="step-tab" [class.step-tab--active]="activeStep === 3" [attr.aria-current]="activeStep === 3 ? 'step' : null" (click)="goToStep(3)">
         <span class="step-num">3</span>
         <span class="step-copy">
-          <strong>Automação</strong>
-          <small>WhatsApp + e-mail</small>
+          <strong>Abordagem</strong>
+          <small>Escolha como conversar</small>
         </span>
       </button>
     </nav>
@@ -256,44 +256,65 @@
           <section class="pp-glass command-panel auto-step-panel">
             <div class="panel-heading">
               <div>
-                <span class="pp-eyebrow">Etapa 3 · Automação</span>
+                <span class="pp-eyebrow">Etapa 3 · Abordagem</span>
                 @if (outreachFlow === 'TWO_STEP') {
-                  <h2>WhatsApp em 2 etapas</h2>
+                  <h2>Prospecção em massa</h2>
                 } @else {
-                  <h2>Campanha por e-mail</h2>
+                  <h2>Comunicação específica</h2>
                 }
                 <p class="panel-lead">
-                  Enriquecer contatos e preparar a primeira mensagem curta para revisão.
+                  Um fluxo claro para cada tipo de conversa, sem colocar sua conta em risco.
                 </p>
               </div>
               <button type="button" class="pp-btn pp-btn--ghost" (click)="goToStep(2)">Ver lista</button>
             </div>
 
-            <div class="outreach-flow-picker" aria-label="Escolha o fluxo de envio">
+            <div class="flow-decision-heading">
+              <span>Como você quer abordar?</span>
+              <p>Escolha pelo tipo de conversa. O MIRA cuida da regra de envio.</p>
+            </div>
+
+            <div class="outreach-flow-picker" aria-label="Escolha o tipo de abordagem">
               <button type="button" class="outreach-flow-choice" [class.outreach-flow-choice--active]="outreachFlow === 'TWO_STEP'" [attr.aria-pressed]="outreachFlow === 'TWO_STEP'" (click)="outreachFlow = 'TWO_STEP'">
-                <span>WhatsApp protegido</span>
-                <strong>Conversar em 2 etapas</strong>
-                <small>Abertura curta, resposta do lead, aprovação e proposta completa.</small>
+                <span class="flow-choice-number">01</span>
+                <span class="flow-choice-copy">
+                  <em>Lista de leads</em>
+                  <strong>Prospecção em massa</strong>
+                  <small>Envie uma abertura curta. A segunda mensagem só é liberada para quem responder.</small>
+                </span>
+                <span class="flow-choice-check" aria-hidden="true">✓</span>
               </button>
               <button type="button" class="outreach-flow-choice" [class.outreach-flow-choice--active]="outreachFlow === 'DIRECT'" [attr.aria-pressed]="outreachFlow === 'DIRECT'" (click)="outreachFlow = 'DIRECT'">
-                <span>E-mail direto</span>
-                <strong>Revisar e enviar o lote</strong>
-                <small>Copy, revisão e confirmação em uma única campanha.</small>
+                <span class="flow-choice-number">02</span>
+                <span class="flow-choice-copy">
+                  <em>Um contato por vez</em>
+                  <strong>Comunicação específica</strong>
+                  <small>Escreva uma mensagem personalizada e escolha WhatsApp ou e-mail antes de enviar.</small>
+                </span>
+                <span class="flow-choice-check" aria-hidden="true">✓</span>
               </button>
             </div>
 
             @if (outreachFlow === 'TWO_STEP') {
+            <div class="meta-rule" role="note">
+              <span class="meta-rule__icon">M</span>
+              <div>
+                <strong>Por que existe uma pausa?</strong>
+                <p>A Meta pode limitar a conta quando uma sequência é enviada sem interação. Por isso, o MIRA envia a abertura e aguarda a resposta antes de liberar a continuação.</p>
+              </div>
+              <span class="meta-rule__status">Proteção ativa</span>
+            </div>
             <ol class="two-step-journey" aria-label="Jornada da abordagem WhatsApp protegida">
-              <li><b>1</b><span><strong>Preparar</strong>Lista entra na fila; nada é enviado.</span></li>
-              <li><b>2</b><span><strong>Abertura curta</strong>O robô envia texto sem link, na cadência definida.</span></li>
-              <li><b>3</b><span><strong>Resposta</strong>O lead responde pelo WhatsApp.</span></li>
-              <li><b>4</b><span><strong>Aprovar</strong>Responsáveis recebem o link e revisam a proposta.</span></li>
-              <li><b>5</b><span><strong>Etapa 2</strong>Só após aprovação, a proposta completa entra na fila.</span></li>
+              <li class="journey-done"><b>1</b><span><strong>Selecionar lista</strong>Defina quem receberá a abertura.</span></li>
+              <li class="journey-current"><b>2</b><span><strong>Enviar abertura</strong>Uma mensagem curta, sem link.</span></li>
+              <li class="journey-wait"><b>3</b><span><strong>Aguardar resposta</strong>O fluxo pausa automaticamente.</span></li>
+              <li><b>4</b><span><strong>Revisar continuação</strong>Personalize apenas para quem respondeu.</span></li>
+              <li><b>5</b><span><strong>Enviar mensagem 2</strong>Proposta completa e aprovada.</span></li>
             </ol>
             <div class="auto-prospect-panel auto-prospect-panel--standalone">
               <div class="auto-prospect-head">
                 <div>
-                  <h3>Preparar etapa 1</h3>
+                  <h3>Preparar primeira mensagem</h3>
                   <p>
                     Fase 1: sem disparos. A abertura não inclui links e fica na fila para revisão.
                   </p>
@@ -314,7 +335,7 @@
                   [disabled]="startingAutoProspect"
                   (click)="startSelectedTwoStepQueue()"
                 >
-                  @if (startingAutoProspect) { Preparando... } @else { Preparar etapa 1 para {{ selectedCompanyIds.size }} leads }
+                  @if (startingAutoProspect) { Preparando... } @else { Revisar abertura para {{ selectedCompanyIds.size }} leads }
                 </button>
               </div>
 
@@ -424,12 +445,17 @@
             </div>
             } @else {
               <div class="direct-campaign-panel">
-                <span class="pp-eyebrow">E-mail direto</span>
-                <h3>Uma única etapa de envio</h3>
-                <p>Os {{ selectedCompanyIds.size }} leads selecionados irão para a tela de copy e revisão. Este fluxo não usa aprovação após resposta.</p>
+                <span class="pp-eyebrow">Comunicação específica</span>
+                <h3>Uma conversa, com contexto</h3>
+                <p>Revise a mensagem, personalize o conteúdo e escolha o canal. Não há sequência automática: cada envio é feito conscientemente.</p>
+                <div class="specific-summary">
+                  <span [class.specific-summary__warning]="selectedCompanyIds.size !== 1"><b>{{ selectedCompanyIds.size }}</b> {{ selectedCompanyIds.size === 1 ? 'contato selecionado' : 'contatos selecionados · escolha apenas 1' }}</span>
+                  <span>WhatsApp ou e-mail</span>
+                  <span>Envio após revisão</span>
+                </div>
                 <div class="direct-campaign-panel__actions">
                   <button type="button" class="pp-btn pp-btn--ghost" (click)="goToStep(2)">Ajustar lista</button>
-                  <button type="button" class="pp-btn pp-btn--primary" (click)="openDirectCampaign()">Continuar para campanha de e-mail</button>
+                  <button type="button" class="pp-btn pp-btn--primary" [disabled]="selectedCompanyIds.size !== 1" (click)="openDirectCampaign()">Escrever mensagem</button>
                 </div>
               </div>
             }

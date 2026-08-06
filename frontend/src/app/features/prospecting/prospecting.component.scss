@@ -311,14 +311,25 @@
 .outreach-flow-picker {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-  margin: 1rem 0;
+  gap: 0.875rem;
+  margin: 0 0 1.25rem;
+}
+
+.flow-decision-heading {
+  margin: 0 0 0.85rem;
+
+  span { display: block; color: var(--pp-text-primary); font-size: 1.05rem; font-weight: 800; }
+  p { margin: 0.25rem 0 0; color: var(--pp-text-muted); font-size: 0.82rem; }
 }
 
 .outreach-flow-choice {
+  position: relative;
   display: grid;
-  gap: 0.3rem;
-  padding: 1rem;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 0.85rem;
+  min-height: 132px;
+  padding: 1.15rem;
   border: 1px solid var(--pp-glass-border);
   border-radius: var(--pp-radius-md);
   background: rgba(15, 23, 42, 0.28);
@@ -326,21 +337,42 @@
   cursor: pointer;
   text-align: left;
 
-  span {
-    color: var(--pp-cyan);
-    font-size: 0.7rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
+  transition: transform .2s ease, border-color .2s ease, background .2s ease;
 
-  strong { font-size: 1rem; }
-  small { color: var(--pp-text-secondary); line-height: 1.4; }
+  &:hover { transform: translateY(-2px); border-color: rgba(129, 140, 248, 0.5); }
+  .flow-choice-number { color: #7dd3fc; font-size: 0.72rem; font-weight: 900; letter-spacing: .08em; }
+  .flow-choice-copy {
+    display: grid;
+    gap: .28rem;
+    em { color: #7dd3fc; font-size: .68rem; font-style: normal; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    strong { color: var(--pp-text-primary); font-size: 1.05rem; }
+    small { color: var(--pp-text-secondary); font-size: .79rem; line-height: 1.5; }
+  }
+  .flow-choice-check { display: grid; place-items: center; width: 1.35rem; height: 1.35rem; border: 1px solid rgba(148, 163, 184, .35); border-radius: 999px; color: transparent; font-size: .75rem; }
 
   &--active {
     border-color: rgba(129, 140, 248, 0.75);
-    background: rgba(99, 102, 241, 0.14);
+    background: linear-gradient(145deg, rgba(99, 102, 241, 0.18), rgba(14, 165, 233, .07));
+    box-shadow: inset 0 0 0 1px rgba(129, 140, 248, .16), 0 12px 28px rgba(2, 6, 23, .18);
+    .flow-choice-check { border-color: #818cf8; background: #6366f1; color: white; }
   }
+}
+
+.meta-rule {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: .9rem;
+  margin-bottom: 1rem;
+  padding: .85rem 1rem;
+  border: 1px solid rgba(45, 212, 191, .25);
+  border-radius: 12px;
+  background: rgba(13, 148, 136, .07);
+
+  &__icon { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 9px; background: #fff; color: #2563eb; font-weight: 1000; }
+  strong { font-size: .82rem; }
+  p { margin: .18rem 0 0; color: var(--pp-text-secondary); font-size: .75rem; line-height: 1.45; }
+  &__status { padding: .3rem .55rem; border-radius: 999px; background: rgba(16, 185, 129, .14); color: #a7f3d0; font-size: .65rem; font-weight: 800; white-space: nowrap; }
 }
 
 .two-step-journey {
@@ -361,6 +393,10 @@
     border-radius: 10px;
     background: rgba(15, 23, 42, 0.34);
   }
+
+  .journey-done { border-color: rgba(45, 212, 191, .25); b { background: #0f766e; } }
+  .journey-current { border-color: rgba(129, 140, 248, .55); background: rgba(99, 102, 241, .12); }
+  .journey-wait { border-style: dashed; b { background: rgba(245, 158, 11, .2); color: #fcd34d; } }
 
   b {
     display: grid;
@@ -394,6 +430,16 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+.specific-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+
+  span { padding: .42rem .65rem; border: 1px solid rgba(148, 163, 184, .18); border-radius: 999px; background: rgba(15, 23, 42, .45); color: var(--pp-text-secondary); font-size: .72rem; }
+  b { color: #7dd3fc; }
+  &__warning { border-color: rgba(245, 158, 11, .32) !important; color: #fcd34d !important; }
 }
 
 .reply-report {
@@ -1435,6 +1481,9 @@
   .two-step-journey {
     grid-template-columns: 1fr;
   }
+
+  .meta-rule { grid-template-columns: auto 1fr; }
+  .meta-rule__status { grid-column: 2; justify-self: start; }
 }
 
 @media (max-width: 520px) {
