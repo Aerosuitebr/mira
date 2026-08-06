@@ -33,11 +33,17 @@
 
   <div class="login-panel pp-glass pp-enter pp-stagger-2">
     <div class="panel-header">
-      <h2>Acessar o MIRA</h2>
-      <p>Entre com suas credenciais corporativas</p>
+      <h2>{{ publicAccess ? (registering ? 'Crie seu acesso gratuito' : 'Entre no MIRA') : 'Acessar o MIRA' }}</h2>
+      <p>{{ publicAccess ? 'Pesquise e use seu contato gratuito com uma conta exclusiva.' : 'Entre com suas credenciais corporativas' }}</p>
     </div>
 
     <form [formGroup]="form" (ngSubmit)="submit()">
+      @if (publicAccess && registering) {
+        <div class="pp-field">
+          <label for="fullName">Nome completo</label>
+          <input id="fullName" class="pp-input" type="text" formControlName="fullName" autocomplete="name" placeholder="Seu nome" />
+        </div>
+      }
       <div class="pp-field">
         <label for="email">E-mail</label>
         <input id="email" class="pp-input" type="email" formControlName="email" autocomplete="username" placeholder="voce@empresa.com" />
@@ -56,14 +62,22 @@
           <span class="pp-loading-dots"><span></span><span></span><span></span></span>
           Entrando...
         } @else {
-          Entrar no MIRA
+          {{ publicAccess && registering ? 'Criar conta e continuar' : 'Entrar no MIRA' }}
         }
       </button>
     </form>
 
-    <div class="demo-hint">
-      <span class="pp-badge pp-badge--violet">Demo</span>
-      <code>demo&#64;prospectportal.com</code> · <code>demo123</code>
-    </div>
+    @if (publicAccess) {
+      <div class="demo-hint">
+        <button type="button" class="pp-btn pp-btn--ghost" (click)="toggleMode()">
+          {{ registering ? 'Já tenho cadastro' : 'Quero criar minha conta' }}
+        </button>
+      </div>
+    } @else {
+      <div class="demo-hint">
+        <span class="pp-badge pp-badge--violet">Demo</span>
+        <code>demo&#64;prospectportal.com</code> · <code>demo123</code>
+      </div>
+    }
   </div>
 </section>

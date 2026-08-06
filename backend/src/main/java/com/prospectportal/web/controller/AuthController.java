@@ -3,6 +3,7 @@ package com.prospectportal.web.controller;
 import com.prospectportal.module.auth.AuthService;
 import com.prospectportal.web.dto.AuthResponse;
 import com.prospectportal.web.dto.LoginRequest;
+import com.prospectportal.web.dto.PublicRegisterRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,5 +23,15 @@ public class AuthController {
     @PostMapping("/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    @PostMapping("/public/login")
+    public AuthResponse publicLogin(@Valid @RequestBody LoginRequest request) {
+        return authService.publicLogin(request);
+    }
+
+    @PostMapping("/public/register")
+    public AuthResponse registerPublic(@Valid @RequestBody PublicRegisterRequest request) {
+        return authService.registerPublic(request);
     }
 }

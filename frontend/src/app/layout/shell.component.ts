@@ -26,7 +26,9 @@ export class ShellComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.resetLegacySelectionSession();
-    this.notifications.start();
+    if (!this.auth.isPublicUser()) {
+      this.notifications.start();
+    }
   }
 
   ngOnDestroy(): void {

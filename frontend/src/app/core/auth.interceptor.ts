@@ -7,14 +7,15 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const token = auth.token();
   const isPublicApiRequest =
-    req.url.includes('/public/') || req.url.includes('/webhooks/evolution/approvals/');
+    (req.url.includes('/api/public/') && !req.url.includes('/api/auth/public/')) ||
+    req.url.includes('/webhooks/evolution/approvals/');
   if (token && !isPublicApiRequest) {
     req = req.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
   }
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
-      const isAuthRequest = req.url.includes('/auth/login');
+      const isAuthRequest = req.url.includes('/auth/login') || req.url.includes('/auth/public/');
       const isCnaeCatalogRequest = req.url.includes('/discovery/cnaes');
       const isDiscoverySearchRequest = req.url.includes('/discovery/companies');
       // WhatsApp connect/qr pode falhar no provedor sem invalidar a sessão do MIRA.

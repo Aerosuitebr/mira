@@ -8,6 +8,7 @@ public record AuthResponse(
     UUID tenantId,
     String fullName,
     String email,
+    String role,
     String planCode,
     int creditsRemaining,
     int monthlyCredits

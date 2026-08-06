@@ -22,26 +22,47 @@ export class LoginComponent {
 
   loading = false;
   error = '';
+  publicAccess = false;
+  registering = false;
 
   form = this.fb.nonNullable.group({
-    email: ['demo@prospectportal.com', [Validators.required, Validators.email]],
-    password: ['demo123', Validators.required]
+    fullName: ['', [Validators.maxLength(200)]],
+    email: ['', [Validators.required, Validators.email]],
+    password: ['', [Validators.required, Validators.minLength(8)]]
   });
 
+  constructor() {
+    this.publicAccess =
+      this.route.snapshot.queryParamMap.get('origem') === 'resolva-jato' || this.auth.publicMode();
+    if (this.publicAccess) {
+      this.auth.activatePublicMode();
+      this.registering = true;
+    } else {
+      this.form.patchValue({ email: 'demo@prospectportal.com', password: 'demo123' });
+    }
+  }
+
   submit(): void {
-    if (this.form.invalid) {
+    if (this.form.invalid || (this.publicAccess && this.registering && !this.form.controls.fullName.value.trim())) {
       return;
     }
     this.loading = true;
     this.error = '';
-    const { email, password } = this.form.getRawValue();
-    this.auth.login(email, password).subscribe({
+    const { fullName, email, password } = this.form.getRawValue();
+    const request = this.publicAccess && this.registering
+      ? this.auth.registerPublic(fullName, email, password)
+      : this.auth.login(email, password);
+    request.subscribe({
       next: () => {
         const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
         void this.router.navigateByUrl(this.safeReturnUrl(returnUrl));
       },
-      error: () => {
-        this.error = 'Credenciais inválidas. Use demo@prospectportal.com / demo123';
+      error: (response) => {
+        this.error = response.status === 409
+          ? 'Este e-mail já possui cadastro. Entre na sua conta.'
+          : this.publicAccess
+            ? 'Não foi possível continuar. Confira os dados informados.'
+            : 'Credenciais inválidas. Use demo@prospectportal.com / demo123';
         this.loading = false;
       },
       complete: () => {
@@ -50,8 +71,15 @@ export class LoginComponent {
     });
   }
 
+  toggleMode(): void {
+    this.registering = !this.registering;
+    this.error = '';
+  }
+
   private safeReturnUrl(value: string | null): string {
-    if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
+    if (!value || !value.startsWith('/') || value.startsWith('//')) {
+      return this.publicAccess ? '/escolher-busca' : '/';
+    }
     return value;
   }
 }

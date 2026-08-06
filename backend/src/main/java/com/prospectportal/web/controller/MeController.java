@@ -19,6 +19,9 @@ public class MeController {
     @GetMapping
     public AuthResponse me() {
         var user = authContext.currentUser();
-        return new AuthResponse(null, user.userId(), user.tenantId(), user.fullName(), user.email(), "PROFESSIONAL", 1880, 2000);
+        return new AuthResponse(
+            null, user.userId(), user.tenantId(), user.fullName(), user.email(), user.role(),
+            "PROFESSIONAL", 1880, 2000
+        );
     }
 }

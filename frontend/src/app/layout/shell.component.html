@@ -18,6 +18,22 @@
     </div>
 
     <nav class="pp-enter pp-stagger-2" aria-label="Navegação principal" (click)="closeMobileMenu()">
+      @if (auth.isPublicUser()) {
+        <span class="nav-group-label">Acesso gratuito</span>
+        <a routerLink="/discover" routerLinkActive="active" class="nav-item">
+          <span class="nav-step">01</span>
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+          </span>
+          <span>Pesquisar empresas</span>
+        </a>
+        <a routerLink="/profissionais" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+          </span>
+          <span>Buscar profissionais</span>
+        </a>
+      } @else {
       <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -98,6 +114,7 @@
         </span>
         <span>Identidade de envio</span>
       </a>
+      }
     </nav>
 
     @if (auth.session(); as session) {

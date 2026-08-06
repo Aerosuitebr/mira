@@ -119,9 +119,22 @@ public class SecurityConfig {
 
                 ).permitAll()
 
+                // O visitante do Resolva Jato pode apenas consultar o diretório e
+                // consumir o contato gratuito. Toda mutação comercial continua restrita.
+                .requestMatchers(HttpMethod.GET,
+                    "/api/discovery/cnaes/**",
+                    "/api/discovery/companies",
+                    "/api/discovery/companies/geo",
+                    "/api/discovery/companies/by-ids",
+                    "/api/professionals/search",
+                    "/api/professionals/location"
+                ).hasAnyRole("PUBLIC_USER", "SELLER", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/professionals/*/contact")
+                    .hasAnyRole("PUBLIC_USER", "SELLER", "ADMIN")
+
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-                .anyRequest().authenticated()
+                .anyRequest().hasAnyRole("SELLER", "ADMIN")
 
             )
 
