@@ -7,11 +7,13 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.List;
 
 /** Publica somente trabalho do fluxo WhatsApp protegido. O MIRA não envia o contato frio. */
 @Service
 public class OutreachBotQueueService {
-    private static final String QUEUE = "mira:outreach:jobs";
+    private static final String COLD_QUEUE = "mira:outreach:jobs";
+    private static final String PRIORITY_QUEUE = "mira:outreach:priority";
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
 
@@ -33,7 +35,7 @@ public class OutreachBotQueueService {
                 "step2Text", step2Text,
                 "approachId", "DIRECT"
             ));
-            redis.opsForList().rightPush(QUEUE, payload);
+            redis.opsForList().rightPush(COLD_QUEUE, payload);
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("Não foi possível enfileirar outreach-bot", ex);
         }
@@ -54,9 +56,38 @@ public class OutreachBotQueueService {
                 "step2Text", message.getBody(),
                 "approachId", "APPROVED_FOLLOW_UP"
             ));
-            redis.opsForList().rightPush(QUEUE, payload);
+            redis.opsForList().rightPush(PRIORITY_QUEUE, payload);
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("Não foi possível enfileirar etapa 2 no outreach-bot", ex);
+        }
+    }
+
+    public void requeue(OutreachMessage message) {
+        if (message.getOutreachStep() == 2) {
+            enqueueApprovedStep2(message);
+            return;
+        }
+        enqueue(message, message.getLead().getCompany().getTradeName(), message.getBody());
+    }
+
+    /** Atualiza o snapshot ainda pendente sem alterar a posição na fila. */
+    @SuppressWarnings("unchecked")
+    public void updateQueuedText(OutreachMessage message) {
+        for (String queue : List.of(COLD_QUEUE, PRIORITY_QUEUE)) {
+            List<String> jobs = redis.opsForList().range(queue, 0, -1);
+            if (jobs == null) continue;
+            for (int index = 0; index < jobs.size(); index++) {
+                String raw = jobs.get(index);
+                try {
+                    Map<String, Object> payload = objectMapper.readValue(raw, Map.class);
+                    if (!message.getId().toString().equals(String.valueOf(payload.get("messageId")))) continue;
+                    payload.put(message.getOutreachStep() == 2 ? "step2Text" : "step1Text", message.getBody());
+                    redis.opsForList().set(queue, index, objectMapper.writeValueAsString(payload));
+                    return;
+                } catch (JsonProcessingException ignored) {
+                    // Item inválido será tratado pelo consumidor e não bloqueia a edição.
+                }
+            }
         }
     }
 }

@@ -14,6 +14,7 @@ export function reportDay(now = new Date(), timeZone = 'America/Sao_Paulo') {
 }
 
 export function selectStep1Text(job, random = Math.random) {
+  if (String(job.step1Text || '').trim()) return String(job.step1Text).trim();
   const company = String(job.companyName || '').trim();
   if (!company) return job.step1Text;
   const variants = [

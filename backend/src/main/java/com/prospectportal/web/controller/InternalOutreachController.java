@@ -142,6 +142,10 @@ public class InternalOutreachController {
                 message.setErrorDetail(stringValue(payload.get("reason")));
             }
             case "THROTTLED" -> message.setStatus("THROTTLED");
+            case "RETRYING" -> {
+                message.setStatus("QUEUED_BOT");
+                message.setErrorDetail(stringValue(payload.get("reason")));
+            }
             default -> { return; }
         }
         messageRepository.save(message);
@@ -157,6 +161,7 @@ public class InternalOutreachController {
             java.util.List.of("SENT", "WAITING_REPLY", "REPLIED"));
         long failed = messageRepository.countByCampaignIdAndOutreachStepAndStatusIn(campaignId, (short) 1,
             java.util.List.of("FAILED", "SKIPPED"));
+        if ("PAUSED".equals(campaign.getStatus())) return;
         campaign.setStatus(pending > 0 ? "SENDING" : (failed > 0 ? (delivered > 0 ? "PARTIAL" : "FAILED") : "SENT"));
         campaignRepository.save(campaign);
     }

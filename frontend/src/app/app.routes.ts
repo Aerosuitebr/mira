@@ -72,6 +72,12 @@ export const routes: Routes = [
         data: { animation: 'OutreachPage' }
       },
       {
+        path: 'campaigns',
+        canActivate: [staffGuard],
+        loadComponent: () => import('./features/campaigns/campaign-control.component').then((m) => m.CampaignControlComponent),
+        data: { animation: 'CampaignControlPage' }
+      },
+      {
         path: 'whatsapp',
         canActivate: [staffGuard],
         loadComponent: () =>

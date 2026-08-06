@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.util.Map;
+import java.util.UUID;
 
 /** Proxy interno: a UI nunca acessa diretamente o outreach-bot. */
 @Service
@@ -31,6 +32,9 @@ public class OutreachBotGatewayService {
     public Map<String, Object> resume() {
         return requestPost("/v1/resume");
     }
+
+    public Map<String, Object> pauseCampaign(UUID id) { return requestPost("/v1/campaigns/" + id + "/pause"); }
+    public Map<String, Object> resumeCampaign(UUID id) { return requestPost("/v1/campaigns/" + id + "/resume"); }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> requestGet(String path) {

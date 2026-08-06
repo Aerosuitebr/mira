@@ -220,10 +220,28 @@ export interface OutreachReport {
   followUpsFailed: number;
 }
 
+export interface CampaignMessageDetail {
+  id: string; companyId: string; companyName: string; cnpj: string; city: string; state: string;
+  contactName: string | null; contactRole: string | null; recipient: string | null; email: string | null;
+  step: number; channel: string; status: string; subject: string | null; body: string;
+  createdAt: string; sentAt: string | null; repliedAt: string | null; approvedAt: string | null;
+  providerMessageId: string | null; errorDetail: string | null; editable: boolean; retryable: boolean;
+}
+
+export interface CampaignDetail extends Campaign {
+  followUpBody: string | null; total: number; queued: number; sent: number; waitingReply: number;
+  replied: number; awaitingApproval: number; step2Queued: number; step2Sent: number;
+  failed: number; skipped: number; messages: CampaignMessageDetail[];
+}
+
 export interface OutreachBotStatus {
   connected: boolean;
   paused: boolean;
   queue: number;
+  step1Queue: number;
+  step2Queue: number;
+  processing: number;
+  deadLetter: number;
   pendingEvents: number;
   sentToday: number;
   remainingToday: number;
@@ -234,6 +252,8 @@ export interface OutreachBotStatus {
   repliesReceived: number;
   step2Sent: number;
   failed: number;
+  nextColdAt: number | null;
+  estimatedDays: number;
   cadence: { minSeconds: number; maxSeconds: number; dailyCap: number };
 }
 
@@ -575,6 +595,19 @@ export class ApiService {
 
   outreachReport() {
     return this.http.get<OutreachReport>(`${environment.apiUrl}/outreach/report`);
+  }
+
+  campaignDetail(id: string) { return this.http.get<CampaignDetail>(`${environment.apiUrl}/outreach/campaigns/${id}`); }
+  updateCampaign(id: string, payload: { name?: string; followUpBody?: string }) {
+    return this.http.put<CampaignDetail>(`${environment.apiUrl}/outreach/campaigns/${id}`, payload);
+  }
+  pauseCampaign(id: string) { return this.http.post<CampaignDetail>(`${environment.apiUrl}/outreach/campaigns/${id}/pause`, {}); }
+  resumeCampaign(id: string) { return this.http.post<CampaignDetail>(`${environment.apiUrl}/outreach/campaigns/${id}/resume`, {}); }
+  updateCampaignMessage(campaignId: string, messageId: string, payload: { subject?: string; body: string }) {
+    return this.http.put<CampaignMessageDetail>(`${environment.apiUrl}/outreach/campaigns/${campaignId}/messages/${messageId}`, payload);
+  }
+  retryCampaignMessage(campaignId: string, messageId: string) {
+    return this.http.post<CampaignMessageDetail>(`${environment.apiUrl}/outreach/campaigns/${campaignId}/messages/${messageId}/retry`, {});
   }
 
   outreachBotStatus() {

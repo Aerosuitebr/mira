@@ -5,6 +5,11 @@ import { canOpenColdConversation, jobStep, nextColdAt, normalizePhone, reportDay
 const port = Number(process.env.PORT || 8090);
 const redis = new Redis(process.env.REDIS_URL || 'redis://redis:6379');
 const queueKey = process.env.OUTREACH_QUEUE_KEY || 'mira:outreach:jobs';
+const priorityQueueKey = process.env.OUTREACH_PRIORITY_QUEUE_KEY || 'mira:outreach:priority';
+const processingColdKey = `${queueKey}:processing`;
+const processingPriorityKey = `${priorityQueueKey}:processing`;
+const deadLetterKey = process.env.OUTREACH_DEAD_LETTER_KEY || 'mira:outreach:dead';
+const pausedCampaignsKey = 'mira:outreach:paused-campaigns';
 const eventQueueKey = process.env.OUTREACH_EVENT_QUEUE_KEY || 'mira:outreach:events';
 const stateKey = 'mira:outreach:bot:state';
 const conversationPrefix = 'mira:outreach:conversation:';
@@ -60,13 +65,20 @@ async function state() {
       throttled: '0'
     });
   }
-  const queue = await redis.llen(queueKey);
+  const step1Queue = await redis.llen(queueKey);
+  const step2Queue = await redis.llen(priorityQueueKey);
+  const processing = (await redis.llen(processingColdKey)) + (await redis.llen(processingPriorityKey));
+  const deadLetter = await redis.llen(deadLetterKey);
   const pendingEvents = await redis.llen(eventQueueKey);
   const sentToday = Number(saved.sentToday || 0);
   return {
     connected: true,
     paused: saved.paused == null ? config.paused : saved.paused === 'true',
-    queue,
+    queue: step1Queue + step2Queue + processing,
+    step1Queue,
+    step2Queue,
+    processing,
+    deadLetter,
     pendingEvents,
     sentToday,
     remainingToday: Math.max(0, config.dailyCap - sentToday),
@@ -77,6 +89,8 @@ async function state() {
     repliesReceived: Number(saved.repliesReceived || 0),
     step2Sent: Number(saved.step2Sent || 0),
     failed: Number(saved.failed || 0),
+    nextColdAt: Number(saved.nextColdAt || 0) || null,
+    estimatedDays: Math.ceil(step1Queue / Math.max(1, config.dailyCap)),
     cadence: { minSeconds: config.minIntervalSeconds, maxSeconds: config.maxIntervalSeconds, dailyCap: config.dailyCap }
   };
 }
@@ -183,17 +197,22 @@ async function processOne() {
   if (current.paused) return;
   processing = true;
   try {
-    const raw = await redis.lpop(queueKey);
+    let sourceKey = priorityQueueKey;
+    let processingKey = processingPriorityKey;
+    let raw = await takeEligible(sourceKey, processingKey);
+    if (!raw) {
+      if (!(await canOpenNextColdConversation())) return;
+      sourceKey = queueKey;
+      processingKey = processingColdKey;
+      raw = await takeEligible(sourceKey, processingKey);
+    }
     if (!raw) return;
     const job = JSON.parse(raw);
     const isStep2 = jobStep(job) === 'STEP2';
     const text = isStep2 ? job.step2Text : selectStep1Text(job);
-  if (!isStep2 && !(await canOpenNextColdConversation())) {
-      await redis.lpush(queueKey, raw);
-      return;
-    }
     if (!normalizePhone(job.phone) || !text) {
       await emit('SKIPPED', { messageId: job.messageId, reason: 'Contato sem WhatsApp ou texto' });
+      await redis.lrem(processingKey, 1, raw);
       return;
     }
     try {
@@ -201,6 +220,7 @@ async function processOne() {
       if (isStep2) {
         await emit('STEP2_SENT', { messageId: job.messageId, phone: normalizePhone(job.phone), providerMessageId, step2Text: job.step2Text });
         await incrementMetric('STEP2_SENT');
+        await redis.lrem(processingKey, 1, raw);
         return;
       }
       await redis.multi()
@@ -209,15 +229,23 @@ async function processOne() {
         .exec();
       await emit('STEP1_SENT', { messageId: job.messageId, phone: normalizePhone(job.phone), providerMessageId, step1Text: text });
       await incrementMetric('STEP1_SENT');
+      await redis.lrem(processingKey, 1, raw);
     } catch (error) {
       if (error.rateLimited) {
-        await redis.lpush(queueKey, raw);
+        await requeueProcessing(processingKey, sourceKey, raw, job);
         await redis.hset(stateKey, 'restrictionDetected', 'true', 'paused', 'true');
         await emit('THROTTLED', { messageId: job.messageId, reason: error.message });
         await incrementMetric('THROTTLED');
       } else {
-        await emit('FAILED', { messageId: job.messageId, reason: error.message });
-        await incrementMetric('FAILED');
+        const attempts = Number(job.attempts || 0) + 1;
+        if (attempts < 3) {
+          await requeueProcessing(processingKey, sourceKey, raw, { ...job, attempts });
+          await emit('RETRYING', { messageId: job.messageId, reason: error.message, attempt: attempts });
+        } else {
+          await redis.multi().lrem(processingKey, 1, raw).rpush(deadLetterKey, JSON.stringify({ ...job, attempts, failedAt: new Date().toISOString(), error: error.message })).exec();
+          await emit('FAILED', { messageId: job.messageId, reason: `${error.message} (após ${attempts} tentativas)` });
+          await incrementMetric('FAILED');
+        }
       }
     }
   } catch (error) {
@@ -227,12 +255,44 @@ async function processOne() {
   }
 }
 
+async function takeEligible(sourceKey, processingKey) {
+  const size = await redis.llen(sourceKey);
+  for (let index = 0; index < size; index += 1) {
+    const raw = await redis.lmove(sourceKey, processingKey, 'LEFT', 'RIGHT');
+    if (!raw) return null;
+    try {
+      const job = JSON.parse(raw);
+      if (!(await redis.sismember(pausedCampaignsKey, String(job.campaignId || '')))) return raw;
+    } catch {
+      await redis.lrem(processingKey, 1, raw);
+      continue;
+    }
+    await redis.multi().lrem(processingKey, 1, raw).rpush(sourceKey, raw).exec();
+  }
+  return null;
+}
+
+async function requeueProcessing(processingKey, sourceKey, raw, job) {
+  await redis.multi().lrem(processingKey, 1, raw).rpush(sourceKey, JSON.stringify(job)).exec();
+}
+
+async function recoverProcessing() {
+  for (const [processingKey, sourceKey] of [[processingPriorityKey, priorityQueueKey], [processingColdKey, queueKey]]) {
+    while (await redis.llen(processingKey)) {
+      const raw = await redis.lpop(processingKey);
+      if (raw) await redis.lpush(sourceKey, raw);
+    }
+  }
+}
+
 app.get('/health', async (_req, res) => {
   try { await redis.ping(); res.json({ status: 'ok' }); } catch { res.status(503).json({ status: 'redis-unavailable' }); }
 });
 app.get('/v1/status', authorize, async (_req, res) => res.json(await state()));
 app.post('/v1/pause', authorize, async (_req, res) => { await redis.hset(stateKey, 'paused', 'true'); res.json(await state()); });
 app.post('/v1/resume', authorize, async (_req, res) => { await redis.hset(stateKey, 'paused', 'false'); res.json(await state()); });
+app.post('/v1/campaigns/:id/pause', authorize, async (req, res) => { await redis.sadd(pausedCampaignsKey, req.params.id); res.json({ campaignId: req.params.id, paused: true }); });
+app.post('/v1/campaigns/:id/resume', authorize, async (req, res) => { await redis.srem(pausedCampaignsKey, req.params.id); res.json({ campaignId: req.params.id, paused: false }); });
 app.get('/v1/conversations', authorize, async (req, res) => {
   const number = normalizePhone(req.query.phone);
   const raw = number ? await redis.get(`${conversationPrefix}${number}`) : null;
@@ -256,6 +316,7 @@ app.post('/webhooks/evolution', async (req, res) => {
 });
 
 // A entrega é bloqueada em produção por OUTREACH_DELIVERY_ENABLED=false até liberar a conta.
+await recoverProcessing();
 setInterval(processOne, 1_000).unref();
 setInterval(flushEvents, 15_000).unref();
 setInterval(sendReport, 15 * 60 * 1_000).unref();

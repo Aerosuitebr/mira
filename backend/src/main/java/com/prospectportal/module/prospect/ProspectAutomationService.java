@@ -296,10 +296,10 @@ public class ProspectAutomationService {
 
         List<UUID> selectedCompanyIds = request.selectedCompanyIds() == null
             ? List.of()
-            : request.selectedCompanyIds().stream().distinct().limit(100).toList();
+            : request.selectedCompanyIds().stream().distinct().limit(400).toList();
         int limit = !selectedCompanyIds.isEmpty()
             ? selectedCompanyIds.size()
-            : request.companyLimit() != null ? Math.min(Math.max(request.companyLimit(), 1), 100) : 20;
+            : request.companyLimit() != null ? Math.min(Math.max(request.companyLimit(), 1), 400) : 20;
         boolean testMode = request.testMode() != null ? request.testMode() : defaultTestMode;
         boolean dryRun = Boolean.TRUE.equals(request.dryRun());
         String openingMessage = blankToNull(request.openingMessage());

@@ -28,6 +28,11 @@ import com.prospectportal.web.dto.OutreachMessageHistoryItem;
 import com.prospectportal.web.dto.OutreachReportResponse;
 import com.prospectportal.web.dto.FollowUpReviewItem;
 import com.prospectportal.web.dto.FollowUpApprovalResponse;
+import com.prospectportal.web.dto.CampaignDetailResponse;
+import com.prospectportal.web.dto.CampaignMessageDetail;
+import com.prospectportal.web.dto.UpdateCampaignMessageRequest;
+import com.prospectportal.web.dto.UpdateCampaignRequest;
+import org.springframework.web.bind.annotation.PutMapping;
 
 @RestController
 @RequestMapping("/api/outreach")
@@ -55,6 +60,39 @@ public class OutreachController {
     @GetMapping("/campaigns")
     public List<CampaignResponse> campaigns() {
         return outreachService.listCampaigns();
+    }
+
+    @GetMapping("/campaigns/{id}")
+    public CampaignDetailResponse campaign(@PathVariable UUID id) { return outreachService.campaignDetail(id); }
+
+    @PutMapping("/campaigns/{id}")
+    public CampaignDetailResponse updateCampaign(@PathVariable UUID id, @RequestBody UpdateCampaignRequest request) {
+        return outreachService.updateCampaign(id, request);
+    }
+
+    @PutMapping("/campaigns/{campaignId}/messages/{messageId}")
+    public CampaignMessageDetail updateMessage(@PathVariable UUID campaignId, @PathVariable UUID messageId,
+                                                @RequestBody UpdateCampaignMessageRequest request) {
+        return outreachService.updateCampaignMessage(campaignId, messageId, request);
+    }
+
+    @PostMapping("/campaigns/{campaignId}/messages/{messageId}/retry")
+    public CampaignMessageDetail retryMessage(@PathVariable UUID campaignId, @PathVariable UUID messageId) {
+        return outreachService.retryCampaignMessage(campaignId, messageId);
+    }
+
+    @PostMapping("/campaigns/{id}/pause")
+    public CampaignDetailResponse pauseCampaign(@PathVariable UUID id) {
+        outreachBotGatewayService.pauseCampaign(id);
+        outreachService.setCampaignStatus(id, "PAUSED");
+        return outreachService.campaignDetail(id);
+    }
+
+    @PostMapping("/campaigns/{id}/resume")
+    public CampaignDetailResponse resumeCampaign(@PathVariable UUID id) {
+        outreachBotGatewayService.resumeCampaign(id);
+        outreachService.setCampaignStatus(id, "SENDING");
+        return outreachService.campaignDetail(id);
     }
 
     @GetMapping("/report")

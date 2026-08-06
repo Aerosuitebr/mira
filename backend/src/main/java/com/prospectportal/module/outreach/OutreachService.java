@@ -30,6 +30,10 @@ import com.prospectportal.web.dto.OutreachMessageHistoryItem;
 import com.prospectportal.web.dto.OutreachReportResponse;
 import com.prospectportal.web.dto.FollowUpReviewItem;
 import com.prospectportal.web.dto.FollowUpApprovalResponse;
+import com.prospectportal.web.dto.CampaignDetailResponse;
+import com.prospectportal.web.dto.CampaignMessageDetail;
+import com.prospectportal.web.dto.UpdateCampaignMessageRequest;
+import com.prospectportal.web.dto.UpdateCampaignRequest;
 import com.prospectportal.web.dto.TemplateResponse;
 import com.prospectportal.web.mapper.DtoMapper;
 import org.slf4j.Logger;
@@ -119,6 +123,91 @@ public class OutreachService {
             .map(DtoMapper::toCampaign)
             .toList();
     }
+
+    @Transactional(readOnly = true)
+    public CampaignDetailResponse campaignDetail(UUID id) {
+        OutreachCampaign campaign = requireCampaign(id);
+        List<OutreachMessage> rows = messageRepository.findCampaignMessages(id, authContext.tenantId());
+        List<CampaignMessageDetail> messages = rows.stream().map(this::toCampaignMessage).toList();
+        return new CampaignDetailResponse(
+            campaign.getId(), campaign.getName(), campaign.getChannel(), campaign.getStatus(), campaign.getCreatedAt(),
+            campaign.getFollowUpBody(), rows.size(), count(rows, (short) 1, "QUEUED_BOT", "PENDING", "THROTTLED"),
+            count(rows, (short) 1, "SENT", "WAITING_REPLY", "REPLIED"), count(rows, (short) 1, "WAITING_REPLY"),
+            count(rows, (short) 1, "REPLIED"), count(rows, (short) 2, "AWAITING_APPROVAL"),
+            count(rows, (short) 2, "QUEUED_BOT", "THROTTLED"), count(rows, (short) 2, "SENT"),
+            count(rows, null, "FAILED"), count(rows, null, "SKIPPED"), messages
+        );
+    }
+
+    @Transactional
+    public CampaignDetailResponse updateCampaign(UUID id, UpdateCampaignRequest request) {
+        OutreachCampaign campaign = requireCampaign(id);
+        if (request.name() != null && !request.name().isBlank()) campaign.setName(request.name().trim());
+        if (request.followUpBody() != null) {
+            if (request.followUpBody().isBlank() || request.followUpBody().length() > 2000)
+                throw new ResponseStatusException(BAD_REQUEST, "A etapa 2 deve ter entre 1 e 2.000 caracteres");
+            campaign.setFollowUpBody(request.followUpBody().trim());
+        }
+        campaignRepository.save(campaign);
+        return campaignDetail(id);
+    }
+
+    @Transactional
+    public CampaignMessageDetail updateCampaignMessage(UUID campaignId, UUID messageId, UpdateCampaignMessageRequest request) {
+        OutreachMessage message = messageRepository.findByIdAndTenantId(messageId, authContext.tenantId())
+            .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Mensagem não encontrada"));
+        if (!message.getCampaign().getId().equals(campaignId)) throw new ResponseStatusException(NOT_FOUND, "Mensagem não pertence à campanha");
+        if (!isEditable(message)) throw new ResponseStatusException(BAD_REQUEST, "Mensagem já enviada e preservada no histórico");
+        if (request.body() == null || request.body().isBlank() || request.body().length() > 2000)
+            throw new ResponseStatusException(BAD_REQUEST, "A mensagem deve ter entre 1 e 2.000 caracteres");
+        message.setBody(request.body().trim());
+        if (request.subject() != null) message.setSubject(request.subject().trim());
+        messageRepository.save(message);
+        outreachBotQueueService.updateQueuedText(message);
+        return toCampaignMessage(message);
+    }
+
+    @Transactional
+    public CampaignMessageDetail retryCampaignMessage(UUID campaignId, UUID messageId) {
+        OutreachMessage message = messageRepository.findByIdAndTenantId(messageId, authContext.tenantId())
+            .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Mensagem não encontrada"));
+        if (!message.getCampaign().getId().equals(campaignId) || !isRetryable(message))
+            throw new ResponseStatusException(BAD_REQUEST, "Esta mensagem não pode ser reenfileirada");
+        message.setStatus("QUEUED_BOT");
+        message.setErrorDetail(null);
+        messageRepository.save(message);
+        outreachBotQueueService.requeue(message);
+        return toCampaignMessage(message);
+    }
+
+    @Transactional
+    public void setCampaignStatus(UUID id, String status) {
+        OutreachCampaign campaign = requireCampaign(id);
+        campaign.setStatus(status);
+        campaignRepository.save(campaign);
+    }
+
+    private OutreachCampaign requireCampaign(UUID id) {
+        return campaignRepository.findByIdAndTenantId(id, authContext.tenantId())
+            .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Campanha não encontrada"));
+    }
+
+    private CampaignMessageDetail toCampaignMessage(OutreachMessage m) {
+        Company company = m.getLead().getCompany();
+        CompanyContact contact = contactRepository.findByCompanyIdOrderByConfidenceDesc(company.getId()).stream().findFirst().orElse(null);
+        return new CampaignMessageDetail(m.getId(), company.getId(), companyDisplayName(company), company.getCnpj(), company.getCity(), company.getState(),
+            contact != null ? contact.getFullName() : null, contact != null ? contact.getRoleTitle() : null, m.getRecipient(),
+            contact != null && contact.getEmail() != null ? contact.getEmail() : company.getEmail(), m.getOutreachStep(), m.getChannel(),
+            m.getStatus(), m.getSubject(), m.getBody(), m.getCreatedAt(), m.getSentAt(), m.getRepliedAt(), m.getApprovalApprovedAt(),
+            m.getProviderMessageId(), m.getErrorDetail(), isEditable(m), isRetryable(m));
+    }
+
+    private static long count(List<OutreachMessage> rows, Short step, String... statuses) {
+        var allowed = java.util.Set.of(statuses);
+        return rows.stream().filter(m -> step == null || m.getOutreachStep() == step).filter(m -> allowed.contains(m.getStatus())).count();
+    }
+    private static boolean isEditable(OutreachMessage m) { return java.util.Set.of("PENDING", "QUEUED_BOT", "THROTTLED", "AWAITING_APPROVAL", "FAILED", "SKIPPED").contains(m.getStatus()); }
+    private static boolean isRetryable(OutreachMessage m) { return "WHATSAPP".equals(m.getChannel()) && java.util.Set.of("FAILED", "SKIPPED", "THROTTLED").contains(m.getStatus()); }
 
     @Transactional(readOnly = true)
     public OutreachReportResponse report() {
@@ -299,6 +388,9 @@ public class OutreachService {
         boolean whatsapp = "WHATSAPP".equals(channel);
         if (whatsapp && (request.followUpBody() == null || request.followUpBody().isBlank())) {
             throw new ResponseStatusException(BAD_REQUEST, "Defina a mensagem da etapa 2 antes de iniciar o disparo.");
+        }
+        if (request.companyIds().stream().distinct().count() > 400) {
+            throw new ResponseStatusException(BAD_REQUEST, "Uma campanha pode envolver no máximo 400 empresas.");
         }
         if (request.followUpBody() != null && request.followUpBody().length() > 2000) {
             throw new ResponseStatusException(BAD_REQUEST, "A mensagem da etapa 2 deve ter no máximo 2.000 caracteres.");

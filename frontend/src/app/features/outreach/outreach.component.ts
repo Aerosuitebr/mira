@@ -229,7 +229,7 @@ export class OutreachComponent implements OnInit, OnDestroy {
 
   get canSendCampaign(): boolean {
     return (
-      this.companyIds.length > 0 &&
+      this.companyIds.length > 0 && this.companyIds.length <= 400 &&
       this.form.controls.templateId.value.trim().length > 0 &&
       this.channelStatus.connected &&
       this.hasPreviewReady &&

@@ -13,8 +13,8 @@ test('uses the configured business timezone for the daily report', () => {
   assert.equal(reportDay(instant, 'UTC'), '2026-08-06');
 });
 
-test('step 1 stays short and never contains a URL', () => {
-  const text = selectStep1Text({ companyName: 'Aero Suite', step1Text: 'fallback' }, () => 0.8);
+test('step 1 preserves the reviewed text when it was configured', () => {
+  const text = selectStep1Text({ companyName: 'Aero Suite', step1Text: 'Olá! Falo com o comercial da Aero Suite?' }, () => 0.8);
   assert.match(text, /Aero Suite/);
   assert.doesNotMatch(text, /https?:\/\//i);
 });

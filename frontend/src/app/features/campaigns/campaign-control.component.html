@@ -1,0 +1,70 @@
+<section class="campaign-page">
+  <header class="campaign-hero">
+    <div><span class="pp-eyebrow">Central operacional</span><h1 class="pp-title">Controle de campanhas</h1><p>Fila, contatos, mensagens e resultados em uma visão auditável.</p></div>
+    <button class="pp-btn pp-btn--secondary" type="button" (click)="refresh()" [disabled]="loading">Atualizar dados</button>
+  </header>
+
+  @if (error) { <div class="pp-banner campaign-alert campaign-alert--error">{{ error }}</div> }
+  @if (feedback) { <div class="pp-banner pp-banner--success campaign-alert">{{ feedback }}</div> }
+
+  <div class="campaign-layout">
+    <aside class="campaign-list pp-glass">
+      <div class="campaign-list__title"><strong>Campanhas</strong><span>{{ campaigns.length }}</span></div>
+      @for (campaign of campaigns; track campaign.id) {
+        <button type="button" [class.active]="campaign.id === selectedId" (click)="selectCampaign(campaign.id)">
+          <span><strong>{{ campaign.name }}</strong><small>{{ campaign.createdAt | date:'dd/MM/yyyy HH:mm' }}</small></span>
+          <i [attr.data-status]="campaign.status">{{ campaign.status }}</i>
+        </button>
+      } @empty { <p>Nenhuma campanha encontrada.</p> }
+    </aside>
+
+    <main class="campaign-main">
+      @if (detail) {
+        <section class="campaign-summary pp-glass">
+          <header><div><span class="pp-eyebrow">{{ detail.channel }} · {{ uniqueCompanies }} empresas</span><h2>{{ detail.name }}</h2><p>Criada em {{ detail.createdAt | date:'dd/MM/yyyy HH:mm' }}</p></div>
+            <button type="button" class="pp-btn" [class.pp-btn--primary]="detail.status === 'PAUSED'" [class.pp-btn--secondary]="detail.status !== 'PAUSED'" (click)="toggleCampaign()" [disabled]="busy">{{ detail.status === 'PAUSED' ? 'Retomar campanha' : 'Pausar campanha' }}</button>
+          </header>
+          <div class="campaign-progress"><span [style.width.%]="completionPercent"></span></div><small>{{ completionPercent }}% processado · atualização automática a cada 10 segundos</small>
+          <div class="metric-grid">
+            <article><span>Empresas</span><strong>{{ uniqueCompanies }}</strong></article><article class="pending"><span>Etapa 1 na fila</span><strong>{{ detail.queued }}</strong></article>
+            <article class="ok"><span>Etapa 1 enviadas</span><strong>{{ detail.sent }}</strong></article><article><span>Aguardando resposta</span><strong>{{ detail.waitingReply }}</strong></article>
+            <article class="reply"><span>Responderam</span><strong>{{ detail.replied }}</strong></article><article class="approval"><span>Aguardando aprovação</span><strong>{{ detail.awaitingApproval }}</strong></article>
+            <article class="priority"><span>Etapa 2 prioritária</span><strong>{{ detail.step2Queued }}</strong></article><article class="ok"><span>Etapa 2 enviadas</span><strong>{{ detail.step2Sent }}</strong></article>
+            <article class="fail"><span>Falhas</span><strong>{{ detail.failed }}</strong></article><article><span>Ignoradas</span><strong>{{ detail.skipped }}</strong></article>
+          </div>
+          @if (bot) {
+            <div class="bot-strip">
+              <span><b>{{ bot.step2Queue }}</b> prioritárias</span><span><b>{{ bot.step1Queue }}</b> aberturas globais</span><span><b>{{ bot.processing }}</b> processando</span><span><b>{{ bot.sentToday }}/{{ bot.cadence.dailyCap }}</b> hoje</span><span><b>{{ bot.estimatedDays }}</b> dias estimados</span>
+              @if (bot.deadLetter) { <span class="danger"><b>{{ bot.deadLetter }}</b> exigem intervenção</span> }
+              <i>{{ !bot.deliveryEnabled ? 'Entrega bloqueada' : bot.paused ? 'Robô pausado' : 'Robô ativo' }}</i>
+            </div>
+          }
+        </section>
+
+        <section class="flow-copy pp-glass">
+          <div><span class="pp-eyebrow">Mensagem padrão · etapa 2</span><h3>Conteúdo após resposta e aprovação</h3></div>
+          @if (editFollowUp) { <textarea class="pp-textarea" rows="6" [(ngModel)]="followUpDraft"></textarea><div class="row-actions"><button class="pp-btn pp-btn--primary" (click)="saveFollowUp()" [disabled]="busy || !followUpDraft.trim()">Salvar padrão</button><button class="pp-btn pp-btn--ghost" (click)="editFollowUp=false">Cancelar</button></div> }
+          @else { <pre>{{ detail.followUpBody || 'Nenhuma mensagem definida.' }}</pre><button class="pp-btn pp-btn--secondary" type="button" (click)="editFollowUp=true">Editar mensagem da etapa 2</button> }
+        </section>
+
+        <section class="contacts-panel pp-glass">
+          <header><div><span class="pp-eyebrow">Empresas, contatos e envios</span><h3>Fluxo individual</h3></div><span>{{ filteredMessages.length }} registros visíveis</span></header>
+          <div class="filters"><input class="pp-input" [(ngModel)]="search" placeholder="Buscar empresa, CNPJ, contato, telefone ou e-mail" aria-label="Buscar registros"/><select class="pp-select" [(ngModel)]="stepFilter"><option [ngValue]="0">Todas as etapas</option><option [ngValue]="1">Etapa 1</option><option [ngValue]="2">Etapa 2</option></select><select class="pp-select" [(ngModel)]="statusFilter"><option value="ALL">Todos os estados</option><option value="QUEUED_BOT">Na fila</option><option value="WAITING_REPLY">Aguardando resposta</option><option value="AWAITING_APPROVAL">Aguardando aprovação</option><option value="SENT">Enviadas</option><option value="FAILED">Falhas</option><option value="SKIPPED">Ignoradas</option></select></div>
+          <div class="message-list">
+            @for (message of filteredMessages; track message.id) {
+              <article class="message-row" [attr.data-status]="message.status">
+                <div class="message-company"><span class="step-badge">E{{ message.step }}</span><div><strong>{{ message.companyName }}</strong><small>{{ message.cnpj }} · {{ message.city }}/{{ message.state }}</small></div></div>
+                <div class="message-contact"><strong>{{ message.contactName || 'Contato não identificado' }}</strong><small>{{ message.contactRole || 'Cargo não informado' }}</small><span>{{ message.recipient || message.email || 'Sem destinatário' }}</span></div>
+                <div class="message-state"><span class="state-chip">{{ statusLabel(message.status) }}</span><small>@if (message.sentAt) { Enviada {{ message.sentAt | date:'dd/MM HH:mm' }} } @else { Criada {{ message.createdAt | date:'dd/MM HH:mm' }} }</small>@if (message.errorDetail) { <em>{{ message.errorDetail }}</em> }</div>
+                <div class="message-preview"><p>{{ message.body }}</p>@if (message.providerMessageId) { <small>ID provedor: {{ message.providerMessageId }}</small> }</div>
+                <div class="message-actions">@if (message.editable) { <button type="button" (click)="openEdit(message)">Editar</button> } @if (message.status === 'AWAITING_APPROVAL') { <button type="button" class="approve" (click)="approve(message)" [disabled]="busy">Aprovar</button> } @if (message.retryable) { <button type="button" class="retry" (click)="retry(message)" [disabled]="busy">Reenfileirar</button> }</div>
+              </article>
+            } @empty { <div class="empty-state">Nenhum envio corresponde aos filtros.</div> }
+          </div>
+        </section>
+      } @else if (loading) { <div class="pp-glass empty-state">Carregando controle da campanha…</div> }
+    </main>
+  </div>
+
+  @if (editing) { <div class="edit-overlay" role="dialog" aria-modal="true" aria-labelledby="edit-title"><form class="edit-modal pp-glass" (submit)="$event.preventDefault(); saveMessage()"><header><div><span class="pp-eyebrow">{{ editing.companyName }} · etapa {{ editing.step }}</span><h2 id="edit-title">Editar mensagem pendente</h2></div><button type="button" aria-label="Fechar" (click)="closeEdit()">×</button></header>@if (editing.channel === 'EMAIL') { <label>Assunto<input class="pp-input" [(ngModel)]="editSubject" name="subject"/></label> }<label>Mensagem<textarea class="pp-textarea" rows="12" [(ngModel)]="editBody" name="body"></textarea></label><small>{{ editBody.length }}/2.000 caracteres · a alteração será aplicada ao item ainda na fila.</small><footer><button type="button" class="pp-btn pp-btn--ghost" (click)="closeEdit()">Cancelar</button><button type="submit" class="pp-btn pp-btn--primary" [disabled]="busy || !editBody.trim() || editBody.length > 2000">Salvar na fila</button></footer></form></div> }
+</section>

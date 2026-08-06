@@ -310,6 +310,9 @@
         }
 
         <div class="preview-actions">
+          @if (companyIds.length > 400) {
+            <div class="pp-banner outreach-banner-error">Esta seleção possui {{ companyIds.length }} empresas. Divida em campanhas de até 400 para manter controle e rastreabilidade.</div>
+          }
           <button
             type="button"
             class="pp-btn send-btn"
