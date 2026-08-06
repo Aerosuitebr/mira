@@ -17,6 +17,7 @@ import {
 } from '../../core/api.service';
 import { AerosuiteFitAnalysis, AerosuiteFitService, AerosuitePlanId } from '../../core/aerosuite-fit.service';
 import { formatBrazilPhoneDisplay } from '../../core/phone.util';
+import { loadDiscoverSession } from '../../core/discover-session';
 
 type ProspectMode = 'pj' | 'pf';
 type MetricLensId = 'icp' | 'plans' | 'promo' | 'sources' | 'routes' | 'speed';
@@ -82,6 +83,7 @@ export class ProspectingComponent implements OnInit, OnDestroy {
   errorMessage = '';
 
   companies: Company[] = [];
+  importedResultCount = 0;
   selectedCompanyIds = new Set<string>();
   appointments: AppointmentItem[] = [];
   lastCreatedAppointment: AppointmentItem | null = null;
@@ -265,16 +267,12 @@ export class ProspectingComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const hasIncomingSelection = this.restoreIncomingSelection();
+    const hasDiscoverContext = this.restoreDiscoverContext();
     if (this.route.snapshot.queryParamMap.get('step') === '3') {
       this.activeStep = 3;
     }
-    if (!hasIncomingSelection) {
-      const defaultPreset = this.presets.find((preset) => preset.id === this.defaultPresetId);
-      if (defaultPreset) {
-        this.applyPreset(defaultPreset, { announce: false });
-      } else {
-        this.searchCompanies();
-      }
+    if (this.route.snapshot.queryParamMap.get('step') !== '3' && (hasIncomingSelection || hasDiscoverContext)) {
+      this.activeStep = 2;
     }
     this.loadAppointments();
     this.refreshLatestJob();
@@ -283,6 +281,33 @@ export class ProspectingComponent implements OnInit, OnDestroy {
     this.loadSendingReadiness();
     this.loadFollowUpsAwaitingApproval();
     this.startOutreachPolling();
+  }
+
+  private restoreDiscoverContext(): boolean {
+    const session = loadDiscoverSession();
+    if (!session?.hasSearched || session.companies.length === 0) return false;
+    this.filters = {
+      keyword: session.filters.keyword || '', cnae: session.filters.cnae || '',
+      state: session.filters.state || '', city: session.filters.city || '', revenue: session.filters.revenue || ''
+    };
+    this.importedResultCount = session.totalElements || session.companies.length;
+    if (this.companies.length === 0) {
+      this.companies = session.companies;
+      this.selectedCompanyIds = new Set(session.selectedIds || []);
+      this.rebuildFitCache(this.companies);
+    }
+    return true;
+  }
+
+  get importedSegmentTitle(): string {
+    const preset = this.presets.find(item => item.cnae && item.cnae === this.filters.cnae);
+    return preset?.title || this.filters.keyword || (this.filters.cnae ? 'Pesquisa por CNAE' : 'Pesquisa personalizada');
+  }
+
+  get importedSegmentSummary(): string {
+    const parts = [this.filters.cnae ? `CNAE ${this.filters.cnae}` : '', this.filters.state,
+      this.filters.city, this.filters.revenue ? this.revenueLabel(this.filters.revenue) : ''].filter(Boolean);
+    return parts.length ? parts.join(' · ') : 'Pesquisa ampla, sem filtros geográficos adicionais';
   }
 
   ngOnDestroy(): void {
@@ -302,6 +327,7 @@ export class ProspectingComponent implements OnInit, OnDestroy {
       const selected = rawCompanies ? (JSON.parse(rawCompanies) as Company[]) : [];
       if (Array.isArray(selected) && selected.length > 0) {
         this.companies = selected.filter((company) => this.selectedCompanyIds.has(company.id));
+        this.importedResultCount = this.companies.length;
         this.rebuildFitCache(this.companies);
       }
       return true;
@@ -768,7 +794,8 @@ export class ProspectingComponent implements OnInit, OnDestroy {
 
   goToStep(step: ProspectStep): void {
     if (step === 2 && this.companies.length === 0 && !this.loadingCompanies) {
-      this.searchCompanies({ advanceToList: true });
+      this.activeStep = 1;
+      this.errorMessage = 'Faça uma pesquisa em Descobrir para formar a lista da campanha.';
       return;
     }
     if (step === 2 && this.companies.length > 0 && this.displayedCompanies.length === 0) {

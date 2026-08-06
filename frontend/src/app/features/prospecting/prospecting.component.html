@@ -76,7 +76,7 @@
         <span class="step-num">1</span>
         <span class="step-copy">
           <strong>Segmento</strong>
-          <small>Filtre o radar</small>
+          <small>Origem da lista</small>
         </span>
       </button>
       <button type="button" class="step-tab" [class.step-tab--active]="activeStep === 2" [attr.aria-current]="activeStep === 2 ? 'step' : null" (click)="goToStep(2)">
@@ -98,63 +98,31 @@
     <div class="prospecting-layout" [class.prospecting-layout--single]="activeStep !== 3">
       <main class="prospecting-main">
         @if (activeStep === 1) {
-          <section class="pp-glass command-panel">
-            <div class="panel-heading">
-              <div>
-                <span class="pp-eyebrow">Etapa 1 · Segmento</span>
-                <h2>Defina o radar</h2>
+          <section class="pp-glass imported-segment">
+            @if (companies.length > 0) {
+              <div class="imported-segment__icon" aria-hidden="true">✓</div>
+              <div class="imported-segment__copy">
+                <span class="pp-eyebrow">Segmento importado de Descobrir</span>
+                <h2>{{ importedSegmentTitle }}</h2>
+                <p>{{ importedSegmentSummary }}</p>
+                <div class="imported-segment__metrics">
+                  <span><strong>{{ (importedResultCount || companies.length) | number }}</strong> empresas encontradas</span>
+                  <span><strong>{{ selectedCompanyIds.size | number }}</strong> selecionadas</span>
+                  @if (filters.keyword) { <span>Palavra-chave: <strong>{{ filters.keyword }}</strong></span> }
+                </div>
               </div>
-              <a routerLink="/discover" class="pp-btn pp-btn--ghost">Abrir mapa</a>
-            </div>
-
-            <div class="preset-row" role="radiogroup" aria-label="Segmento do radar">
-              @for (preset of presets; track preset.id) {
-                <button
-                  type="button"
-                  class="preset-card"
-                  role="radio"
-                  [attr.aria-checked]="isPresetActive(preset.id)"
-                  [class.preset-card--active]="isPresetActive(preset.id)"
-                  (click)="applyPreset(preset)"
-                >
-                  <strong>{{ preset.title }}</strong>
-                  <span>{{ preset.subtitle }}</span>
-                  <small>{{ preset.pitch }}</small>
-                </button>
-              }
-            </div>
-
-            <form class="prospect-form" (ngSubmit)="searchCompanies({ advanceToList: true })">
-              <div class="keyword-filter">
-                <label class="pp-field">
-                  <span>Palavra-chave</span>
-                  <input class="pp-input" name="keyword" [(ngModel)]="filters.keyword" placeholder="Nome, CNPJ, nicho ou dor" />
-                </label>
-                @if (filters.cnae) {
-                  <div class="cnae-badge"><span>CNAE ativo:</span> <strong>{{ filters.cnae }}</strong></div>
-                }
+              <div class="imported-segment__actions">
+                <a routerLink="/discover" class="pp-btn pp-btn--ghost">Alterar pesquisa</a>
+                <button type="button" class="pp-btn pp-btn--primary" (click)="goToStep(2)">Continuar com esta lista</button>
               </div>
-              <label class="pp-field">
-                <span>UF</span>
-                <input class="pp-input" name="state" [(ngModel)]="filters.state" placeholder="RJ, SP..." />
-              </label>
-              <label class="pp-field">
-                <span>Cidade</span>
-                <input class="pp-input" name="city" [(ngModel)]="filters.city" placeholder="Cidade foco" />
-              </label>
-              <label class="pp-field">
-                <span>Porte</span>
-                <select class="pp-select" name="revenue" [(ngModel)]="filters.revenue">
-                  <option value="">Todos</option>
-                  <option value="SMALL">Pequeno</option>
-                  <option value="MEDIUM">Médio</option>
-                  <option value="LARGE">Grande</option>
-                </select>
-              </label>
-              <button type="submit" class="pp-btn pp-btn--primary search-submit" [disabled]="loadingCompanies">
-                @if (loadingCompanies) { Buscando... } @else { Buscar e ir para a lista }
-              </button>
-            </form>
+            } @else {
+              <div class="imported-segment__empty">
+                <span class="pp-eyebrow">Nenhuma pesquisa importada</span>
+                <h2>Comece definindo seu público em Descobrir</h2>
+                <p>Os filtros e resultados serão preservados e aparecerão aqui prontos para qualificação.</p>
+                <a routerLink="/discover" class="pp-btn pp-btn--primary">Ir para Descobrir</a>
+              </div>
+            }
           </section>
         }
 
@@ -169,7 +137,7 @@
                 }
               </div>
               <div class="results-toolbar-actions">
-                <button type="button" class="pp-btn pp-btn--ghost" (click)="goToStep(1)">Ajustar filtros</button>
+                <a routerLink="/discover" class="pp-btn pp-btn--ghost">Alterar pesquisa</a>
                 <button type="button" class="pp-btn pp-btn--secondary" (click)="goToStep(3)">Ir para automação</button>
               </div>
             </div>
@@ -181,8 +149,8 @@
             } @else if (companies.length === 0) {
               <div class="pp-glass pp-empty">
                 <strong>Nenhuma empresa encontrada</strong>
-                <span>Volte ao segmento e ajuste cidade, UF ou porte.</span>
-                <button type="button" class="pp-btn pp-btn--primary" (click)="goToStep(1)">Definir segmento</button>
+                <span>Faça uma pesquisa em Descobrir para formar esta lista.</span>
+                <a routerLink="/discover" class="pp-btn pp-btn--primary">Ir para Descobrir</a>
               </div>
             } @else if (displayedCompanies.length === 0) {
               <div class="pp-glass pp-empty">
