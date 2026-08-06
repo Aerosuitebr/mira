@@ -60,8 +60,9 @@ export const routes: Routes = [
       },
       {
         path: 'prospecting',
-        redirectTo: 'discover',
-        pathMatch: 'full'
+        canActivate: [staffGuard],
+        loadComponent: () => import('./features/prospecting/prospecting.component').then((m) => m.ProspectingComponent),
+        data: { animation: 'ProspectingPage' }
       },
       {
         path: 'enrich',

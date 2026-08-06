@@ -814,6 +814,14 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
     void this.router.navigate(['/discover/enrich']);
   }
 
+  prospectSelection(): void {
+    const selectedCompanies = this.companies.filter((company) => this.selected.has(company.id));
+    sessionStorage.setItem('selected-companies', JSON.stringify([...this.selected]));
+    sessionStorage.setItem('selected-companies-cache', JSON.stringify(selectedCompanies));
+    this.persistSession();
+    void this.router.navigate(['/prospecting'], { queryParams: { step: 3 } });
+  }
+
   sendToEnrich(companyId: string, event: Event): void {
     event.stopPropagation();
     const company = this.allCompanies.find((item) => item.id === companyId);
@@ -825,9 +833,11 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
 
   sendToOutreach(companyId: string, event: Event): void {
     event.stopPropagation();
+    const company = this.companies.find((item) => item.id === companyId);
     sessionStorage.setItem('selected-companies', JSON.stringify([companyId]));
+    sessionStorage.setItem('selected-companies-cache', JSON.stringify(company ? [company] : []));
     this.persistSession();
-    void this.router.navigate(['/outreach']);
+    void this.router.navigate(['/prospecting'], { queryParams: { step: 3 } });
   }
 
   isApproached(companyId: string): boolean {

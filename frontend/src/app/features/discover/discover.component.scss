@@ -298,6 +298,21 @@
   box-shadow: none;
 }
 
+.discover-next-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+@media (max-width: 720px) {
+  .discover-next-actions {
+    width: 100%;
+
+    .pp-btn { flex: 1 1 100%; }
+  }
+}
+
 .save-cta.pp-btn--primary {
   animation: save-cta-pulse 2.4s ease-in-out infinite;
 }

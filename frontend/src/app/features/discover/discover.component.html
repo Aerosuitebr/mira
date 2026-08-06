@@ -5,24 +5,15 @@
       <h1 class="pp-title">Descobrir empresas</h1>
       <p class="pp-subtitle">Busque por UF, CNAE e palavra-chave. Marque &quot;site contatável&quot; para filtrar empresas com presença web verificada.</p>
     </div>
-    <button
-      type="button"
-      class="pp-btn save-cta"
-      [class.pp-btn--primary]="selected.size > 0"
-      [class.save-cta--idle]="selected.size === 0"
-      [disabled]="selected.size === 0"
-      (click)="storeSelection()"
-    >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-        <polyline points="17 21 17 13 7 13 7 21"/>
-      </svg>
-      @if (selected.size > 0) {
-        Salvar {{ selected.size }} e ir para Enriquecer
-      } @else {
-        Salvar selecionadas
-      }
-    </button>
+    <div class="discover-next-actions">
+      <button type="button" class="pp-btn pp-btn--secondary" [disabled]="selected.size === 0" (click)="storeSelection()">
+        Qualificar {{ selected.size || '' }} selecionadas
+      </button>
+      <button type="button" class="pp-btn save-cta" [class.pp-btn--primary]="selected.size > 0" [class.save-cta--idle]="selected.size === 0" [disabled]="selected.size === 0" (click)="prospectSelection()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        Prospectar {{ selected.size || '' }} selecionadas
+      </button>
+    </div>
   </header>
 
   <form
@@ -332,8 +323,8 @@
                 <button
                   type="button"
                   class="card-action card-action--outreach"
-                  title="Abordar esta empresa"
-                  aria-label="Enviar para Abordar"
+                  title="Prospectar esta empresa"
+                  aria-label="Enviar para Prospectar"
                   (click)="sendToOutreach(company.id, $event)"
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
