@@ -28,7 +28,8 @@ export class LoginComponent {
   form = this.fb.nonNullable.group({
     fullName: ['', [Validators.maxLength(200)]],
     email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(8)]]
+    // Cadastro publico exige 8+; login corporativo (demo123) aceita a partir de 6.
+    password: ['', [Validators.required, Validators.minLength(6)]]
   });
 
   constructor() {
@@ -37,6 +38,8 @@ export class LoginComponent {
     if (this.publicAccess) {
       this.auth.activatePublicMode();
       this.registering = true;
+      this.form.controls.password.setValidators([Validators.required, Validators.minLength(8)]);
+      this.form.controls.password.updateValueAndValidity({ emitEvent: false });
     } else {
       this.form.patchValue({ email: 'demo@prospectportal.com', password: 'demo123' });
     }
@@ -44,6 +47,9 @@ export class LoginComponent {
 
   submit(): void {
     if (this.form.invalid || (this.publicAccess && this.registering && !this.form.controls.fullName.value.trim())) {
+      this.error = this.publicAccess && this.registering && this.form.controls.password.hasError('minlength')
+        ? 'A senha precisa ter pelo menos 8 caracteres.'
+        : 'Preencha os campos obrigatórios para continuar.';
       return;
     }
     this.loading = true;
@@ -74,6 +80,12 @@ export class LoginComponent {
   toggleMode(): void {
     this.registering = !this.registering;
     this.error = '';
+    if (this.publicAccess && this.registering) {
+      this.form.controls.password.setValidators([Validators.required, Validators.minLength(8)]);
+    } else {
+      this.form.controls.password.setValidators([Validators.required, Validators.minLength(6)]);
+    }
+    this.form.controls.password.updateValueAndValidity({ emitEvent: false });
   }
 
   private safeReturnUrl(value: string | null): string {
