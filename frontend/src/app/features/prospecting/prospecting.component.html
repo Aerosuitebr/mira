@@ -384,6 +384,20 @@
               </section>
               <div class="auto-prospect-actions">
                 <label class="pp-field">
+                  <span>Nome da campanha <b aria-hidden="true">*</b></span>
+                  <input
+                    class="pp-input"
+                    type="text"
+                    name="campaignName"
+                    [(ngModel)]="autoProspect.campaignName"
+                    maxlength="120"
+                    required
+                    autocomplete="off"
+                    placeholder="Ex.: MRO RJ · Agosto 2026"
+                  />
+                  <small>Este nome aparecerá nos cards, no histórico e nos relatórios.</small>
+                </label>
+                <label class="pp-field">
                   <span>Leads selecionados</span>
                   <input class="pp-input" type="text" [value]="selectedCompanyIds.size + ' lead(s)'" readonly />
                 </label>
@@ -391,7 +405,7 @@
                   type="button"
                   class="pp-btn pp-btn--primary"
                   [class.campaign-prepared-button]="currentSelectionPrepared"
-                  [disabled]="startingAutoProspect || currentSelectionPrepared || !autoProspect.openingMessage.trim() || !autoProspect.followUpMessage.trim() || selectedCompanyIds.size === 0"
+                  [disabled]="startingAutoProspect || currentSelectionPrepared || !autoProspect.campaignName.trim() || !autoProspect.openingMessage.trim() || !autoProspect.followUpMessage.trim() || selectedCompanyIds.size === 0"
                   (click)="startSelectedTwoStepQueue()"
                 >
                   @if (startingAutoProspect) { Preparando... }

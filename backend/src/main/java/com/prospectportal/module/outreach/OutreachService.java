@@ -378,6 +378,12 @@ public class OutreachService {
         if (request.companyIds() == null || request.companyIds().isEmpty()) {
             throw new ResponseStatusException(BAD_REQUEST, "Nenhuma empresa selecionada");
         }
+        if (request.campaignName() == null || request.campaignName().isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "Informe um nome para a campanha.");
+        }
+        if (request.campaignName().trim().length() > 120) {
+            throw new ResponseStatusException(BAD_REQUEST, "O nome da campanha deve ter no máximo 120 caracteres.");
+        }
 
         UUID tenantId = authContext.tenantId();
         Tenant tenant = tenantRepository.findByIdForUpdate(tenantId)
@@ -425,7 +431,7 @@ public class OutreachService {
             throw new ResponseStatusException(BAD_REQUEST, "SMTP não configurado para envio de e-mail.");
         }
 
-        OutreachCampaign campaign = createCampaign(tenant, request.campaignName(), channel, template, request.followUpBody());
+        OutreachCampaign campaign = createCampaign(tenant, request.campaignName().trim(), channel, template, request.followUpBody());
         var brand = outreachSettingsService.resolveBrand(tenant.getId());
 
         int sent = 0;

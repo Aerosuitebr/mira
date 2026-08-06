@@ -290,6 +290,13 @@ public class ProspectAutomationService {
         if (request == null) {
             throw new ResponseStatusException(BAD_REQUEST, "Request inválido");
         }
+        String campaignName = blankToNull(request.name());
+        if (campaignName == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "Informe um nome para a campanha.");
+        }
+        if (campaignName.length() > 120) {
+            throw new ResponseStatusException(BAD_REQUEST, "O nome da campanha deve ter no máximo 120 caracteres.");
+        }
         UUID tenantId = authContext.tenantId();
         Tenant tenant = tenantRepository.findByIdForUpdate(tenantId)
             .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Tenant não encontrado"));
@@ -327,9 +334,7 @@ public class ProspectAutomationService {
 
         OutreachCampaign campaign = new OutreachCampaign();
         campaign.setTenant(tenant);
-        campaign.setName(request.name() != null && !request.name().isBlank()
-            ? request.name()
-            : "Prospecção automática " + Instant.now());
+        campaign.setName(campaignName);
         campaign.setChannel("AUTO");
         campaign.setStatus("QUEUED");
         campaign.setSentCount(0);

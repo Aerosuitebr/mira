@@ -125,6 +125,7 @@ export class ProspectingComponent implements OnInit, OnDestroy {
   private outreachPollHandle: ReturnType<typeof setInterval> | null = null;
 
   autoProspect = {
+    campaignName: '',
     limit: 5,
     testMode: false,
     openingMessage: `${this.saoPauloGreeting()}! Tudo bem? Nesse contato falo com o responsável comercial da {{empresa}}?`,
@@ -358,11 +359,15 @@ export class ProspectingComponent implements OnInit, OnDestroy {
   }
 
   startAutoProspect(): void {
+    if (!this.autoProspect.campaignName.trim()) {
+      this.errorMessage = 'Informe um nome para identificar a campanha.';
+      return;
+    }
     this.startingAutoProspect = true;
     this.errorMessage = '';
     this.api
       .startProspectJob({
-        name: `Auto · ${this.filters.cnae || 'segmento'} · ${this.filters.state || 'BR'}`,
+        name: this.autoProspect.campaignName.trim(),
         cnae: this.filters.cnae || undefined,
         state: this.filters.state || undefined,
         city: this.filters.city || undefined,
@@ -493,11 +498,15 @@ export class ProspectingComponent implements OnInit, OnDestroy {
       this.errorMessage = 'Defina a segunda mensagem antes de criar a campanha.';
       return;
     }
+    if (!this.autoProspect.campaignName.trim()) {
+      this.errorMessage = 'Informe um nome para identificar a campanha nos cards e no histórico.';
+      return;
+    }
     this.startingAutoProspect = true;
     this.errorMessage = '';
     const selectedIds = [...this.selectedCompanyIds];
     this.api.startProspectJob({
-      name: `WhatsApp 2 etapas · ${selectedIds.length} leads`,
+      name: this.autoProspect.campaignName.trim(),
       companyLimit: selectedIds.length,
       testMode: this.autoProspect.testMode,
       dryRun: false,
