@@ -1,6 +1,6 @@
 import express from 'express';
 import Redis from 'ioredis';
-import { canOpenColdConversation, jobStep, nextColdAt, normalizePhone, reportDay, selectStep1Text } from './state.js';
+import { applyTimeGreeting, canOpenColdConversation, jobStep, nextColdAt, normalizePhone, reportDay, selectStep1Text } from './state.js';
 
 const port = Number(process.env.PORT || 8090);
 const redis = new Redis(process.env.REDIS_URL || 'redis://redis:6379');
@@ -20,7 +20,7 @@ const config = {
   paused: process.env.OUTREACH_BOT_PAUSED !== 'false',
   minIntervalSeconds: Number(process.env.OUTREACH_MIN_INTERVAL_SECONDS || 180),
   maxIntervalSeconds: Number(process.env.OUTREACH_MAX_INTERVAL_SECONDS || 300),
-  dailyCap: Number(process.env.OUTREACH_DAILY_CAP || 15),
+  dailyCap: Number(process.env.OUTREACH_DAILY_CAP || 40),
   timeZone: process.env.OUTREACH_TIMEZONE || 'America/Sao_Paulo',
   deliveryEnabled: process.env.OUTREACH_DELIVERY_ENABLED === 'true'
 };
@@ -31,6 +31,7 @@ const evolution = {
   apiKey: process.env.EVOLUTION_API_KEY || process.env.APP_EVOLUTION_API_KEY || '',
   instance: process.env.EVOLUTION_INSTANCE || process.env.APP_EVOLUTION_INSTANCE || ''
 };
+const publicBaseUrl = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
 let processing = false;
 
 function authorize(req, res, next) {
@@ -213,7 +214,7 @@ async function processOne() {
     if (!raw) return;
     const job = JSON.parse(raw);
     const isStep2 = jobStep(job) === 'STEP2';
-    const text = isStep2 ? job.step2Text : selectStep1Text(job);
+    const text = applyTimeGreeting(isStep2 ? job.step2Text : selectStep1Text(job), config.timeZone);
     if (!normalizePhone(job.phone) || !text) {
       await emit('SKIPPED', { messageId: job.messageId, reason: 'Contato sem WhatsApp ou texto' });
       await redis.lrem(processingKey, 1, raw);
@@ -299,7 +300,7 @@ async function recoverProcessing() {
 async function recoverConnectionPause() {
   if (!config.deliveryEnabled) return;
   const saved = await redis.hgetall(stateKey);
-  if (saved.pausedReason !== 'CONNECTION') return;
+  if (!['CONNECTION', 'WEBHOOK'].includes(saved.pausedReason)) return;
   const raw = await redis.lindex(priorityQueueKey, 0) || await redis.lindex(queueKey, 0);
   if (!raw) return;
   try {
@@ -312,12 +313,50 @@ async function recoverConnectionPause() {
     const body = await response.json().catch(() => ({}));
     const connectionState = String(body?.instance?.state || body?.state || '').toLowerCase();
     if (response.ok && ['open', 'connected'].includes(connectionState)) {
+      if (!(await ensureReplyWebhook(instance))) {
+        await redis.hset(stateKey, 'paused', 'true', 'pausedReason', 'WEBHOOK');
+        return;
+      }
       await redis.hset(stateKey, 'paused', 'false', 'restrictionDetected', 'false');
       await redis.hdel(stateKey, 'pausedReason');
       console.log(`delivery resumed automatically for ${instance}`);
     }
   } catch (error) {
     console.error('automatic connection recovery check failed', error.message);
+  }
+}
+
+async function ensureReplyWebhook(instance) {
+  if (!instance || !evolution.baseUrl || !evolution.apiKey || !webhookSecret || !publicBaseUrl) return false;
+  try {
+    const response = await fetch(`${evolution.baseUrl}/webhook/set/${encodeURIComponent(instance)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json', apikey: evolution.apiKey },
+      body: JSON.stringify({ webhook: {
+        enabled: true,
+        url: `${publicBaseUrl}/webhooks/outreach-bot`,
+        events: ['MESSAGES_UPSERT'],
+        headers: { 'X-Webhook-Secret': webhookSecret },
+        base64: false
+      } })
+    });
+    if (!response.ok) console.error(`reply webhook configuration failed for ${instance}: HTTP ${response.status}`);
+    return response.ok;
+  } catch (error) {
+    console.error('reply webhook configuration failed', error.message);
+    return false;
+  }
+}
+
+async function ensureQueueWebhook() {
+  const raw = await redis.lindex(priorityQueueKey, 0) || await redis.lindex(queueKey, 0);
+  if (!raw) return;
+  try {
+    const job = JSON.parse(raw);
+    const instance = String(job.evolutionInstance || evolution.instance || '').trim();
+    await ensureReplyWebhook(instance);
+  } catch (error) {
+    console.error('could not inspect queue webhook', error.message);
   }
 }
 
@@ -353,8 +392,10 @@ app.post('/webhooks/evolution', async (req, res) => {
 
 // A entrega é bloqueada em produção por OUTREACH_DELIVERY_ENABLED=false até liberar a conta.
 await recoverProcessing();
+setTimeout(ensureQueueWebhook, 2_000).unref();
 setInterval(processOne, 1_000).unref();
 setInterval(recoverConnectionPause, 15_000).unref();
+setInterval(ensureQueueWebhook, 10 * 60_000).unref();
 setInterval(flushEvents, 15_000).unref();
 setInterval(sendReport, 15 * 60 * 1_000).unref();
 app.listen(port, () => console.log(`outreach-bot listening on ${port}, paused=${config.paused}`));

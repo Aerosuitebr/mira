@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canOpenColdConversation, jobStep, nextColdAt, normalizePhone, reportDay, selectStep1Text } from '../src/state.js';
+import { applyTimeGreeting, canOpenColdConversation, jobStep, nextColdAt, normalizePhone, reportDay, selectStep1Text } from '../src/state.js';
 
 test('normalizes Evolution and E.164 phone forms', () => {
   assert.equal(normalizePhone('552199836870@s.whatsapp.net'), '552199836870');
@@ -13,6 +13,13 @@ test('uses the configured business timezone for the daily report', () => {
   const instant = new Date('2026-08-06T01:30:00.000Z');
   assert.equal(reportDay(instant, 'America/Sao_Paulo'), '2026-08-05');
   assert.equal(reportDay(instant, 'UTC'), '2026-08-06');
+});
+
+test('updates the reviewed greeting at the actual send time', () => {
+  const original = 'Olá, boa tarde! Tudo bem?';
+  assert.equal(applyTimeGreeting(original, 'America/Sao_Paulo', new Date('2026-08-06T11:00:00Z')), 'Olá, bom dia! Tudo bem?');
+  assert.equal(applyTimeGreeting(original, 'America/Sao_Paulo', new Date('2026-08-06T17:00:00Z')), 'Olá, boa tarde! Tudo bem?');
+  assert.equal(applyTimeGreeting(original, 'America/Sao_Paulo', new Date('2026-08-06T23:00:00Z')), 'Olá, boa noite! Tudo bem?');
 });
 
 test('step 1 preserves the reviewed text when it was configured', () => {

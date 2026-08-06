@@ -5,6 +5,21 @@ export function normalizePhone(value) {
   return digits;
 }
 
+export function applyTimeGreeting(text, timeZone = 'America/Sao_Paulo', now = new Date()) {
+  const hour = Number(new Intl.DateTimeFormat('en-US', { timeZone, hour: '2-digit', hourCycle: 'h23' }).format(now));
+  const greeting = hour >= 5 && hour < 12 ? 'bom dia' : hour >= 12 && hour < 18 ? 'boa tarde' : 'boa noite';
+  const value = String(text || '').trim();
+  if (!value) return value;
+  if (/^olá,?\s*(bom dia|boa tarde|boa noite)\b/i.test(value)) {
+    return value.replace(/^olá,?\s*(bom dia|boa tarde|boa noite)\b/i, `Olá, ${greeting}`);
+  }
+  if (/^(bom dia|boa tarde|boa noite)\b/i.test(value)) {
+    return value.replace(/^(bom dia|boa tarde|boa noite)\b/i, greeting[0].toUpperCase() + greeting.slice(1));
+  }
+  if (/^olá!\s*/i.test(value)) return value.replace(/^olá!\s*/i, `Olá, ${greeting}! `);
+  return value;
+}
+
 export function reportDay(now = new Date(), timeZone = 'America/Sao_Paulo') {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,

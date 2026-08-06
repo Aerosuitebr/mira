@@ -252,12 +252,13 @@ public class EvolutionClient {
         if (!isEnabled()) return SendResult.fail("Evolution API desabilitada");
         if (webhookSecret == null || webhookSecret.isBlank()) return SendResult.fail("APP_EVOLUTION_WEBHOOK_SECRET não configurado");
         try {
-            Map<String, Object> body = new HashMap<>();
-            body.put("enabled", true);
-            body.put("url", publicBaseUrl + "/webhooks/outreach-bot");
-            body.put("events", List.of("MESSAGES_UPSERT"));
-            body.put("headers", Map.of("X-Webhook-Secret", webhookSecret));
-            body.put("base64", false);
+            Map<String, Object> webhook = new HashMap<>();
+            webhook.put("enabled", true);
+            webhook.put("url", publicBaseUrl + "/webhooks/outreach-bot");
+            webhook.put("events", List.of("MESSAGES_UPSERT"));
+            webhook.put("headers", Map.of("X-Webhook-Secret", webhookSecret));
+            webhook.put("base64", false);
+            Map<String, Object> body = Map.of("webhook", webhook);
             post("/webhook/set/" + encode(resolveInstance(instance)), body);
             return SendResult.ok(null);
         } catch (Exception ex) {
