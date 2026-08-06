@@ -26,8 +26,9 @@ export class AuthService {
 
   constructor(private readonly http: HttpClient, private readonly router: Router) {}
 
-  login(email: string, password: string) {
-    const path = this.publicMode() ? '/auth/public/login' : '/auth/login';
+  login(email: string, password: string, opts?: { publicOnly?: boolean }) {
+    const publicOnly = opts?.publicOnly ?? this.publicMode();
+    const path = publicOnly ? '/auth/public/login' : '/auth/login';
     return this.http
       .post<AuthSession>(`${environment.apiUrl}${path}`, { email, password })
       .pipe(tap((session) => this.persist(session)));
@@ -44,6 +45,16 @@ export class AuthService {
     sessionStorage.setItem(this.originKey, 'resolva-jato');
     if (!this.publicMode()) {
       this.publicMode.set(true);
+      this.session.set(this.readSession());
+    }
+  }
+
+  /** Volta ao login corporativo e limpa sessão/origem públicas grudadas. */
+  clearPublicMode(): void {
+    sessionStorage.removeItem(this.originKey);
+    sessionStorage.removeItem(this.publicStorageKey);
+    if (this.publicMode()) {
+      this.publicMode.set(false);
       this.session.set(this.readSession());
     }
   }

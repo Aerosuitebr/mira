@@ -33,14 +33,18 @@ export class LoginComponent {
   });
 
   constructor() {
-    this.publicAccess =
-      this.route.snapshot.queryParamMap.get('origem') === 'resolva-jato' || this.auth.publicMode();
-    if (this.publicAccess) {
+    const fromResolvaJato = this.route.snapshot.queryParamMap.get('origem') === 'resolva-jato';
+    if (fromResolvaJato) {
       this.auth.activatePublicMode();
+      this.publicAccess = true;
       this.registering = true;
       this.form.controls.password.setValidators([Validators.required, Validators.minLength(8)]);
       this.form.controls.password.updateValueAndValidity({ emitEvent: false });
     } else {
+      // /login sem origem=resolva-jato sempre e corporativo, mesmo se a aba
+      // ainda tiver mira-origin no sessionStorage de uma visita anterior.
+      this.auth.clearPublicMode();
+      this.publicAccess = false;
       this.form.patchValue({ email: 'demo@prospectportal.com', password: 'demo123' });
     }
   }
@@ -57,7 +61,7 @@ export class LoginComponent {
     const { fullName, email, password } = this.form.getRawValue();
     const request = this.publicAccess && this.registering
       ? this.auth.registerPublic(fullName, email, password)
-      : this.auth.login(email, password);
+      : this.auth.login(email, password, { publicOnly: this.publicAccess });
     request.subscribe({
       next: () => {
         const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
