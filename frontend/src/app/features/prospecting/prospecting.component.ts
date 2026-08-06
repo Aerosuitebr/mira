@@ -1,5 +1,5 @@
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
-import { Component, HostListener, OnInit, inject } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
@@ -61,7 +61,7 @@ interface PlaybookStep {
   templateUrl: './prospecting.component.html',
   styleUrl: './prospecting.component.scss'
 })
-export class ProspectingComponent implements OnInit {
+export class ProspectingComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -110,6 +110,7 @@ export class ProspectingComponent implements OnInit {
   followUpsAwaitingApproval: FollowUpReviewItem[] = [];
   approvingFollowUpId: string | null = null;
   private jobPollHandle: ReturnType<typeof setInterval> | null = null;
+  private outreachPollHandle: ReturnType<typeof setInterval> | null = null;
 
   autoProspect = {
     limit: 5,
@@ -234,6 +235,12 @@ export class ProspectingComponent implements OnInit {
     this.loadOutreachReport();
     this.loadOutreachBotStatus();
     this.loadFollowUpsAwaitingApproval();
+    this.startOutreachPolling();
+  }
+
+  ngOnDestroy(): void {
+    if (this.jobPollHandle) clearInterval(this.jobPollHandle);
+    if (this.outreachPollHandle) clearInterval(this.outreachPollHandle);
   }
 
   private restoreIncomingSelection(): boolean {
@@ -440,6 +447,15 @@ export class ProspectingComponent implements OnInit {
     this.api.followUpsAwaitingApproval().subscribe({
       next: (items) => (this.followUpsAwaitingApproval = items)
     });
+  }
+
+  private startOutreachPolling(): void {
+    this.outreachPollHandle = setInterval(() => {
+      if (this.activeStep !== 3) return;
+      this.loadOutreachBotStatus();
+      this.loadOutreachReport();
+      this.loadFollowUpsAwaitingApproval();
+    }, 15_000);
   }
 
   approveFollowUp(id: string): void {
