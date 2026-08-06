@@ -1,14 +1,18 @@
-name: CI Quality Gate
+name: Validate and Deploy Production
 
 on:
   push:
     branches: [master, main]
   pull_request:
     branches: [master, main]
+  workflow_dispatch:
 
 concurrency:
-  group: ci-quality-${{ github.ref }}
+  group: production-pipeline-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   quality:
@@ -110,3 +114,92 @@ jobs:
       - name: Build frontend (production)
         working-directory: frontend
         run: npm run build -- --configuration=production
+
+      - name: Install outreach bot deps
+        working-directory: services/outreach-bot
+        run: npm ci
+
+      - name: Test outreach bot
+        working-directory: services/outreach-bot
+        run: npm test
+
+  deploy:
+    name: Deploy Vultr and smoke production
+    needs: quality
+    if: github.event_name != 'pull_request' && needs.quality.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout validated commit
+        uses: actions/checkout@v4
+
+      - name: Resolve release SHA
+        id: meta
+        shell: bash
+        run: |
+          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "short=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "Validated release ${GITHUB_SHA}"
+
+      - name: Setup SSH
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_USER: ${{ secrets.PROD_SSH_USER }}
+        run: |
+          set -euo pipefail
+          test -n "${SSH_KEY:-}" && test -n "${SSH_HOST:-}" && test -n "${SSH_USER:-}"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/prod_key
+          chmod 600 ~/.ssh/prod_key
+          cat > ~/.ssh/config <<EOF
+          Host mira-prod
+            HostName ${SSH_HOST}
+            User ${SSH_USER}
+            IdentityFile ~/.ssh/prod_key
+            StrictHostKeyChecking accept-new
+            ConnectTimeout 20
+          EOF
+          ssh mira-prod 'echo SSH_OK && hostname'
+
+      - name: Pack validated release
+        shell: bash
+        run: |
+          set -euo pipefail
+          git archive --format=tar.gz -o /tmp/mira-release.tgz HEAD -- \
+            backend/src/main/java backend/src/main/resources \
+            frontend/src frontend/angular.json frontend/nginx.conf frontend/package.json frontend/package-lock.json \
+            services/outreach-bot docker-compose.production.yml docker-compose.tunnel.yml docker-compose.yml \
+            .env.production.example scripts/deploy/nginx-mira.conf scripts/deploy/prod-remote.sh \
+            scripts/deploy/mira-poll-deploy.sh scripts/deploy/install-mira-poller.sh
+          ls -lh /tmp/mira-release.tgz
+
+      - name: Upload release
+        shell: bash
+        run: |
+          set -euo pipefail
+          scp /tmp/mira-release.tgz mira-prod:/tmp/mira-release.tgz
+          printf '%s\n' '${{ steps.meta.outputs.sha }}' > /tmp/mira-release.sha
+          scp /tmp/mira-release.sha mira-prod:/tmp/mira-release.sha
+
+      - name: Rebuild and restart production
+        shell: bash
+        run: |
+          set -euo pipefail
+          scp scripts/deploy/prod-remote.sh mira-prod:/tmp/mira-prod-remote.sh
+          ssh mira-prod 'sed -i "s/\r$//" /tmp/mira-prod-remote.sh && bash /tmp/mira-prod-remote.sh'
+
+      - name: Public smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 20); do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' https://search.aerosuite.com.br/ || true)"
+            echo "attempt=${attempt} public_http=${code}"
+            [[ "$code" == "200" ]] && exit 0
+            sleep 3
+          done
+          echo 'Public smoke failed'
+          exit 1
