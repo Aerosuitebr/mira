@@ -145,6 +145,20 @@ public class InternalOutreachController {
             default -> { return; }
         }
         messageRepository.save(message);
+        if (message.getOutreachStep() == 1) refreshCampaignStatus(message);
+    }
+
+    private void refreshCampaignStatus(OutreachMessage message) {
+        var campaign = message.getCampaign();
+        UUID campaignId = campaign.getId();
+        long pending = messageRepository.countByCampaignIdAndOutreachStepAndStatusIn(campaignId, (short) 1,
+            java.util.List.of("QUEUED_BOT", "PENDING"));
+        long delivered = messageRepository.countByCampaignIdAndOutreachStepAndStatusIn(campaignId, (short) 1,
+            java.util.List.of("SENT", "WAITING_REPLY", "REPLIED"));
+        long failed = messageRepository.countByCampaignIdAndOutreachStepAndStatusIn(campaignId, (short) 1,
+            java.util.List.of("FAILED", "SKIPPED", "THROTTLED"));
+        campaign.setStatus(pending > 0 ? "SENDING" : (failed > 0 ? (delivered > 0 ? "PARTIAL" : "FAILED") : "SENT"));
+        campaignRepository.save(campaign);
     }
 
     private static String stringValue(Object value) {

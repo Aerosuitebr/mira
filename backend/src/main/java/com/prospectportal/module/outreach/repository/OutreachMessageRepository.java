@@ -84,6 +84,8 @@ public interface OutreachMessageRepository extends JpaRepository<OutreachMessage
     long countByTenantAndStepAndStatusIn(@Param("tenantId") UUID tenantId, @Param("step") short step,
                                          @Param("statuses") List<String> statuses);
 
+    long countByCampaignIdAndOutreachStepAndStatusIn(UUID campaignId, short outreachStep, List<String> statuses);
+
     @Query("""
         SELECT COUNT(m) FROM OutreachMessage m
         WHERE m.campaign.tenant.id = :tenantId
