@@ -291,12 +291,23 @@ public class ProspectAutomationService {
             throw new ResponseStatusException(BAD_REQUEST, "Request inválido");
         }
         UUID tenantId = authContext.tenantId();
-        Tenant tenant = tenantRepository.findById(tenantId)
+        Tenant tenant = tenantRepository.findByIdForUpdate(tenantId)
             .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Tenant não encontrado"));
 
         List<UUID> selectedCompanyIds = request.selectedCompanyIds() == null
             ? List.of()
             : request.selectedCompanyIds().stream().distinct().limit(400).toList();
+        if (!selectedCompanyIds.isEmpty()) {
+            var approached = new java.util.HashSet<>(
+                messageRepository.findCompanyIdsWithFirstStepAttempt(tenantId, selectedCompanyIds)
+            );
+            selectedCompanyIds = selectedCompanyIds.stream()
+                .filter(companyId -> !approached.contains(companyId))
+                .toList();
+            if (selectedCompanyIds.isEmpty()) {
+                throw new ResponseStatusException(BAD_REQUEST, "As empresas selecionadas já possuem abordagem registrada. Consulte a campanha existente para evitar contato duplicado.");
+            }
+        }
         int limit = !selectedCompanyIds.isEmpty()
             ? selectedCompanyIds.size()
             : request.companyLimit() != null ? Math.min(Math.max(request.companyLimit(), 1), 400) : 20;
@@ -380,6 +391,8 @@ public class ProspectAutomationService {
     private void prepareJob(UUID jobId, String openingMessage) {
         ProspectJob job = jobRepository.findById(jobId)
             .orElseThrow(() -> new IllegalStateException("Job não encontrado: " + jobId));
+        tenantRepository.findByIdForUpdate(job.getTenant().getId())
+            .orElseThrow(() -> new IllegalStateException("Tenant não encontrado para o job: " + jobId));
 
         // Fase 1 termina com a campanha preparada para revisão. O worker de envio
         // permanece bloqueado por configuração até a etapa de webhook/resposta.
@@ -408,6 +421,12 @@ public class ProspectAutomationService {
                 job.getCompanyLimit()
             );
             companyIds = page.content().stream().map(CompanyResponse::id).limit(job.getCompanyLimit()).toList();
+        }
+        if (!companyIds.isEmpty()) {
+            var approached = new java.util.HashSet<>(
+                messageRepository.findCompanyIdsWithFirstStepAttempt(job.getTenant().getId(), companyIds)
+            );
+            companyIds = companyIds.stream().filter(companyId -> !approached.contains(companyId)).toList();
         }
         job.setFoundCount(companyIds.size());
         jobRepository.save(job);
@@ -441,6 +460,11 @@ public class ProspectAutomationService {
             String cityState = formatCityState(company);
             String segment = company.getCnaeDescription() != null ? company.getCnaeDescription() : company.getCnaeMain();
             var brand = outreachSettingsService.resolveBrand(tenant.getId());
+            String recipient = EvolutionClient.cleanPhone(preferredPhone(contact, company));
+            if (!recipient.isBlank() && messageRepository.existsFirstStepAttemptToRecipient(tenant.getId(), recipient)) {
+                log.info("Empresa {} ignorada: destinatário já possui abordagem registrada", companyName);
+                continue;
+            }
 
             OutreachMessage message = new OutreachMessage();
             message.setCampaign(campaign);
@@ -450,7 +474,7 @@ public class ProspectAutomationService {
             message.setBody(copyBuilder.whatsappStep1(companyName, openingMessage));
             message.setStatus("QUEUED_BOT");
             message.setProspectJobId(job.getId());
-            message.setRecipient(preferredPhone(contact, company));
+            message.setRecipient(recipient);
             message.setCreatedAt(Instant.now());
             messageRepository.save(message);
             String followUp = campaign.getFollowUpBody() == null

@@ -41,6 +41,26 @@ public interface OutreachMessageRepository extends JpaRepository<OutreachMessage
     List<OutreachMessage> findByLeadIdInWithCampaignOrderByCreatedAtDesc(@Param("leadIds") List<UUID> leadIds);
 
     @Query("""
+        SELECT DISTINCT co.id FROM OutreachMessage m
+        JOIN m.lead l
+        JOIN l.company co
+        WHERE m.campaign.tenant.id = :tenantId
+          AND co.id IN :companyIds
+          AND m.outreachStep = 1
+        """)
+    List<UUID> findCompanyIdsWithFirstStepAttempt(@Param("tenantId") UUID tenantId,
+                                                   @Param("companyIds") List<UUID> companyIds);
+
+    @Query("""
+        SELECT CASE WHEN COUNT(m) > 0 THEN true ELSE false END FROM OutreachMessage m
+        WHERE m.campaign.tenant.id = :tenantId
+          AND m.recipient = :recipient
+          AND m.outreachStep = 1
+        """)
+    boolean existsFirstStepAttemptToRecipient(@Param("tenantId") UUID tenantId,
+                                               @Param("recipient") String recipient);
+
+    @Query("""
         SELECT m FROM OutreachMessage m
         JOIN FETCH m.lead l
         JOIN FETCH l.company

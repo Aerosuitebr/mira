@@ -855,6 +855,7 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
     this.hideApproached = (event.target as HTMLInputElement).checked;
     this.pageIndex = 0;
     if (this.hideApproached) {
+      this.removeApproachedFromSelection();
       this.loadApproachStatus(this.allCompanies);
     }
     this.refreshPagedView(false);
@@ -891,6 +892,7 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
         for (const status of statuses) this.approachByCompanyId[status.companyId] = status;
         this.approachByCompanyId = { ...this.approachByCompanyId };
         if (this.hideApproached) {
+          this.removeApproachedFromSelection();
           this.syncCompaniesFromCache();
           queueMicrotask(() => {
             this.renderMarkers(this.mapCompanies);
@@ -900,6 +902,20 @@ export class DiscoverComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       }
     });
+  }
+
+  private removeApproachedFromSelection(): void {
+    let changed = false;
+    for (const companyId of [...this.selected]) {
+      if (this.isApproached(companyId)) {
+        this.selected.delete(companyId);
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.refreshClusterIcons();
+      if (this.hasSearched) this.persistSession();
+    }
   }
 
   sendToAgenda(company: Company): void {

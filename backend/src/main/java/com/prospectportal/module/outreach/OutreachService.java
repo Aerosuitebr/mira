@@ -256,9 +256,9 @@ public class OutreachService {
         Map<UUID, Lead> leads = leadRepository.findByTenantIdAndCompanyIdIn(tenantId, companyIds).stream()
             .collect(java.util.stream.Collectors.toMap(lead -> lead.getCompany().getId(), lead -> lead));
         List<UUID> leadIds = leads.values().stream().map(Lead::getId).toList();
-        Map<UUID, OutreachMessage> latestSent = leadIds.isEmpty() ? Map.of() :
+        Map<UUID, OutreachMessage> latestAttempt = leadIds.isEmpty() ? Map.of() :
             messageRepository.findByLeadIdInWithCampaignOrderByCreatedAtDesc(leadIds).stream()
-                .filter(message -> "SENT".equals(message.getStatus()))
+                .filter(message -> message.getOutreachStep() == 1)
                 .collect(java.util.stream.Collectors.toMap(
                     message -> message.getLead().getId(),
                     message -> message,
@@ -267,7 +267,7 @@ public class OutreachService {
 
         return companyIds.stream().distinct().map(companyId -> {
             Lead lead = leads.get(companyId);
-            OutreachMessage message = lead == null ? null : latestSent.get(lead.getId());
+            OutreachMessage message = lead == null ? null : latestAttempt.get(lead.getId());
             return new ApproachStatusResponse(
                 companyId,
                 lead != null ? lead.getId() : null,
@@ -276,7 +276,7 @@ public class OutreachService {
                 message != null ? message.getChannel() : null,
                 message != null ? message.getProvider() : null,
                 message != null ? message.getRecipient() : null,
-                message != null ? message.getSentAt() : null,
+                message != null ? (message.getSentAt() != null ? message.getSentAt() : message.getCreatedAt()) : null,
                 message != null ? message.getErrorDetail() : null,
                 message != null && isFallback(message),
                 message != null ? message.getCampaign().getName() : null
@@ -373,14 +373,26 @@ public class OutreachService {
         return company.getLegalName();
     }
 
+    @Transactional
     public BulkCampaignResponse sendBulk(BulkOutreachRequest request) {
         if (request.companyIds() == null || request.companyIds().isEmpty()) {
             throw new ResponseStatusException(BAD_REQUEST, "Nenhuma empresa selecionada");
         }
 
         UUID tenantId = authContext.tenantId();
-        Tenant tenant = tenantRepository.findById(tenantId)
+        Tenant tenant = tenantRepository.findByIdForUpdate(tenantId)
             .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Tenant não encontrado"));
+
+        List<UUID> requestedCompanyIds = request.companyIds().stream().distinct().toList();
+        var previouslyApproached = new java.util.HashSet<>(
+            messageRepository.findCompanyIdsWithFirstStepAttempt(tenantId, requestedCompanyIds)
+        );
+        List<UUID> eligibleCompanyIds = requestedCompanyIds.stream()
+            .filter(companyId -> !previouslyApproached.contains(companyId))
+            .toList();
+        if (eligibleCompanyIds.isEmpty()) {
+            throw new ResponseStatusException(BAD_REQUEST, "As empresas selecionadas já possuem abordagem registrada. Use a campanha existente para acompanhar ou reenviar individualmente.");
+        }
 
         OutreachTemplate template = templateRepository.findById(request.templateId())
             .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Template não encontrado"));
@@ -430,7 +442,7 @@ public class OutreachService {
         // Fallback e-mail é a regra padrão quando o canal é WhatsApp.
         boolean emailFallback = request.emailFallbackEnabled();
 
-        for (UUID companyId : request.companyIds()) {
+        for (UUID companyId : eligibleCompanyIds) {
             Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Empresa não encontrada"));
 
@@ -486,8 +498,13 @@ public class OutreachService {
                     }
 
                     String step2Text = body;
+                    String recipient = EvolutionClient.cleanPhone(phone);
+                    if (messageRepository.existsFirstStepAttemptToRecipient(tenantId, recipient)) {
+                        log.info("Empresa {} ignorada: destinatário já possui abordagem registrada", companyName);
+                        continue;
+                    }
                     message.setChannel("WHATSAPP");
-                    message.setRecipient(EvolutionClient.cleanPhone(phone));
+                    message.setRecipient(recipient);
                     message.setBody(copyBuilder.whatsappStep1(companyName));
                     message.setStatus("QUEUED_BOT");
                     messageRepository.save(message);
