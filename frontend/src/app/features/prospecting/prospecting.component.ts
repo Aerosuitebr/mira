@@ -135,8 +135,18 @@ export class ProspectingComponent implements OnInit, OnDestroy {
   }
 
   get approvalAdminCount(): number {
+    return this.approvalAdmins.length;
+  }
+
+  get approvalAdmins(): string[] {
     return [this.outreachSettings?.approvalRecipient1, this.outreachSettings?.approvalRecipient2]
-      .filter((recipient) => !!recipient?.trim()).length;
+      .filter((recipient): recipient is string => !!recipient?.trim())
+      .map((recipient) => recipient.trim());
+  }
+
+  get connectedWhatsAppLabel(): string {
+    if (!this.whatsappConnection?.connected) return 'Não conectado';
+    return this.whatsappConnection.phone?.trim() || this.whatsappConnection.instanceName?.trim() || 'Conectado';
   }
 
   private saoPauloGreeting(): string {

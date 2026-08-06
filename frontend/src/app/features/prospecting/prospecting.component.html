@@ -32,7 +32,10 @@
       <span class="readiness-item__light" aria-hidden="true"></span>
       <span class="readiness-item__copy">
         <small>WhatsApp</small>
-        <strong>{{ loadingReadiness ? 'Verificando...' : (whatsappConnection?.connected ? 'Conectado' : 'Não conectado') }}</strong>
+        <strong>{{ loadingReadiness ? 'Verificando...' : connectedWhatsAppLabel }}</strong>
+        @if (!loadingReadiness && whatsappConnection?.connected && whatsappConnection?.phone) {
+          <em>Número conectado</em>
+        }
       </span>
       <span class="readiness-item__action">{{ whatsappConnection?.connected ? 'Gerenciar' : 'Conectar' }} →</span>
     </a>
@@ -50,6 +53,11 @@
           @else if (approvalAdminCount > 0) { {{ approvalAdminCount }} {{ approvalAdminCount === 1 ? 'cadastrado' : 'cadastrados' }} }
           @else { Nenhum cadastrado }
         </strong>
+        @if (!loadingReadiness && approvalAdmins.length > 0) {
+          <span class="readiness-item__details">
+            @for (admin of approvalAdmins; track admin) { <em>{{ admin }}</em> }
+          </span>
+        }
       </span>
       <span class="readiness-item__action">Configurar →</span>
     </a>
