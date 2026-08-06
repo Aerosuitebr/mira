@@ -766,6 +766,7 @@ export class ApiService {
     dryRun?: boolean;
     selectedCompanyIds?: string[];
     openingMessage?: string;
+    followUpBody?: string;
   }) {
     return this.http.post<ProspectJob>(`${environment.apiUrl}/prospect/jobs`, payload);
   }

@@ -116,3 +116,12 @@ textarea {
 .campaign-created-modal__warning { padding: .75rem; border-radius: 10px; background: rgba(245, 158, 11, .12); color: #fde68a; font-size: .8rem; line-height: 1.45; }
 .campaign-created-modal__actions { display: flex; justify-content: flex-end; gap: .65rem; margin-top: 1.15rem; }
 @media (max-width: 700px) { .campaign-started-banner { grid-template-columns: auto 1fr; } .campaign-started-banner .pp-btn { grid-column: 1 / -1; } .campaign-created-modal__actions { flex-direction: column-reverse; } }
+.follow-up-editor-block { display: grid; gap: .8rem; padding-top: 1rem; border-top: 1px solid rgba(129, 140, 248, .2); }
+.follow-up-required { align-self: start; padding: .25rem .5rem; border-radius: 99px; background: rgba(192, 132, 252, .13); color: #d8b4fe; font-size: .68rem; font-weight: 700; }
+.message-template-picker { display: flex; flex-wrap: wrap; gap: .45rem; }
+.message-template-picker button { padding: .42rem .65rem; border: 1px solid rgba(129, 140, 248, .28); border-radius: 9px; background: rgba(99, 102, 241, .09); color: #c7d2fe; font-size: .72rem; cursor: pointer; }
+.message-template-picker button:hover { border-color: rgba(129, 140, 248, .6); background: rgba(99, 102, 241, .17); }
+.opening-preview--follow-up { background: rgba(76, 29, 149, .24) !important; border-color: rgba(192, 132, 252, .25) !important; }
+.follow-up-save-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .7rem; border-radius: 10px; background: rgba(15, 23, 42, .4); }
+.follow-up-save-row small { color: var(--pp-text-secondary); }
+@media (max-width: 700px) { .follow-up-save-row { align-items: stretch; flex-direction: column; } }

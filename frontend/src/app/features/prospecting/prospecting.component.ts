@@ -118,6 +118,7 @@ export class ProspectingComponent implements OnInit, OnDestroy {
   outreachSettings: OutreachSettings | null = null;
   loadingReadiness = true;
   updatingOutreachBot = false;
+  savingFollowUp = false;
   followUpsAwaitingApproval: FollowUpReviewItem[] = [];
   approvingFollowUpId: string | null = null;
   private jobPollHandle: ReturnType<typeof setInterval> | null = null;
@@ -126,8 +127,15 @@ export class ProspectingComponent implements OnInit, OnDestroy {
   autoProspect = {
     limit: 5,
     testMode: false,
-    openingMessage: `${this.saoPauloGreeting()}! Tudo bem? Nesse contato falo com o responsável comercial da {{empresa}}?`
+    openingMessage: `${this.saoPauloGreeting()}! Tudo bem? Nesse contato falo com o responsável comercial da {{empresa}}?`,
+    followUpMessage: `${this.saoPauloGreeting()}! Obrigado pelo retorno. A Aero Suite ajuda a {{empresa}} a organizar o fluxo comercial e operacional em um só lugar. Posso apresentar em uma conversa rápida de 15 minutos?`
   };
+
+  readonly followUpTemplates = [
+    { label: 'Diagnóstico rápido', body: `${this.saoPauloGreeting()}! Obrigado pelo retorno. Gostaria de entender como a {{empresa}} organiza hoje seus contatos, propostas e operação. Podemos fazer um diagnóstico rápido de 15 minutos?` },
+    { label: 'Apresentação objetiva', body: `${this.saoPauloGreeting()}! Obrigado por responder. A Aero Suite centraliza o fluxo comercial e operacional da {{empresa}}. Posso mostrar os principais ganhos em uma apresentação breve?` },
+    { label: 'Próximo passo', body: `${this.saoPauloGreeting()}! Perfeito, obrigado pelo retorno. Para avançarmos, posso agendar uma conversa rápida e preparar uma demonstração direcionada à realidade da {{empresa}}?` }
+  ];
 
   get openingMessagePreview(): string {
     const company = this.selectedCompanies[0];
@@ -139,6 +147,12 @@ export class ProspectingComponent implements OnInit, OnDestroy {
     const company = this.selectedCompanies[0];
     return company ? (company.tradeName || company.legalName) : 'um lead';
   }
+
+  get followUpMessagePreview(): string {
+    return this.autoProspect.followUpMessage.replaceAll('{{empresa}}', this.openingPreviewCompanyName);
+  }
+
+  applyFollowUpTemplate(body: string): void { this.autoProspect.followUpMessage = body; }
 
   get currentSelectionPrepared(): boolean {
     return this.preparedSelectionKey !== '' && this.preparedSelectionKey === this.selectionKey();
@@ -355,7 +369,9 @@ export class ProspectingComponent implements OnInit, OnDestroy {
         keyword: this.filters.keyword || undefined,
         companyLimit: this.autoProspect.limit,
         testMode: this.autoProspect.testMode,
-        dryRun: false
+        dryRun: false,
+        openingMessage: this.autoProspect.openingMessage.trim(),
+        followUpBody: this.autoProspect.followUpMessage.trim()
       })
       .subscribe({
         next: (job) => {
@@ -451,6 +467,11 @@ export class ProspectingComponent implements OnInit, OnDestroy {
       next: (jobs) => {
         const latest = jobs[0] ?? null;
         this.activeJob = latest;
+        if (latest?.campaignId) {
+          this.api.campaignDetail(latest.campaignId).subscribe({
+            next: campaign => { if (campaign.followUpBody) this.autoProspect.followUpMessage = campaign.followUpBody; }
+          });
+        }
         if (latest && (latest.status === 'RUNNING' || latest.status === 'QUEUED')) {
           this.startJobPolling(latest.id);
         }
@@ -468,6 +489,10 @@ export class ProspectingComponent implements OnInit, OnDestroy {
       this.errorMessage = 'Escreva a primeira mensagem antes de preparar a fila.';
       return;
     }
+    if (!this.autoProspect.followUpMessage.trim()) {
+      this.errorMessage = 'Defina a segunda mensagem antes de criar a campanha.';
+      return;
+    }
     this.startingAutoProspect = true;
     this.errorMessage = '';
     const selectedIds = [...this.selectedCompanyIds];
@@ -477,7 +502,8 @@ export class ProspectingComponent implements OnInit, OnDestroy {
       testMode: this.autoProspect.testMode,
       dryRun: false,
       selectedCompanyIds: selectedIds,
-      openingMessage: this.autoProspect.openingMessage.trim()
+      openingMessage: this.autoProspect.openingMessage.trim(),
+      followUpBody: this.autoProspect.followUpMessage.trim()
     }).subscribe({
       next: (job) => {
         this.activeJob = job;
@@ -493,6 +519,15 @@ export class ProspectingComponent implements OnInit, OnDestroy {
         this.startingAutoProspect = false;
         this.errorMessage = err?.error?.message || 'Não foi possível preparar a etapa 1.';
       }
+    });
+  }
+
+  saveCurrentFollowUp(): void {
+    if (!this.activeJob?.campaignId || !this.autoProspect.followUpMessage.trim()) return;
+    this.savingFollowUp = true;
+    this.api.updateCampaign(this.activeJob.campaignId, { followUpBody: this.autoProspect.followUpMessage.trim() }).subscribe({
+      next: () => { this.savingFollowUp = false; this.statusMessage = 'Segunda mensagem salva na campanha e atualizada em todos os itens pendentes da fila.'; },
+      error: err => { this.savingFollowUp = false; this.errorMessage = err?.error?.message || 'Não foi possível salvar a segunda mensagem.'; }
     });
   }
 

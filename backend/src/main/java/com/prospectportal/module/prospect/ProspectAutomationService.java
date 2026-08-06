@@ -303,11 +303,15 @@ public class ProspectAutomationService {
         boolean testMode = request.testMode() != null ? request.testMode() : defaultTestMode;
         boolean dryRun = Boolean.TRUE.equals(request.dryRun());
         String openingMessage = blankToNull(request.openingMessage());
+        String followUpBody = blankToNull(request.followUpBody());
         if (openingMessage != null && openingMessage.length() > 500) {
             throw new ResponseStatusException(BAD_REQUEST, "A primeira mensagem deve ter no máximo 500 caracteres.");
         }
         if (openingMessage != null && openingMessage.toLowerCase().matches("(?s).*(https?://|www\\.).*")) {
             throw new ResponseStatusException(BAD_REQUEST, "A primeira mensagem não pode conter links.");
+        }
+        if (followUpBody == null || followUpBody.length() > 2000) {
+            throw new ResponseStatusException(BAD_REQUEST, "A segunda mensagem deve ter entre 1 e 2.000 caracteres.");
         }
 
         OutreachCampaign campaign = new OutreachCampaign();
@@ -318,6 +322,7 @@ public class ProspectAutomationService {
         campaign.setChannel("AUTO");
         campaign.setStatus("QUEUED");
         campaign.setSentCount(0);
+        campaign.setFollowUpBody(followUpBody);
         campaign.setCreatedAt(Instant.now());
         campaign = campaignRepository.save(campaign);
 
@@ -448,7 +453,10 @@ public class ProspectAutomationService {
             message.setRecipient(preferredPhone(contact, company));
             message.setCreatedAt(Instant.now());
             messageRepository.save(message);
-            outreachBotQueueService.enqueue(message, companyName, copyBuilder.whatsappFollowUp(companyName, brand));
+            String followUp = campaign.getFollowUpBody() == null
+                ? copyBuilder.whatsappFollowUp(companyName, brand)
+                : campaign.getFollowUpBody().replace("{{empresa}}", companyName);
+            outreachBotQueueService.enqueue(message, companyName, followUp);
             queued++;
         }
 

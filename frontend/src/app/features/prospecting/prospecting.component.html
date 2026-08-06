@@ -356,6 +356,32 @@
                   <small>WhatsApp · mensagem 1 de 2</small>
                 </div>
               </div>
+              <section class="follow-up-editor-block">
+                <div class="auto-prospect-head">
+                  <div><h3>Segunda mensagem</h3><p>Enviada somente para quem responder à abertura e depois da aprovação humana.</p></div>
+                  <span class="follow-up-required">Obrigatória antes de iniciar</span>
+                </div>
+                <div class="message-template-picker" aria-label="Modelos sugeridos para a segunda mensagem">
+                  @for (template of followUpTemplates; track template.label) {
+                    <button type="button" (click)="applyFollowUpTemplate(template.body)">{{ template.label }}</button>
+                  }
+                </div>
+                <div class="opening-editor opening-editor--follow-up">
+                  <label class="pp-field opening-editor__field">
+                    <span>Mensagem após resposta</span>
+                    <textarea class="pp-input" name="followUpMessage" [(ngModel)]="autoProspect.followUpMessage" rows="6" maxlength="2000" placeholder="Defina a continuação que será revisada antes do envio"></textarea>
+                    <small><b>{{ autoProspect.followUpMessage.length }}/2.000</b> Use <code>{{ '{{empresa}}' }}</code> para personalizar. A saudação sugerida considera o horário de Brasília.</small>
+                  </label>
+                  <div class="opening-preview opening-preview--follow-up" aria-live="polite">
+                    <span>Prévia da etapa 2 para {{ openingPreviewCompanyName }}</span>
+                    <p>{{ followUpMessagePreview }}</p>
+                    <small>WhatsApp · mensagem 2 de 2 · sujeita à aprovação</small>
+                  </div>
+                </div>
+                @if (activeJob?.campaignId) {
+                  <div class="follow-up-save-row"><small>Esta campanha já existe. Salve para atualizar a etapa 2 dos itens que ainda estão na fila.</small><button type="button" class="pp-btn pp-btn--secondary" (click)="saveCurrentFollowUp()" [disabled]="savingFollowUp || !autoProspect.followUpMessage.trim()">@if (savingFollowUp) { Salvando... } @else { Salvar etapa 2 na campanha atual }</button></div>
+                }
+              </section>
               <div class="auto-prospect-actions">
                 <label class="pp-field">
                   <span>Leads selecionados</span>
@@ -365,7 +391,7 @@
                   type="button"
                   class="pp-btn pp-btn--primary"
                   [class.campaign-prepared-button]="currentSelectionPrepared"
-                  [disabled]="startingAutoProspect || currentSelectionPrepared || !autoProspect.openingMessage.trim() || selectedCompanyIds.size === 0"
+                  [disabled]="startingAutoProspect || currentSelectionPrepared || !autoProspect.openingMessage.trim() || !autoProspect.followUpMessage.trim() || selectedCompanyIds.size === 0"
                   (click)="startSelectedTwoStepQueue()"
                 >
                   @if (startingAutoProspect) { Preparando... }

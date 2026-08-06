@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Map;
 import java.util.List;
+import java.util.UUID;
 
 /** Publica somente trabalho do fluxo WhatsApp protegido. O MIRA não envia o contato frio. */
 @Service
@@ -87,6 +88,24 @@ public class OutreachBotQueueService {
                 } catch (JsonProcessingException ignored) {
                     // Item inválido será tratado pelo consumidor e não bloqueia a edição.
                 }
+            }
+        }
+    }
+
+    /** Atualiza a etapa 2 de todos os itens frios ainda pendentes da campanha. */
+    @SuppressWarnings("unchecked")
+    public void updateQueuedFollowUp(UUID campaignId, String template) {
+        List<String> jobs = redis.opsForList().range(COLD_QUEUE, 0, -1);
+        if (jobs == null) return;
+        for (int index = 0; index < jobs.size(); index++) {
+            try {
+                Map<String, Object> payload = objectMapper.readValue(jobs.get(index), Map.class);
+                if (!campaignId.toString().equals(String.valueOf(payload.get("campaignId")))) continue;
+                String companyName = String.valueOf(payload.getOrDefault("companyName", ""));
+                payload.put("step2Text", template.replace("{{empresa}}", companyName));
+                redis.opsForList().set(COLD_QUEUE, index, objectMapper.writeValueAsString(payload));
+            } catch (JsonProcessingException ignored) {
+                // Um item inválido não impede a atualização dos demais.
             }
         }
     }

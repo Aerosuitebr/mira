@@ -147,6 +147,7 @@ public class OutreachService {
             if (request.followUpBody().isBlank() || request.followUpBody().length() > 2000)
                 throw new ResponseStatusException(BAD_REQUEST, "A etapa 2 deve ter entre 1 e 2.000 caracteres");
             campaign.setFollowUpBody(request.followUpBody().trim());
+            outreachBotQueueService.updateQueuedFollowUp(campaign.getId(), campaign.getFollowUpBody());
         }
         campaignRepository.save(campaign);
         return campaignDetail(id);

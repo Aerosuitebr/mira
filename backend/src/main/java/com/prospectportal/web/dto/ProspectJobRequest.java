@@ -13,6 +13,7 @@ public record ProspectJobRequest(
     Boolean testMode,
     Boolean dryRun,
     List<UUID> selectedCompanyIds,
-    String openingMessage
+    String openingMessage,
+    String followUpBody
 ) {
 }
