@@ -14,6 +14,25 @@
     </div>
   </header>
 
+  <a
+    routerLink="/whatsapp"
+    class="whatsapp-readiness"
+    [class.whatsapp-readiness--connected]="whatsappConnection?.connected"
+    [class.whatsapp-readiness--offline]="!checkingWhatsApp && !whatsappConnection?.connected"
+  >
+    <span class="whatsapp-readiness__light" aria-hidden="true"></span>
+    <span class="whatsapp-readiness__copy">
+      <small>Conexão necessária para os alertas</small>
+      <strong>
+        @if (checkingWhatsApp) { Verificando WhatsApp... }
+        @else if (whatsappConnection?.connected) { {{ connectedWhatsAppNumber }} }
+        @else { WhatsApp não conectado }
+      </strong>
+      <em>{{ whatsappConnection?.connected ? 'Clique para gerenciar a conexão' : 'Clique para conectar agora' }}</em>
+    </span>
+    <span class="whatsapp-readiness__action">{{ whatsappConnection?.connected ? 'Gerenciar' : 'Conectar' }} →</span>
+  </a>
+
   @if (loading) {
     <p class="settings-muted">Carregando…</p>
   } @else {
@@ -98,8 +117,8 @@
     }
 
     <div class="settings-actions">
-      <button type="button" class="pp-btn pp-btn--outline" (click)="testApprovalNotification()" [disabled]="testingApprovalNotification">
-        {{ testingApprovalNotification ? 'Enviando teste…' : 'Testar alerta aos responsáveis' }}
+      <button type="button" class="pp-btn pp-btn--outline" (click)="testApprovalNotification()" [disabled]="testingApprovalNotification || checkingWhatsApp || !whatsappConnection?.connected">
+        {{ testingApprovalNotification ? 'Enviando teste…' : (whatsappConnection?.connected ? 'Testar alerta aos responsáveis' : 'Conecte o WhatsApp para testar') }}
       </button>
       <button type="button" class="pp-btn pp-btn--primary" (click)="save()" [disabled]="saving">
         {{ saving ? 'Salvando…' : 'Salvar configurações' }}

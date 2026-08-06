@@ -1,8 +1,8 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ApiService, OutreachSettings } from '../../core/api.service';
-import { brazilPhoneValidationMessage, formatBrazilPhoneInput, isValidBrazilPhone, toWhatsAppPhone } from '../../core/phone.util';
+import { ApiService, OutreachSettings, WhatsAppConnection } from '../../core/api.service';
+import { brazilPhoneValidationMessage, formatBrazilPhoneDisplay, formatBrazilPhoneInput, isValidBrazilPhone, toWhatsAppPhone } from '../../core/phone.util';
 
 @Component({
   selector: 'app-outreach-settings',
@@ -22,6 +22,8 @@ export class OutreachSettingsComponent implements OnInit {
   clearBrandImage = false;
   approvalRecipient1 = '';
   approvalRecipient2 = '';
+  whatsappConnection: WhatsAppConnection | null = null;
+  checkingWhatsApp = true;
 
   loading = true;
   saving = false;
@@ -31,6 +33,21 @@ export class OutreachSettingsComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.loadWhatsAppStatus();
+  }
+
+  get connectedWhatsAppNumber(): string {
+    return formatBrazilPhoneDisplay(this.whatsappConnection?.phone)
+      || this.whatsappConnection?.instanceName
+      || 'WhatsApp conectado';
+  }
+
+  private loadWhatsAppStatus(): void {
+    this.checkingWhatsApp = true;
+    this.api.whatsappStatus().subscribe({
+      next: (status) => { this.whatsappConnection = status; this.checkingWhatsApp = false; },
+      error: () => { this.whatsappConnection = null; this.checkingWhatsApp = false; }
+    });
   }
 
   load(): void {
@@ -134,17 +151,26 @@ export class OutreachSettingsComponent implements OnInit {
   }
 
   testApprovalNotification(): void {
+    if (!this.whatsappConnection?.connected) {
+      this.message = '';
+      this.error = 'Conecte o WhatsApp antes de testar o alerta aos responsáveis.';
+      return;
+    }
     this.testingApprovalNotification = true;
     this.message = '';
     this.error = '';
     this.api.testApprovalNotification().subscribe({
       next: result => {
         this.testingApprovalNotification = false;
-        this.message = result.error || `Alerta enviado a ${result.sentCount} de ${result.configuredCount} responsável(is).`;
+        if (result.error || result.sentCount === 0) {
+          this.error = 'Não foi possível enviar o teste. Verifique a conexão do WhatsApp e os números cadastrados.';
+          return;
+        }
+        this.message = `Alerta enviado a ${result.sentCount} de ${result.configuredCount} responsável(is).`;
       },
       error: err => {
         this.testingApprovalNotification = false;
-        this.error = err?.error?.message || 'Não foi possível enviar o alerta de teste.';
+        this.error = 'Não foi possível enviar o teste. Verifique a conexão do WhatsApp e tente novamente.';
       }
     });
   }
