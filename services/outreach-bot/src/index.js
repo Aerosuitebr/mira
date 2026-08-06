@@ -165,11 +165,12 @@ async function sendReport() {
   }
 }
 
-async function sendText(destination, text) {
-  if (!evolution.baseUrl || !evolution.apiKey || !evolution.instance) {
+async function sendText(destination, text, requestedInstance) {
+  const instance = String(requestedInstance || evolution.instance || '').trim();
+  if (!evolution.baseUrl || !evolution.apiKey || !instance) {
     throw new Error('Evolution não configurada no outreach-bot');
   }
-  const response = await fetch(`${evolution.baseUrl}/message/sendText/${encodeURIComponent(evolution.instance)}`, {
+  const response = await fetch(`${evolution.baseUrl}/message/sendText/${encodeURIComponent(instance)}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json', apikey: evolution.apiKey },
     body: JSON.stringify({ number: normalizePhone(destination), text })
@@ -216,7 +217,7 @@ async function processOne() {
       return;
     }
     try {
-      const providerMessageId = await sendText(job.phone, text);
+      const providerMessageId = await sendText(job.phone, text, job.evolutionInstance);
       if (isStep2) {
         await emit('STEP2_SENT', { messageId: job.messageId, phone: normalizePhone(job.phone), providerMessageId, step2Text: job.step2Text });
         await incrementMetric('STEP2_SENT');

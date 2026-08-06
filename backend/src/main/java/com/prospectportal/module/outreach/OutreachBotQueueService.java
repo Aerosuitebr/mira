@@ -32,6 +32,7 @@ public class OutreachBotQueueService {
                 "companyId", message.getLead().getCompany().getId().toString(),
                 "phone", message.getRecipient() == null ? "" : message.getRecipient(),
                 "companyName", companyName,
+                "evolutionInstance", evolutionInstance(message),
                 "step1Text", message.getBody(),
                 "step2Text", step2Text,
                 "approachId", "DIRECT"
@@ -54,6 +55,7 @@ public class OutreachBotQueueService {
                 "companyId", message.getLead().getCompany().getId().toString(),
                 "phone", message.getRecipient() == null ? "" : message.getRecipient(),
                 "companyName", companyName,
+                "evolutionInstance", evolutionInstance(message),
                 "step2Text", message.getBody(),
                 "approachId", "APPROVED_FOLLOW_UP"
             ));
@@ -69,6 +71,11 @@ public class OutreachBotQueueService {
             return;
         }
         enqueue(message, message.getLead().getCompany().getTradeName(), message.getBody());
+    }
+
+    private String evolutionInstance(OutreachMessage message) {
+        String instance = message.getCampaign().getTenant().getEvolutionInstanceName();
+        return instance == null ? "" : instance.trim();
     }
 
     /** Atualiza o snapshot ainda pendente sem alterar a posição na fila. */

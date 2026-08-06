@@ -2,7 +2,7 @@ import { Component, HostListener, OnDestroy, OnInit, inject } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { ApiService, Campaign, CampaignDetail, CampaignMessageDetail, OutreachBotStatus } from '../../core/api.service';
+import { ApiService, Campaign, CampaignDetail, CampaignMessageDetail, OutreachBotStatus, WhatsAppConnection } from '../../core/api.service';
 
 @Component({
   selector: 'app-campaign-control', standalone: true, imports: [FormsModule, DatePipe, RouterLink],
@@ -13,6 +13,7 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
   campaigns: Campaign[] = [];
   detail: CampaignDetail | null = null;
   bot: OutreachBotStatus | null = null;
+  whatsapp: WhatsAppConnection | null = null;
   selectedId = '';
   search = '';
   statusFilter = 'ALL';
@@ -65,12 +66,14 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
   }
 
   get hasWhatsAppConnectionIssue(): boolean {
-    return (this.detail?.messages || []).some(message => this.isConnectionError(message.errorDetail));
+    return this.whatsapp !== null && !this.whatsapp.connected;
   }
 
   friendlyDeliveryIssue(message: CampaignMessageDetail): string {
     const detail = message.errorDetail || '';
-    if (this.isConnectionError(detail)) return 'WhatsApp desconectado. Reconecte a conta para continuar o envio.';
+    if (this.isConnectionError(detail)) return this.whatsapp?.connected
+      ? 'Envio não concluído anteriormente. A conta está conectada; reenfileire para tentar novamente.'
+      : 'WhatsApp desconectado. Reconecte a conta para continuar o envio.';
     if (/sem whatsapp|sem destinat[aá]rio|telefone|n[uú]mero inv[aá]lido/i.test(detail)) return 'Este contato precisa de um número de WhatsApp válido.';
     if (/limit|thrott|rate|restri[cç][aã]o/i.test(detail)) return 'Envio temporariamente pausado para proteger sua conta.';
     return 'Não foi possível concluir este envio. Verifique a conexão e tente novamente.';
@@ -102,6 +105,7 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
       if (this.openModalAfterLoad) { this.detailModalOpen = true; this.openModalAfterLoad = false; }
     }, error: e => { this.loading = false; this.error = e?.error?.message || 'Falha ao consultar a campanha.'; } });
     this.api.outreachBotStatus().subscribe({ next: status => this.bot = status, error: () => this.bot = null });
+    this.api.whatsappStatus().subscribe({ next: status => this.whatsapp = status, error: () => this.whatsapp = null });
   }
 
   closeDetailModal(): void { this.detailModalOpen = false; }
