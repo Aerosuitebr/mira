@@ -59,11 +59,10 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
       return matchesSearch && matchesFilter;
     });
   }
-  get completionPercent(): number {
+  get deliveryPercent(): number {
     if (!this.detail || !this.uniqueCompanies) return 0;
-    return Math.round(((this.detail.sent + this.detail.failed + this.detail.skipped) / this.uniqueCompanies) * 100);
+    return Math.round((this.detail.sent / this.uniqueCompanies) * 100);
   }
-  get processedCount(): number { return this.detail ? this.detail.sent + this.detail.failed + this.detail.skipped : 0; }
 
   get hasWhatsAppConnectionIssue(): boolean {
     return (this.detail?.messages || []).some(message => this.isConnectionError(message.errorDetail));
