@@ -163,7 +163,8 @@ export class OutreachSettingsComponent implements OnInit {
       next: result => {
         this.testingApprovalNotification = false;
         if (result.error || result.sentCount === 0) {
-          this.error = 'Não foi possível enviar o teste. Verifique a conexão do WhatsApp e os números cadastrados.';
+          this.error = result.error
+            || 'Não foi possível enviar o teste. Verifique a conexão do WhatsApp e os números cadastrados.';
           return;
         }
         this.message = `Alerta enviado a ${result.sentCount} de ${result.configuredCount} responsável(is).`;

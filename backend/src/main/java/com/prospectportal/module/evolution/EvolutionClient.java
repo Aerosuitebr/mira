@@ -267,10 +267,15 @@ public class EvolutionClient {
 
     /** Alerta operacional para contatos internos; não habilita envios aos leads. */
     public SendResult sendInternalNotification(String phoneE164, String text) {
+        return sendInternalNotification(defaultInstance, phoneE164, text);
+    }
+
+    /** Alerta interno pela instância do tenant (não pela instância padrão global). */
+    public SendResult sendInternalNotification(String instance, String phoneE164, String text) {
         if (!internalNotificationsEnabled) {
             return SendResult.fail("Alertas internos WhatsApp desabilitados");
         }
-        return sendTextUnchecked(defaultInstance, phoneE164, text);
+        return sendTextUnchecked(instance, phoneE164, text);
     }
 
     private SendResult sendTextUnchecked(String instance, String phoneE164, String text) {

@@ -28,6 +28,7 @@ public class WhatsAppReplyAutomationService {
     private final OutreachSettingsService settingsService;
     private final ProspectCopyBuilder copyBuilder;
     private final EvolutionClient evolutionClient;
+    private final WhatsAppConnectionService whatsAppConnectionService;
     private final OutreachBotQueueService outreachBotQueueService;
     private final String publicBaseUrl;
 
@@ -36,6 +37,7 @@ public class WhatsAppReplyAutomationService {
         OutreachSettingsService settingsService,
         ProspectCopyBuilder copyBuilder,
         EvolutionClient evolutionClient,
+        WhatsAppConnectionService whatsAppConnectionService,
         OutreachBotQueueService outreachBotQueueService,
         @Value("${app.public-base-url:http://localhost:4201}") String publicBaseUrl
     ) {
@@ -43,6 +45,7 @@ public class WhatsAppReplyAutomationService {
         this.settingsService = settingsService;
         this.copyBuilder = copyBuilder;
         this.evolutionClient = evolutionClient;
+        this.whatsAppConnectionService = whatsAppConnectionService;
         this.outreachBotQueueService = outreachBotQueueService;
         this.publicBaseUrl = publicBaseUrl.replaceAll("/+$", "");
     }
@@ -108,13 +111,14 @@ public class WhatsAppReplyAutomationService {
         String notification = "Nova resposta de " + displayName(followUp) + " (" + followUp.getRecipient() + ").\n"
             + "Revise e autorize a etapa 2: " + link;
         var tenant = followUp.getCampaign().getTenant();
+        String instance = whatsAppConnectionService.resolveSendInstanceForTenant(tenant.getId());
         java.util.stream.Stream.of(tenant.getOutreachApprovalRecipient1(), tenant.getOutreachApprovalRecipient2())
             .filter(number -> number != null && !number.isBlank())
             .distinct()
             .forEach(number -> {
-                var result = evolutionClient.sendInternalNotification(number, notification);
+                var result = evolutionClient.sendInternalNotification(instance, number, notification);
                 if (!result.success()) {
-                    log.warn("RevisÃ£o da etapa 2 criada, mas o alerta para {} falhou: {}", number, result.error());
+                    log.warn("Revisão da etapa 2 criada, mas o alerta para {} falhou: {}", number, result.error());
                 }
             });
     }

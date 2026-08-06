@@ -4,6 +4,7 @@ import com.prospectportal.common.entity.Tenant;
 import com.prospectportal.common.repository.TenantRepository;
 import com.prospectportal.module.prospect.ProspectCopyBuilder;
 import com.prospectportal.module.evolution.EvolutionClient;
+import com.prospectportal.module.whatsapp.WhatsAppConnectionService;
 import com.prospectportal.security.AuthContext;
 import com.prospectportal.web.dto.OutreachSettingsRequest;
 import com.prospectportal.web.dto.OutreachSettingsResponse;
@@ -28,11 +29,18 @@ public class OutreachSettingsService {
     private final AuthContext authContext;
     private final TenantRepository tenantRepository;
     private final EvolutionClient evolutionClient;
+    private final WhatsAppConnectionService whatsAppConnectionService;
 
-    public OutreachSettingsService(AuthContext authContext, TenantRepository tenantRepository, EvolutionClient evolutionClient) {
+    public OutreachSettingsService(
+        AuthContext authContext,
+        TenantRepository tenantRepository,
+        EvolutionClient evolutionClient,
+        WhatsAppConnectionService whatsAppConnectionService
+    ) {
         this.authContext = authContext;
         this.tenantRepository = tenantRepository;
         this.evolutionClient = evolutionClient;
+        this.whatsAppConnectionService = whatsAppConnectionService;
     }
 
     @Transactional(readOnly = true)
@@ -153,11 +161,25 @@ public class OutreachSettingsService {
         var recipients = java.util.stream.Stream.of(tenant.getOutreachApprovalRecipient1(), tenant.getOutreachApprovalRecipient2())
             .filter(value -> value != null && !value.isBlank()).distinct().toList();
         if (recipients.isEmpty()) return new ApprovalNotificationTestResponse(0, 0, "Cadastre ao menos um responsável.");
+
+        String instance = whatsAppConnectionService.resolveSendInstance();
+        var status = evolutionClient.connectionStatus(instance);
+        if (!status.connected()) {
+            return new ApprovalNotificationTestResponse(
+                recipients.size(),
+                0,
+                "WhatsApp do tenant não está conectado. Reconecte antes de testar."
+            );
+        }
+
         int sent = 0;
         String error = null;
         for (String recipient : recipients) {
-            var result = evolutionClient.sendInternalNotification(recipient,
-                "Teste MIRA: este número receberá links de aprovação quando um lead responder à etapa 1.");
+            var result = evolutionClient.sendInternalNotification(
+                instance,
+                recipient,
+                "Teste MIRA: este número receberá links de aprovação quando um lead responder à etapa 1."
+            );
             if (result.success()) sent++;
             else error = result.error();
         }
