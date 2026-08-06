@@ -115,7 +115,7 @@ export class ProspectingComponent implements OnInit, OnDestroy {
   autoProspect = {
     limit: 5,
     testMode: false,
-    openingMessage: 'Olá, boa tarde! Tudo bem? Nesse contato falo com o responsável comercial da {{empresa}}?'
+    openingMessage: `${this.saoPauloGreeting()}! Tudo bem? Nesse contato falo com o responsável comercial da {{empresa}}?`
   };
 
   get openingMessagePreview(): string {
@@ -127,6 +127,17 @@ export class ProspectingComponent implements OnInit, OnDestroy {
   get openingPreviewCompanyName(): string {
     const company = this.selectedCompanies[0];
     return company ? (company.tradeName || company.legalName) : 'um lead';
+  }
+
+  private saoPauloGreeting(): string {
+    const hour = Number(new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      hour: '2-digit',
+      hourCycle: 'h23'
+    }).format(new Date()));
+    if (hour < 12) return 'Olá, bom dia';
+    if (hour < 18) return 'Olá, boa tarde';
+    return 'Olá, boa noite';
   }
 
   readonly presets: ProspectPreset[] = [

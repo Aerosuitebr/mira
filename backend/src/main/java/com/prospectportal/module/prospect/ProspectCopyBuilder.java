@@ -6,6 +6,8 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -168,8 +170,15 @@ public class ProspectCopyBuilder {
 
     /** Entrada curta, sem URL: única copy permitida na primeira mensagem fria. */
     public String whatsappStep1(String companyName) {
-        return "Olá, boa tarde! Tudo bem? Nesse contato falo com o responsável comercial da "
+        return saoPauloGreeting() + "! Tudo bem? Nesse contato falo com o responsável comercial da "
             + shortCompanyName(companyName) + "?";
+    }
+
+    private static String saoPauloGreeting() {
+        int hour = LocalTime.now(ZoneId.of("America/Sao_Paulo")).getHour();
+        if (hour < 12) return "Olá, bom dia";
+        if (hour < 18) return "Olá, boa tarde";
+        return "Olá, boa noite";
     }
 
     public String whatsappStep1(String companyName, String template) {
