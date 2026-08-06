@@ -5,6 +5,8 @@ import { canOpenColdConversation, jobStep, nextColdAt, normalizePhone, reportDay
 test('normalizes Evolution and E.164 phone forms', () => {
   assert.equal(normalizePhone('552199836870@s.whatsapp.net'), '552199836870');
   assert.equal(normalizePhone('+55 (21) 99836-870'), '552199836870');
+  assert.equal(normalizePhone('(62) 3091-2171'), '556230912171');
+  assert.equal(normalizePhone('(62) 99123-4567'), '5562991234567');
 });
 
 test('uses the configured business timezone for the daily report', () => {

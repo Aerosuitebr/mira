@@ -182,6 +182,7 @@ async function sendText(destination, text, requestedInstance) {
     const error = new Error(`Evolution HTTP ${response.status}: ${detail}`);
     error.rateLimited = response.status === 429 || detail.toLowerCase().includes('rate');
     error.connectionUnavailable = response.status >= 500 && /connection\s*closed|disconnected|not connected|instance.*close/i.test(detail);
+    error.invalidRecipient = response.status === 400 && /"exists"\s*:\s*false/i.test(detail);
     throw error;
   }
   return body?.key?.id || body?.key?.messageId || body?.messageId || body?.id || null;
@@ -243,6 +244,9 @@ async function processOne() {
         await requeueProcessing(processingKey, sourceKey, raw, job);
         await redis.hset(stateKey, 'paused', 'true', 'pausedReason', 'CONNECTION');
         await emit('RETRYING', { messageId: job.messageId, reason: 'WhatsApp temporariamente indisponível; retomada automática aguardando conexão.' });
+      } else if (error.invalidRecipient) {
+        await redis.lrem(processingKey, 1, raw);
+        await emit('SKIPPED', { messageId: job.messageId, reason: 'Este contato não possui WhatsApp ativo.' });
       } else {
         const attempts = Number(job.attempts || 0) + 1;
         if (attempts < 3) {

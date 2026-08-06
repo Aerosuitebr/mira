@@ -1,5 +1,8 @@
 export function normalizePhone(value) {
-  return String(value || '').replace(/@.+$/, '').replace(/\D/g, '');
+  const digits = String(value || '').replace(/@.+$/, '').replace(/\D/g, '');
+  if (digits.startsWith('55') && digits.length >= 12) return digits;
+  if (digits.length === 10 || digits.length === 11) return `55${digits}`;
+  return digits;
 }
 
 export function reportDay(now = new Date(), timeZone = 'America/Sao_Paulo') {
