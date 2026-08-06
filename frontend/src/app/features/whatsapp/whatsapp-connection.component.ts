@@ -150,7 +150,7 @@ export class WhatsAppConnectionComponent implements OnInit, OnDestroy {
             ok: true,
             message: `Conexão OK. Sessão ativa. ${phoneDetail}.`
           };
-          this.showToast(true, 'Mensagem de teste enviada com sucesso!', phoneDetail);
+          this.showToast(true, 'Conexão verificada com sucesso', phoneDetail);
         } else {
           const failMsg = conn.hint || 'Sessão não está conectada. Reconecte via QR Code.';
           this.testResult = { ok: false, message: failMsg };
