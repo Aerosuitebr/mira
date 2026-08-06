@@ -27,6 +27,8 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
   editFollowUp = false;
   followUpDraft = '';
   detailModalOpen = false;
+  modalSearch = '';
+  modalFilter = 'ALL';
   private openModalAfterLoad = false;
   private poll: ReturnType<typeof setInterval> | null = null;
 
@@ -43,6 +45,20 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
   }
 
   get uniqueCompanies(): number { return new Set((this.detail?.messages || []).map(m => m.companyId)).size; }
+  get modalMessages(): CampaignMessageDetail[] {
+    const query = this.modalSearch.trim().toLocaleLowerCase('pt-BR');
+    return (this.detail?.messages || []).filter(message => {
+      const matchesSearch = !query || [message.companyName, message.cnpj, message.city, message.state].some(value => String(value || '').toLocaleLowerCase('pt-BR').includes(query));
+      const matchesFilter = this.modalFilter === 'ALL' ||
+        (this.modalFilter === 'QUEUE_1' && message.step === 1 && !message.sentAt && !['FAILED', 'SKIPPED'].includes(message.status)) ||
+        (this.modalFilter === 'SENT_1' && message.step === 1 && !!message.sentAt) ||
+        (this.modalFilter === 'REPLIED' && (!!message.repliedAt || ['REPLIED', 'AWAITING_APPROVAL'].includes(message.status))) ||
+        (this.modalFilter === 'PENDING_2' && message.step === 2 && !message.sentAt) ||
+        (this.modalFilter === 'SENT_2' && message.step === 2 && !!message.sentAt) ||
+        (this.modalFilter === 'FAILED' && ['FAILED', 'SKIPPED'].includes(message.status));
+      return matchesSearch && matchesFilter;
+    });
+  }
   get completionPercent(): number {
     if (!this.detail || !this.uniqueCompanies) return 0;
     return Math.round(((this.detail.sent + this.detail.failed + this.detail.skipped) / this.uniqueCompanies) * 100);
@@ -72,6 +88,9 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
   }
 
   closeDetailModal(): void { this.detailModalOpen = false; }
+  setModalFilter(filter: string): void { this.modalFilter = this.modalFilter === filter ? 'ALL' : filter; }
+  refreshModal(): void { this.refresh(false); }
+  openEditFromModal(message: CampaignMessageDetail): void { this.closeDetailModal(); this.openEdit(message); }
   @HostListener('document:keydown.escape')
   closeModalWithEscape(): void { if (this.detailModalOpen) this.closeDetailModal(); }
 
