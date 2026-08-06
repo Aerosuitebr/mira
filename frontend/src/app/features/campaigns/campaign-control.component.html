@@ -26,7 +26,7 @@
           <header><div><span class="pp-eyebrow">{{ detail.channel }} · {{ uniqueCompanies }} empresas</span><h2>{{ detail.name }}</h2><p>Criada em {{ detail.createdAt | date:'dd/MM/yyyy HH:mm' }}</p></div>
             <button type="button" class="pp-btn" [class.pp-btn--primary]="detail.status === 'PAUSED'" [class.pp-btn--secondary]="detail.status !== 'PAUSED'" (click)="toggleCampaign()" [disabled]="busy">{{ detail.status === 'PAUSED' ? 'Retomar campanha' : 'Pausar campanha' }}</button>
           </header>
-          <div class="campaign-progress"><span [style.width.%]="completionPercent"></span></div><small>{{ completionPercent }}% processado · atualização automática a cada 10 segundos</small>
+          <div class="campaign-progress-row"><div class="campaign-progress" role="progressbar" aria-label="Progresso da campanha" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="completionPercent"><span [style.width.%]="completionPercent"></span></div><strong>{{ completionPercent }}%</strong></div><small>{{ completionPercent }}% processado · atualização automática a cada 10 segundos</small>
           <div class="metric-grid">
             <article [class.zero]="uniqueCompanies === 0"><span>Empresas</span><strong>{{ uniqueCompanies }}</strong></article><article class="pending" [class.zero]="detail.queued === 0"><span>Etapa 1 na fila</span><strong>{{ detail.queued }}</strong></article>
             <article class="ok" [class.zero]="detail.sent === 0"><span>Etapa 1 enviadas</span><strong>{{ detail.sent }}</strong></article><article [class.zero]="detail.waitingReply === 0"><span>Aguardando resposta</span><strong>{{ detail.waitingReply }}</strong></article>
@@ -38,7 +38,7 @@
             <div class="bot-strip">
               <span><b>{{ bot.step2Queue }}</b> prioritárias</span><span><b>{{ bot.step1Queue }}</b> aberturas globais</span><span><b>{{ bot.processing }}</b> processando</span><span><b>{{ bot.sentToday }}/{{ bot.cadence.dailyCap }}</b> hoje</span><span><b>{{ bot.estimatedDays }}</b> dias estimados</span>
               @if (bot.deadLetter) { <span class="danger"><b>{{ bot.deadLetter }}</b> exigem intervenção</span> }
-              <i>{{ !bot.deliveryEnabled ? 'Entrega bloqueada' : bot.paused ? 'Robô pausado' : 'Robô ativo' }}</i>
+              @if (bot.deliveryEnabled && !bot.paused) { <i>Robô ativo</i> }
             </div>
           }
         </section>
