@@ -81,6 +81,9 @@ export class ProspectingComponent implements OnInit, OnDestroy {
   scheduling = false;
   statusMessage = '';
   errorMessage = '';
+  showCampaignCreatedModal = false;
+  createdCampaignLeadCount = 0;
+  private preparedSelectionKey = '';
 
   companies: Company[] = [];
   importedResultCount = 0;
@@ -135,6 +138,10 @@ export class ProspectingComponent implements OnInit, OnDestroy {
   get openingPreviewCompanyName(): string {
     const company = this.selectedCompanies[0];
     return company ? (company.tradeName || company.legalName) : 'um lead';
+  }
+
+  get currentSelectionPrepared(): boolean {
+    return this.preparedSelectionKey !== '' && this.preparedSelectionKey === this.selectionKey();
   }
 
   get approvalAdminCount(): number {
@@ -475,7 +482,10 @@ export class ProspectingComponent implements OnInit, OnDestroy {
       next: (job) => {
         this.activeJob = job;
         this.startingAutoProspect = false;
-        this.statusMessage = `Etapa 1 preparada para ${selectedIds.length} lead(s). Nenhuma mensagem foi enviada automaticamente.`;
+        this.preparedSelectionKey = this.selectionKey();
+        this.createdCampaignLeadCount = selectedIds.length;
+        this.showCampaignCreatedModal = true;
+        this.statusMessage = `Campanha criada com ${selectedIds.length} lead(s) e adicionada à fila de envio.`;
         this.loadOutreachReport();
         this.startJobPolling(job.id);
       },
@@ -484,6 +494,19 @@ export class ProspectingComponent implements OnInit, OnDestroy {
         this.errorMessage = err?.error?.message || 'Não foi possível preparar a etapa 1.';
       }
     });
+  }
+
+  closeCampaignCreatedModal(): void {
+    this.showCampaignCreatedModal = false;
+  }
+
+  viewCreatedCampaign(): void {
+    this.showCampaignCreatedModal = false;
+    void this.router.navigate(['/campaigns']);
+  }
+
+  private selectionKey(): string {
+    return [...this.selectedCompanyIds].sort().join('|');
   }
 
   openDirectCampaign(): void {
@@ -924,6 +947,10 @@ export class ProspectingComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown.escape')
   closeMeetingDraftWithEscape(): void {
+    if (this.showCampaignCreatedModal) {
+      this.closeCampaignCreatedModal();
+      return;
+    }
     if (this.meetingDraftOpen) {
       this.closeMeetingDraft();
     }

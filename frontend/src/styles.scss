@@ -100,3 +100,19 @@ textarea {
 .leaflet-popup-tip {
   background: var(--pp-bg-elevated);
 }
+/* Confirmação global da transição da seleção para uma campanha ativa. */
+.campaign-prepared-button { border-color: rgba(52, 211, 153, .5) !important; background: rgba(16, 185, 129, .16) !important; color: #a7f3d0 !important; opacity: 1 !important; }
+.campaign-started-banner { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .85rem; padding: .9rem 1rem; border: 1px solid rgba(52, 211, 153, .35); border-radius: var(--pp-radius-md); background: rgba(6, 78, 59, .24); }
+.campaign-started-banner p { margin: .2rem 0 0; color: var(--pp-text-secondary); font-size: .78rem; }
+.campaign-started-banner__check, .campaign-created-modal__icon { display: grid; place-items: center; border-radius: 50%; background: rgba(16, 185, 129, .18); color: #6ee7b7; font-weight: 900; }
+.campaign-started-banner__check { width: 2rem; height: 2rem; }
+.campaign-created-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 1rem; background: rgba(2, 6, 23, .78); backdrop-filter: blur(8px); }
+.campaign-created-modal { width: min(590px, 100%); padding: 1.5rem; border: 1px solid rgba(52, 211, 153, .35); box-shadow: 0 24px 80px rgba(0, 0, 0, .55); }
+.campaign-created-modal h2 { margin: .35rem 0 .55rem; }
+.campaign-created-modal > p { margin: 0; color: var(--pp-text-secondary); line-height: 1.5; }
+.campaign-created-modal ol { margin: 1rem 0; padding-left: 1.25rem; color: var(--pp-text-secondary); }
+.campaign-created-modal li + li { margin-top: .55rem; }
+.campaign-created-modal__icon { width: 3rem; height: 3rem; margin-bottom: .85rem; font-size: 1.35rem; }
+.campaign-created-modal__warning { padding: .75rem; border-radius: 10px; background: rgba(245, 158, 11, .12); color: #fde68a; font-size: .8rem; line-height: 1.45; }
+.campaign-created-modal__actions { display: flex; justify-content: flex-end; gap: .65rem; margin-top: 1.15rem; }
+@media (max-width: 700px) { .campaign-started-banner { grid-template-columns: auto 1fr; } .campaign-started-banner .pp-btn { grid-column: 1 / -1; } .campaign-created-modal__actions { flex-direction: column-reverse; } }

@@ -364,12 +364,26 @@
                 <button
                   type="button"
                   class="pp-btn pp-btn--primary"
-                  [disabled]="startingAutoProspect || !autoProspect.openingMessage.trim() || selectedCompanyIds.size === 0"
+                  [class.campaign-prepared-button]="currentSelectionPrepared"
+                  [disabled]="startingAutoProspect || currentSelectionPrepared || !autoProspect.openingMessage.trim() || selectedCompanyIds.size === 0"
                   (click)="startSelectedTwoStepQueue()"
                 >
-                  @if (startingAutoProspect) { Preparando... } @else { Preparar fila para {{ selectedCompanyIds.size }} leads }
+                  @if (startingAutoProspect) { Preparando... }
+                  @else if (currentSelectionPrepared) { ✓ Campanha criada · {{ selectedCompanyIds.size }} leads }
+                  @else { Criar campanha com {{ selectedCompanyIds.size }} leads }
                 </button>
               </div>
+
+              @if (currentSelectionPrepared && activeJob) {
+                <div class="campaign-started-banner" role="status">
+                  <span class="campaign-started-banner__check">✓</span>
+                  <div>
+                    <strong>Nova fase iniciada: campanha criada</strong>
+                    <p>Os {{ createdCampaignLeadCount }} leads saíram da preparação e agora estão na fila. Acompanhe envios, pendências e falhas na Central de Campanhas.</p>
+                  </div>
+                  <button type="button" class="pp-btn pp-btn--secondary" (click)="viewCreatedCampaign()">Acompanhar campanha</button>
+                </div>
+              }
 
               @if (activeJob) {
                 <div class="job-progress">
@@ -706,8 +720,33 @@
           Limpar
         </button>
         <button type="button" class="pp-btn pp-btn--secondary" (click)="sendSelectionToEnrichment()">Enriquecer</button>
-        <button type="button" class="pp-btn pp-btn--primary" (click)="sendSelectionToOutreach()">Abordar</button>
+        <button type="button" class="pp-btn pp-btn--primary" (click)="goToStep(3)">Configurar abordagem</button>
       </div>
+    </div>
+  }
+
+  @if (showCampaignCreatedModal && activeJob) {
+    <div class="campaign-created-backdrop" role="presentation" (click)="closeCampaignCreatedModal()">
+      <section class="campaign-created-modal pp-glass" role="dialog" aria-modal="true" aria-labelledby="campaign-created-title" (click)="$event.stopPropagation()">
+        <div class="campaign-created-modal__icon" aria-hidden="true">✓</div>
+        <span class="pp-eyebrow">Campanha iniciada</span>
+        <h2 id="campaign-created-title">{{ createdCampaignLeadCount }} leads entraram na fila</h2>
+        <p>A campanha <strong>{{ activeJob.name }}</strong> foi criada com sucesso. Você não precisa clicar novamente.</p>
+        <ol>
+          <li><strong>Agora:</strong> as mensagens ficam organizadas na fila.</li>
+          <li><strong>Quando o robô estiver ativo:</strong> a primeira mensagem será enviada gradualmente.</li>
+          <li><strong>Após uma resposta:</strong> a etapa 2 será preparada para revisão e aprovação.</li>
+        </ol>
+        @if (outreachBotStatus && !outreachBotStatus.deliveryEnabled) {
+          <div class="campaign-created-modal__warning">Envio bloqueado no momento. A campanha está salva e aguardará a liberação do robô por um administrador.</div>
+        } @else if (outreachBotStatus?.paused) {
+          <div class="campaign-created-modal__warning">O robô está pausado. A fila será preservada até ele ser retomado.</div>
+        }
+        <div class="campaign-created-modal__actions">
+          <button type="button" class="pp-btn pp-btn--secondary" (click)="closeCampaignCreatedModal()">Continuar nesta tela</button>
+          <button type="button" class="pp-btn pp-btn--primary" (click)="viewCreatedCampaign()">Acompanhar campanha</button>
+        </div>
+      </section>
     </div>
   }
 
