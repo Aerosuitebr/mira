@@ -19,7 +19,10 @@ param(
     [switch]$SkipDeploy,
     [switch]$SkipQuality,
     [switch]$QualityOnly,
-    [switch]$SkipFrontendBuild
+    [switch]$SkipFrontendBuild,
+    # Apos push, faz deploy no Vultr via SSH (nao depende de runner GitHub-hosted).
+    [switch]$Production,
+    [switch]$SkipProduction
 )
 
 $ErrorActionPreference = 'Stop'
@@ -476,6 +479,27 @@ function Invoke-Deploy([string[]]$Paths, [bool]$HadCommit) {
     }
 }
 
+function Invoke-ProductionDeploy {
+    if ($SkipProduction) {
+        Write-Host 'Deploy producao pulado (-SkipProduction)' -ForegroundColor Yellow
+        return
+    }
+    if (-not $Production) {
+        Write-Host 'Producao: use -Production para publicar no Vultr via SSH (fallback do Actions).' -ForegroundColor DarkGray
+        return
+    }
+
+    Write-Banner 'DEPLOY PRODUCAO (SSH Vultr)'
+    $prodScript = Join-Path $PSScriptRoot 'deploy-production.ps1'
+    if (-not (Test-Path $prodScript)) {
+        throw "Script ausente: $prodScript"
+    }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $prodScript
+    if ($LASTEXITCODE -ne 0) {
+        throw "Deploy producao falhou (exit $LASTEXITCODE)"
+    }
+}
+
 function Invoke-PipelineOnce {
     Write-Banner 'MIRA AUTO-DEPLOY'
     Write-Host "Root: $root" -ForegroundColor DarkGray
@@ -492,10 +516,9 @@ function Invoke-PipelineOnce {
         return
     }
 
-    if (-not $dirty -and -not $ForceDeploy) {
+    if (-not $dirty -and -not $ForceDeploy -and -not $Production) {
         Write-Host 'Working tree limpa. Nada para commitar.' -ForegroundColor Yellow
-        Write-Host 'Use -ForceDeploy para reiniciar servicos mesmo assim.' -ForegroundColor DarkGray
-        # Ainda valida qualidade se pedido implicito? skip.
+        Write-Host 'Use -ForceDeploy para reiniciar servicos locais, ou -Production para publicar no Vultr.' -ForegroundColor DarkGray
         return
     }
 
@@ -509,16 +532,25 @@ function Invoke-PipelineOnce {
         if ($commitResult.Count -gt 0) {
             $committed = [System.Convert]::ToBoolean($commitResult[-1])
         }
-        Invoke-Deploy -Paths $paths -HadCommit:$committed
+        if (-not $SkipDeploy) {
+            Invoke-Deploy -Paths $paths -HadCommit:$committed
+        }
+        if ($committed -or $Production) {
+            Invoke-ProductionDeploy
+        }
     } else {
-        Write-Host 'ForceDeploy com tree limpa.' -ForegroundColor DarkGray
-        Invoke-Deploy -Paths @() -HadCommit:$false
+        if ($ForceDeploy) {
+            Write-Host 'ForceDeploy com tree limpa.' -ForegroundColor DarkGray
+            Invoke-Deploy -Paths @() -HadCommit:$false
+        }
+        Invoke-ProductionDeploy
     }
 
     Write-Banner 'ESTEIRA CONCLUIDA'
     Write-Host 'Codigo no GitHub + quality gate + smoke local.' -ForegroundColor Green
     Write-Host 'Front: http://127.0.0.1:4201  |  API: http://127.0.0.1:8082  |  Tunnel: http://127.0.0.1:8083' -ForegroundColor DarkGray
     Write-Host 'Dica: mudanca so de CSS/TS usa HMR (rapido). Restart completo: deploy.bat -ForceDeploy' -ForegroundColor DarkGray
+    Write-Host 'Producao: deploy.bat -Production  (SSH Vultr; nao depende do runner do Actions)' -ForegroundColor DarkGray
 }
 
 function Wait-WorkingTreeSettle {

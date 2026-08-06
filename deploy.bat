@@ -15,16 +15,19 @@ REM Flags opcionais (passe apos o bat):
 REM   deploy.bat
 REM   deploy.bat -Watch
 REM   deploy.bat -ForceDeploy          ^<-- reinicia API + frontend de verdade
+REM   deploy.bat -Production           ^<-- apos push, publica no Vultr via SSH
 REM   deploy.bat -QualityOnly
 REM   deploy.bat -Message "fix(ui): contraste"
 REM   deploy.bat -SkipFrontendBuild
 REM   deploy.bat -SkipDeploy
 REM   deploy.bat -SkipPush
+REM   deploy.bat -SkipProduction
 REM
 REM Nota:
 REM   - Commit so de scripts/deploy = VERIFY (app nao muda). Esperado.
 REM   - Mudanca em frontend/ = reinicia ng serve.
 REM   - Mudanca em backend/ ou -ForceDeploy = restart completo (1-3 min).
+REM   - -Production nao depende do GitHub Actions (fallback quando runner falha).
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\deploy\auto-deploy.ps1" %*
 set "EXITCODE=%ERRORLEVEL%"
