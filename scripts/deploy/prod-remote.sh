@@ -17,7 +17,7 @@ fi
 exec 9>"$LOCK"
 if ! flock -n 9; then
   echo "Outro deploy em andamento (lock $LOCK). Abortando."
-  exit 0
+  exit 75
 fi
 
 echo "=== deploying ${SHORT} ==="
@@ -33,6 +33,23 @@ tar -czf "/opt/mira-backups/mira-pre-${SHORT}-$(date +%Y%m%d%H%M%S).tgz" \
   backend/src docker-compose.production.yml frontend/src scripts/deploy/nginx-mira.conf \
   2>/dev/null || true
 
+# O release e um snapshot. Remover arvores versionadas antes de extrair evita
+# que arquivos deletados no Git sobrevivam no servidor (ex.: migrations antigas).
+for target in \
+  /opt/mira/backend/src/main/java \
+  /opt/mira/backend/src/main/resources \
+  /opt/mira/frontend/src \
+  /opt/mira/services/outreach-bot; do
+  case "$target" in
+    /opt/mira/backend/src/main/java|/opt/mira/backend/src/main/resources|/opt/mira/frontend/src|/opt/mira/services/outreach-bot)
+      rm -rf -- "$target"
+      ;;
+    *)
+      echo "Recusa ao limpar destino inesperado: $target"
+      exit 1
+      ;;
+  esac
+done
 tar -xzf /tmp/mira-release.tgz -C /opt/mira
 
 # Garante que o proprio script de deploy remoto fique atualizado no servidor
