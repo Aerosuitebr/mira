@@ -68,11 +68,15 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
   get hasWhatsAppConnectionIssue(): boolean {
     return this.whatsapp !== null && !this.whatsapp.connected;
   }
+  get hasPreviousConnectionFailures(): boolean {
+    return (this.detail?.messages || []).some(message => this.isConnectionError(message.errorDetail));
+  }
+  get currentWhatsAppNumber(): string { return this.whatsapp?.phone?.trim() || 'número atual'; }
 
   friendlyDeliveryIssue(message: CampaignMessageDetail): string {
     const detail = message.errorDetail || '';
     if (this.isConnectionError(detail)) return this.whatsapp?.connected
-      ? 'Envio não concluído anteriormente. A conta está conectada; reenfileire para tentar novamente.'
+      ? `Tentativa anterior não concluída. O WhatsApp atual (${this.currentWhatsAppNumber}) está conectado; reenfileire para tentar novamente.`
       : 'WhatsApp desconectado. Reconecte a conta para continuar o envio.';
     if (/sem whatsapp|sem destinat[aá]rio|telefone|n[uú]mero inv[aá]lido/i.test(detail)) return 'Este contato precisa de um número de WhatsApp válido.';
     if (/limit|thrott|rate|restri[cç][aã]o/i.test(detail)) return 'Envio temporariamente pausado para proteger sua conta.';
