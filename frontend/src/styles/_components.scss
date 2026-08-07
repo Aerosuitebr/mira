@@ -195,6 +195,61 @@
 
 .pp-select {
   cursor: pointer;
+  min-height: 46px;
+  padding-right: 2.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color-scheme: dark;
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--pp-input-bg);
+  background-image:
+    linear-gradient(45deg, transparent 50%, #cbd5e1 50%),
+    linear-gradient(135deg, #cbd5e1 50%, transparent 50%),
+    linear-gradient(to right, rgba(148, 163, 184, 0.18), rgba(148, 163, 184, 0.18));
+  background-position: calc(100% - 18px) 50%, calc(100% - 12px) 50%, calc(100% - 2.35rem) 50%;
+  background-size: 6px 6px, 6px 6px, 1px 1.6rem;
+  background-repeat: no-repeat;
+
+  &:hover:not(:disabled) {
+    border-color: rgba(129, 140, 248, 0.45);
+    background-color: rgba(15, 23, 42, 0.92);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+  }
+
+  option,
+  optgroup {
+    background: #111827;
+    color: #f8fafc;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  option {
+    padding: 0.65rem 0.8rem;
+  }
+}
+
+[data-theme='light'] .pp-select {
+  color-scheme: light;
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #475569 50%),
+    linear-gradient(135deg, #475569 50%, transparent 50%),
+    linear-gradient(to right, rgba(71, 85, 105, 0.2), rgba(71, 85, 105, 0.2));
+
+  &:hover:not(:disabled) { background-color: #f8fafc; }
+
+  option,
+  optgroup {
+    background: #ffffff;
+    color: #0f172a;
+  }
 }
 
 .pp-stat-grid {

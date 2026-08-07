@@ -81,6 +81,11 @@ public class OutreachController {
         return outreachService.retryCampaignMessage(campaignId, messageId);
     }
 
+    @PostMapping("/campaigns/{campaignId}/messages/retry-problems")
+    public CampaignDetailResponse retryProblems(@PathVariable UUID campaignId) {
+        return outreachService.retryCampaignProblems(campaignId);
+    }
+
     @PostMapping("/campaigns/{id}/pause")
     public CampaignDetailResponse pauseCampaign(@PathVariable UUID id) {
         outreachBotGatewayService.pauseCampaign(id);

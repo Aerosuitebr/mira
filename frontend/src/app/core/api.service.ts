@@ -610,6 +610,9 @@ export class ApiService {
   retryCampaignMessage(campaignId: string, messageId: string) {
     return this.http.post<CampaignMessageDetail>(`${environment.apiUrl}/outreach/campaigns/${campaignId}/messages/${messageId}/retry`, {});
   }
+  retryCampaignProblems(campaignId: string) {
+    return this.http.post<CampaignDetail>(`${environment.apiUrl}/outreach/campaigns/${campaignId}/messages/retry-problems`, {});
+  }
 
   outreachBotStatus() {
     return this.http.get<OutreachBotStatus>(`${environment.apiUrl}/outreach/bot/status`);

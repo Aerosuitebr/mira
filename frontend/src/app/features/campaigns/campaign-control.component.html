@@ -53,7 +53,7 @@
         </section>
 
         <section class="contacts-panel pp-glass">
-          <header><div><span class="pp-eyebrow">Empresas, contatos e envios</span><h3>Fluxo individual</h3></div><span>{{ filteredMessages.length }} registros visíveis</span></header>
+          <header><div><span class="pp-eyebrow">Empresas, contatos e envios</span><h3>Fluxo individual</h3></div><div class="contacts-panel__actions"><span>{{ filteredMessages.length }} registros visíveis</span>@if (retryableCount > 0) { <button type="button" class="pp-btn retry-all-button" (click)="retryProblems()" [disabled]="busy || hasWhatsAppConnectionIssue" [attr.aria-label]="'Reenviar ' + retryableCount + ' mensagens com problema'">{{ busy ? 'Reenfileirando…' : 'Reenviar com problema (' + retryableCount + ')' }}</button> }</div></header>
           <div class="filters"><input class="pp-input" [(ngModel)]="search" placeholder="Buscar empresa, CNPJ, contato, telefone ou e-mail" aria-label="Buscar registros"/><select class="pp-select" [(ngModel)]="stepFilter"><option [ngValue]="0">Todas as etapas</option><option [ngValue]="1">Etapa 1</option><option [ngValue]="2">Etapa 2</option></select><select class="pp-select" [(ngModel)]="statusFilter"><option value="ALL">Todos os estados</option><option value="QUEUED_BOT">Na fila</option><option value="WAITING_REPLY">Aguardando resposta</option><option value="AWAITING_APPROVAL">Aguardando aprovação</option><option value="SENT">Enviadas</option><option value="FAILED">Falhas</option><option value="SKIPPED">Ignoradas</option></select></div>
           <div class="message-list">
             <div class="message-column-head" aria-hidden="true"><span>Empresa</span><span>Contato / endereço</span><span>Estado do envio</span><span>Mensagem</span><span>Ação</span></div>
@@ -121,7 +121,7 @@
           </div>
         </div>
 
-        <footer><button type="button" class="pp-btn pp-btn--secondary" (click)="refreshModal()" [disabled]="loading">Atualizar status</button><button type="button" class="pp-btn pp-btn--primary" (click)="closeDetailModal()">Fechar</button></footer>
+        <footer>@if (retryableCount > 0) { <button type="button" class="pp-btn retry-all-button" (click)="retryProblems()" [disabled]="busy || hasWhatsAppConnectionIssue">{{ busy ? 'Reenfileirando…' : 'Reenviar falhas e ignoradas (' + retryableCount + ')' }}</button> }<span class="campaign-footer-spacer"></span><button type="button" class="pp-btn pp-btn--secondary" (click)="refreshModal()" [disabled]="loading">Atualizar status</button><button type="button" class="pp-btn pp-btn--primary" (click)="closeDetailModal()">Fechar</button></footer>
       </section>
     </div>
   }

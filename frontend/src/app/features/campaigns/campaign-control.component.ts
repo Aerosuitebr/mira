@@ -46,6 +46,8 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
   }
 
   get uniqueCompanies(): number { return new Set((this.detail?.messages || []).map(m => m.companyId)).size; }
+  get retryableMessages(): CampaignMessageDetail[] { return (this.detail?.messages || []).filter(message => message.retryable); }
+  get retryableCount(): number { return this.retryableMessages.length; }
   get modalMessages(): CampaignMessageDetail[] {
     const query = this.modalSearch.trim().toLocaleLowerCase('pt-BR');
     return (this.detail?.messages || []).filter(message => {
@@ -155,6 +157,28 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
     next: updated => { this.replaceMessage(updated); this.busy = false; this.feedback = `${message.companyName} voltou para a fila.`; },
     error: e => { this.busy = false; this.error = e?.error?.message || 'Falha ao reenfileirar.'; }
   }); }
+
+  retryProblems(): void {
+    if (!this.detail || !this.retryableCount || this.busy) return;
+    const count = this.retryableCount;
+    const confirmed = window.confirm(
+      `Reenfileirar ${count} mensagem(ns) com falha, ignorada(s) ou pausada(s)? Elas poderão ser enviadas automaticamente quando o robô estiver ativo.`
+    );
+    if (!confirmed) return;
+    this.busy = true;
+    this.clearFeedback();
+    this.api.retryCampaignProblems(this.detail.id).subscribe({
+      next: detail => {
+        this.detail = detail;
+        this.busy = false;
+        this.feedback = `${count} mensagem(ns) com falha, ignorada(s) ou pausada(s) voltaram para a fila.`;
+      },
+      error: e => {
+        this.busy = false;
+        this.error = e?.error?.message || 'Não foi possível reenfileirar as mensagens com problema.';
+      }
+    });
+  }
 
   statusLabel(status: string): string { return ({QUEUED_BOT:'Na fila',WAITING_REPLY:'Aguardando resposta',REPLIED:'Respondeu',AWAITING_APPROVAL:'Aguardando aprovação',SENT:'Enviada',FAILED:'Não enviado',SKIPPED:'Requer contato',THROTTLED:'Pausada por segurança',PENDING:'Pendente'} as Record<string,string>)[status] || status; }
   private isConnectionError(detail: string | null): boolean { return /connection\s*closed|disconnected|conex[aã]o.*fechada|evolution\s*http/i.test(detail || ''); }

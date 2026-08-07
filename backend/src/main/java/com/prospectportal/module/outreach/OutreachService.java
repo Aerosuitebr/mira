@@ -182,6 +182,29 @@ public class OutreachService {
     }
 
     @Transactional
+    public CampaignDetailResponse retryCampaignProblems(UUID campaignId) {
+        OutreachCampaign campaign = requireCampaign(campaignId);
+        List<OutreachMessage> retryable = messageRepository
+            .findCampaignMessages(campaignId, authContext.tenantId())
+            .stream()
+            .filter(OutreachService::isRetryable)
+            .toList();
+
+        for (OutreachMessage message : retryable) {
+            message.setStatus("QUEUED_BOT");
+            message.setErrorDetail(null);
+            messageRepository.save(message);
+            outreachBotQueueService.requeue(message);
+        }
+
+        if (!retryable.isEmpty() && !"PAUSED".equals(campaign.getStatus())) {
+            campaign.setStatus("SENDING");
+            campaignRepository.save(campaign);
+        }
+        return campaignDetail(campaignId);
+    }
+
+    @Transactional
     public void setCampaignStatus(UUID id, String status) {
         OutreachCampaign campaign = requireCampaign(id);
         campaign.setStatus(status);
