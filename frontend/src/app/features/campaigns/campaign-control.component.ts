@@ -4,11 +4,19 @@ import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { ApiService, Campaign, CampaignDetail, CampaignMessageDetail, OutreachBotStatus, WhatsAppConnection } from '../../core/api.service';
 
+interface RetryProgressSession {
+  campaignId: string;
+  campaignName: string;
+  messageIds: string[];
+  startedAt: string;
+}
+
 @Component({
   selector: 'app-campaign-control', standalone: true, imports: [FormsModule, DatePipe, RouterLink],
   templateUrl: './campaign-control.component.html', styleUrl: './campaign-control.component.scss'
 })
 export class CampaignControlComponent implements OnInit, OnDestroy {
+  private readonly retryStorageKey = 'mira.campaignRetryProgress';
   private api = inject(ApiService);
   campaigns: Campaign[] = [];
   detail: CampaignDetail | null = null;
@@ -30,11 +38,22 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
   detailModalOpen = false;
   modalSearch = '';
   modalFilter = 'ALL';
+  retryDialog: 'confirm' | 'progress' | null = null;
+  retrySession: RetryProgressSession | null = null;
+  retryProgressDetail: CampaignDetail | null = null;
   private openModalAfterLoad = false;
   private poll: ReturnType<typeof setInterval> | null = null;
+  private retryPoll: ReturnType<typeof setInterval> | null = null;
 
-  ngOnInit(): void { this.loadCampaigns(); this.poll = setInterval(() => this.refresh(false), 10_000); }
-  ngOnDestroy(): void { if (this.poll) clearInterval(this.poll); }
+  ngOnInit(): void {
+    this.restoreRetryProgress();
+    this.loadCampaigns();
+    this.poll = setInterval(() => this.refresh(false), 10_000);
+  }
+  ngOnDestroy(): void {
+    if (this.poll) clearInterval(this.poll);
+    if (this.retryPoll) clearInterval(this.retryPoll);
+  }
 
   get filteredMessages(): CampaignMessageDetail[] {
     const query = this.search.trim().toLocaleLowerCase('pt-BR');
@@ -48,6 +67,24 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
   get uniqueCompanies(): number { return new Set((this.detail?.messages || []).map(m => m.companyId)).size; }
   get retryableMessages(): CampaignMessageDetail[] { return (this.detail?.messages || []).filter(message => message.retryable); }
   get retryableCount(): number { return this.retryableMessages.length; }
+  get retryProgressMessages(): CampaignMessageDetail[] {
+    if (!this.retrySession || !this.retryProgressDetail) return [];
+    const tracked = new Set(this.retrySession.messageIds);
+    return this.retryProgressDetail.messages.filter(message => tracked.has(message.id));
+  }
+  get retrySentCount(): number {
+    return this.retryProgressMessages.filter(message => ['SENT', 'WAITING_REPLY', 'REPLIED', 'AWAITING_APPROVAL'].includes(message.status)).length;
+  }
+  get retryFailedCount(): number {
+    return this.retryProgressMessages.filter(message => ['FAILED', 'SKIPPED', 'THROTTLED'].includes(message.status)).length;
+  }
+  get retryPendingCount(): number { return Math.max(0, this.retryProgressTotal - this.retrySentCount - this.retryFailedCount); }
+  get retryProgressTotal(): number { return this.retrySession?.messageIds.length || 0; }
+  get retryProcessedCount(): number { return this.retrySentCount + this.retryFailedCount; }
+  get retryProgressPercent(): number {
+    return this.retryProgressTotal ? Math.round((this.retryProcessedCount / this.retryProgressTotal) * 100) : 0;
+  }
+  get retryProgressComplete(): boolean { return this.retryProgressTotal > 0 && this.retryPendingCount === 0; }
   get modalMessages(): CampaignMessageDetail[] {
     const query = this.modalSearch.trim().toLocaleLowerCase('pt-BR');
     return (this.detail?.messages || []).filter(message => {
@@ -119,7 +156,11 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
   refreshModal(): void { this.refresh(false); }
   openEditFromModal(message: CampaignMessageDetail): void { this.closeDetailModal(); this.openEdit(message); }
   @HostListener('document:keydown.escape')
-  closeModalWithEscape(): void { if (this.detailModalOpen) this.closeDetailModal(); }
+  closeModalWithEscape(): void {
+    if (this.retryDialog === 'confirm') this.retryDialog = null;
+    else if (this.retryDialog === 'progress') this.minimizeRetryProgress();
+    else if (this.detailModalOpen) this.closeDetailModal();
+  }
 
   toggleCampaign(): void {
     if (!this.detail) return; this.busy = true; this.clearFeedback();
@@ -160,22 +201,74 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
 
   retryProblems(): void {
     if (!this.detail || !this.retryableCount || this.busy) return;
-    const count = this.retryableCount;
-    const confirmed = window.confirm(
-      `Reenfileirar ${count} mensagem(ns) com falha, ignorada(s) ou pausada(s)? Elas poderão ser enviadas automaticamente quando o robô estiver ativo.`
-    );
-    if (!confirmed) return;
+    this.clearFeedback();
+    this.retryDialog = 'confirm';
+  }
+
+  confirmRetryProblems(): void {
+    if (!this.detail || !this.retryableCount || this.busy) return;
+    const campaignId = this.detail.id;
+    const campaignName = this.detail.name;
+    const messageIds = this.retryableMessages.map(message => message.id);
     this.busy = true;
     this.clearFeedback();
-    this.api.retryCampaignProblems(this.detail.id).subscribe({
+    this.api.retryCampaignProblems(campaignId).subscribe({
       next: detail => {
         this.detail = detail;
         this.busy = false;
-        this.feedback = `${count} mensagem(ns) com falha, ignorada(s) ou pausada(s) voltaram para a fila.`;
+        this.retrySession = { campaignId, campaignName, messageIds, startedAt: new Date().toISOString() };
+        this.retryProgressDetail = detail;
+        localStorage.setItem(this.retryStorageKey, JSON.stringify(this.retrySession));
+        this.retryDialog = 'progress';
+        this.startRetryPolling();
       },
       error: e => {
         this.busy = false;
         this.error = e?.error?.message || 'Não foi possível reenfileirar as mensagens com problema.';
+      }
+    });
+  }
+
+  minimizeRetryProgress(): void { this.retryDialog = null; }
+  reopenRetryProgress(): void { this.retryDialog = 'progress'; this.pollRetryProgress(); }
+  finishRetryProgress(): void {
+    if (!this.retryProgressComplete) return;
+    this.retryDialog = null;
+    this.retrySession = null;
+    this.retryProgressDetail = null;
+    localStorage.removeItem(this.retryStorageKey);
+    if (this.retryPoll) { clearInterval(this.retryPoll); this.retryPoll = null; }
+  }
+
+  private restoreRetryProgress(): void {
+    const raw = localStorage.getItem(this.retryStorageKey);
+    if (!raw) return;
+    try {
+      const session = JSON.parse(raw) as RetryProgressSession;
+      if (!session.campaignId || !session.messageIds?.length) throw new Error('invalid retry session');
+      this.retrySession = session;
+      this.retryDialog = 'progress';
+      this.pollRetryProgress();
+      this.startRetryPolling();
+    } catch {
+      localStorage.removeItem(this.retryStorageKey);
+    }
+  }
+
+  private startRetryPolling(): void {
+    if (this.retryPoll) clearInterval(this.retryPoll);
+    this.retryPoll = setInterval(() => this.pollRetryProgress(), 5_000);
+  }
+
+  pollRetryProgress(): void {
+    if (!this.retrySession) return;
+    this.api.campaignDetail(this.retrySession.campaignId).subscribe({
+      next: detail => {
+        this.retryProgressDetail = detail;
+        if (detail.id === this.selectedId) this.detail = detail;
+      },
+      error: () => {
+        this.error = 'Não foi possível atualizar o acompanhamento do reenvio.';
       }
     });
   }

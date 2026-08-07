@@ -125,4 +125,41 @@
       </section>
     </div>
   }
+
+  @if (retryDialog === 'confirm' && detail) {
+    <div class="retry-dialog-overlay" role="presentation" (click)="!busy && (retryDialog = null)">
+      <section class="retry-dialog pp-glass" role="alertdialog" aria-modal="true" aria-labelledby="retry-confirm-title" aria-describedby="retry-confirm-description" (click)="$event.stopPropagation()">
+        <div class="retry-dialog__icon retry-dialog__icon--warning" aria-hidden="true">&#8635;</div>
+        <span class="pp-eyebrow">Confirmação de reenvio</span>
+        <h2 id="retry-confirm-title">Reenviar {{ retryableCount }} mensagem(ns)?</h2>
+        <p id="retry-confirm-description">As mensagens com falha, ignoradas ou pausadas voltarão para a fila da campanha <strong>{{ detail.name }}</strong>.</p>
+        <div class="retry-dialog__notice"><span aria-hidden="true">i</span><p>O envio continuará mesmo se você sair desta página. Ao retornar, o acompanhamento será restaurado automaticamente.</p></div>
+        <footer><button type="button" class="pp-btn pp-btn--ghost" (click)="retryDialog = null" [disabled]="busy">Cancelar</button><button type="button" class="pp-btn pp-btn--primary" (click)="confirmRetryProblems()" [disabled]="busy">{{ busy ? 'Preparando reenvio…' : 'Confirmar e acompanhar' }}</button></footer>
+      </section>
+    </div>
+  }
+
+  @if (retryDialog === 'progress' && retrySession) {
+    <div class="retry-dialog-overlay">
+      <section class="retry-dialog retry-dialog--progress pp-glass" role="dialog" aria-modal="true" aria-labelledby="retry-progress-title">
+        <header><div><span class="pp-eyebrow">Acompanhamento em tempo real</span><h2 id="retry-progress-title">Reenvio da campanha</h2><p>{{ retrySession.campaignName }} · iniciado em {{ retrySession.startedAt | date:'dd/MM/yyyy HH:mm' }}</p></div><button type="button" class="retry-dialog__minimize" aria-label="Minimizar acompanhamento" (click)="minimizeRetryProgress()">&minus;</button></header>
+        <div class="retry-progress-summary">
+          <div class="retry-progress-ring" [style.--retry-progress]="retryProgressPercent"><strong>{{ retryProgressPercent }}%</strong><span>processado</span></div>
+          <div><h3>{{ retryProgressComplete ? 'Reenvio processado' : 'Mensagens sendo reenviadas' }}</h3><p>{{ retryProgressComplete ? 'Todas as tentativas desta operação foram concluídas.' : 'Você pode minimizar esta janela. O acompanhamento continuará ativo.' }}</p></div>
+        </div>
+        <div class="retry-progress-bar" role="progressbar" aria-label="Progresso do reenvio" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="retryProgressPercent"><span [style.width.%]="retryProgressPercent"></span></div>
+        <div class="retry-progress-metrics"><article><span>Na fila</span><strong>{{ retryPendingCount }}</strong></article><article class="success"><span>Enviadas</span><strong>{{ retrySentCount }}</strong></article><article class="danger"><span>Ainda com falha</span><strong>{{ retryFailedCount }}</strong></article><article><span>Total</span><strong>{{ retryProgressTotal }}</strong></article></div>
+        <div class="retry-progress-list">
+          @for (message of retryProgressMessages; track message.id) {
+            <div><span class="retry-progress-list__state" [attr.data-state]="message.status"></span><strong>{{ message.companyName }}</strong><small>{{ statusLabel(message.status) }}</small></div>
+          } @empty { <p>Carregando o estado atual das mensagens…</p> }
+        </div>
+        <footer><small>Atualização automática a cada 5 segundos</small><button type="button" class="pp-btn pp-btn--secondary" (click)="pollRetryProgress()">Atualizar agora</button>@if (retryProgressComplete) { <button type="button" class="pp-btn pp-btn--primary" (click)="finishRetryProgress()">Concluir</button> } @else { <button type="button" class="pp-btn pp-btn--primary" (click)="minimizeRetryProgress()">Continuar em segundo plano</button> }</footer>
+      </section>
+    </div>
+  }
+
+  @if (retrySession && retryDialog === null) {
+    <button type="button" class="retry-progress-fab" (click)="reopenRetryProgress()"><span class="retry-progress-fab__pulse" aria-hidden="true"></span><span><strong>Reenvio em acompanhamento</strong><small>{{ retryProcessedCount }} de {{ retryProgressTotal }} processadas</small></span><b>{{ retryProgressPercent }}%</b></button>
+  }
 </section>
