@@ -231,7 +231,10 @@ public class OutreachService {
         return rows.stream().filter(m -> step == null || m.getOutreachStep() == step).filter(m -> allowed.contains(m.getStatus())).count();
     }
     private static boolean isEditable(OutreachMessage m) { return java.util.Set.of("PENDING", "QUEUED_BOT", "THROTTLED", "AWAITING_APPROVAL", "FAILED", "SKIPPED").contains(m.getStatus()); }
-    private static boolean isRetryable(OutreachMessage m) { return "WHATSAPP".equals(m.getChannel()) && java.util.Set.of("FAILED", "SKIPPED", "THROTTLED").contains(m.getStatus()); }
+    static boolean isRetryable(OutreachMessage m) {
+        return java.util.Set.of("WHATSAPP", "AUTO").contains(m.getChannel())
+            && java.util.Set.of("FAILED", "SKIPPED", "THROTTLED").contains(m.getStatus());
+    }
 
     @Transactional(readOnly = true)
     public OutreachReportResponse report() {
