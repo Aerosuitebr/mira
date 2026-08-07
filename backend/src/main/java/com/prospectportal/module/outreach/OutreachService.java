@@ -211,6 +211,22 @@ public class OutreachService {
         campaignRepository.save(campaign);
     }
 
+    @Transactional
+    public void cancelCampaign(UUID id) {
+        OutreachCampaign campaign = requireCampaign(id);
+        campaign.setStatus("CANCELLED");
+        campaignRepository.save(campaign);
+        messageRepository.findCampaignMessages(id, authContext.tenantId()).stream()
+            .filter(message -> message.getSentAt() == null)
+            .filter(message -> java.util.Set.of("PENDING", "QUEUED_BOT", "THROTTLED", "AWAITING_APPROVAL", "FAILED", "SKIPPED")
+                .contains(message.getStatus()))
+            .forEach(message -> {
+                message.setStatus("CANCELLED");
+                message.setErrorDetail("Campanha cancelada pelo usuário; item removido da fila do robô.");
+                messageRepository.save(message);
+            });
+    }
+
     private OutreachCampaign requireCampaign(UUID id) {
         return campaignRepository.findByIdAndTenantId(id, authContext.tenantId())
             .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Campanha não encontrada"));

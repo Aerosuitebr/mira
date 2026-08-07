@@ -26,7 +26,8 @@
       @if (detail) {
         <section class="campaign-summary pp-glass">
           <header><div><span class="pp-eyebrow">{{ detail.channel }} · {{ uniqueCompanies }} empresas</span><h2>{{ detail.name }}</h2><p>Criada em {{ detail.createdAt | date:'dd/MM/yyyy HH:mm' }}</p></div>
-            @if (hasWhatsAppConnectionIssue || !bot?.deliveryEnabled) { <button type="button" class="pp-btn pp-btn--secondary" disabled>Campanha interrompida</button> }
+            @if (detail.status === 'CANCELLED') { <button type="button" class="pp-btn pp-btn--secondary" disabled>Campanha cancelada</button> }
+            @else if (hasWhatsAppConnectionIssue || !bot?.deliveryEnabled) { <button type="button" class="pp-btn pp-btn--secondary" disabled>Campanha interrompida</button> }
             @else { <button type="button" class="pp-btn" [class.pp-btn--primary]="detail.status === 'PAUSED'" [class.pp-btn--secondary]="detail.status !== 'PAUSED'" (click)="toggleCampaign()" [disabled]="busy">{{ detail.status === 'PAUSED' ? 'Retomar campanha' : 'Pausar campanha' }}</button> }
           </header>
           <div class="campaign-progress-row"><div class="campaign-progress" role="progressbar" aria-label="Mensagens efetivamente enviadas" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="deliveryPercent"><span [style.width.%]="deliveryPercent"></span></div><strong>{{ deliveryPercent }}% enviados</strong></div><small>{{ detail.sent }} de {{ uniqueCompanies }} enviados · {{ detail.queued }} na fila · {{ detail.failed }} não concluídos · {{ detail.skipped }} requer contato · atualização automática a cada 10 segundos</small>
@@ -93,7 +94,18 @@
       <section class="campaign-detail-modal pp-glass" role="dialog" aria-modal="true" aria-labelledby="campaign-detail-title" (click)="$event.stopPropagation()">
         <header>
           <div><span class="pp-eyebrow">Detalhes da campanha</span><h2 id="campaign-detail-title">{{ detail.name }}</h2><p>Criada em {{ detail.createdAt | date:'dd/MM/yyyy' }} às {{ detail.createdAt | date:'HH:mm:ss' }} · {{ detail.channel }}</p></div>
-          <button type="button" class="campaign-detail-close" aria-label="Fechar detalhes" (click)="closeDetailModal()">×</button>
+          <div class="campaign-detail-header-actions">
+            @if (detail.status === 'CANCELLED') {
+              <span class="campaign-cancelled-badge">Campanha cancelada</span>
+            } @else {
+              <button type="button" class="campaign-transport-button" [class.is-paused]="detail.status === 'PAUSED'" (click)="toggleCampaign()" [disabled]="busy || hasWhatsAppConnectionIssue || !bot?.deliveryEnabled" [attr.aria-label]="detail.status === 'PAUSED' ? 'Reativar campanha e realinhar mensagens na fila' : 'Pausar campanha e retirar mensagens da fila'" [title]="detail.status === 'PAUSED' ? 'Reativar campanha' : 'Pausar campanha'">
+                @if (detail.status === 'PAUSED') { <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg> }
+                @else { <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg> }
+              </button>
+              <button type="button" class="campaign-cancel-button" (click)="requestCancelCampaign()" [disabled]="busy"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg><span>Cancelar campanha</span></button>
+            }
+            <button type="button" class="campaign-detail-close" aria-label="Fechar detalhes" (click)="closeDetailModal()">×</button>
+          </div>
         </header>
 
         <div class="campaign-detail-metrics">
@@ -108,7 +120,7 @@
 
         <div class="campaign-company-summary">
           <div class="campaign-company-summary__head"><strong>Resumo por empresa</strong><span>{{ modalMessages.length }} de {{ detail.messages.length }} registros</span></div>
-          <div class="campaign-modal-filters"><input class="pp-input" type="search" [(ngModel)]="modalSearch" placeholder="Buscar por empresa, CNPJ, cidade ou UF" aria-label="Buscar empresas nesta campanha"/><select class="pp-select" [(ngModel)]="modalFilter" aria-label="Filtrar empresas por situação"><option value="ALL">Todas as situações</option><option value="QUEUE_1">Etapa 1 na fila</option><option value="SENT_1">Etapa 1 enviadas</option><option value="REPLIED">Responderam</option><option value="PENDING_2">Etapa 2 aguardando</option><option value="SENT_2">Etapa 2 enviadas</option><option value="FAILED">Falhas ou ignoradas</option></select></div>
+          <div class="campaign-modal-filters"><input class="pp-input" type="search" [(ngModel)]="modalSearch" placeholder="Buscar por empresa, CNPJ, cidade ou UF" aria-label="Buscar empresas nesta campanha"/><select class="pp-select" [(ngModel)]="modalFilter" aria-label="Filtrar empresas por situação"><option value="ALL">Todas as situações</option><option value="QUEUE_1">Etapa 1 na fila</option><option value="SENT_1">Etapa 1 enviadas</option><option value="REPLIED">Responderam</option><option value="PENDING_2">Etapa 2 aguardando</option><option value="SENT_2">Etapa 2 enviadas</option><option value="FAILED">Falhas, ignoradas ou canceladas</option></select></div>
           <div class="campaign-company-summary__list">
             @for (message of modalMessages; track message.id) {
               <article [attr.data-status]="message.status">
@@ -122,6 +134,19 @@
         </div>
 
         <footer>@if (retryableCount > 0) { <button type="button" class="pp-btn retry-all-button" (click)="retryProblems()" [disabled]="busy || hasWhatsAppConnectionIssue">{{ busy ? 'Reenfileirando…' : 'Reenviar falhas e ignoradas (' + retryableCount + ')' }}</button> }<span class="campaign-footer-spacer"></span><button type="button" class="pp-btn pp-btn--secondary" (click)="refreshModal()" [disabled]="loading">Atualizar status</button><button type="button" class="pp-btn pp-btn--primary" (click)="closeDetailModal()">Fechar</button></footer>
+      </section>
+    </div>
+  }
+
+  @if (campaignActionDialog === 'cancel' && detail) {
+    <div class="retry-dialog-overlay" role="presentation" (click)="!busy && (campaignActionDialog = null)">
+      <section class="retry-dialog campaign-cancel-dialog pp-glass" role="alertdialog" aria-modal="true" aria-labelledby="campaign-cancel-title" aria-describedby="campaign-cancel-description" (click)="$event.stopPropagation()">
+        <div class="retry-dialog__icon campaign-cancel-dialog__icon" aria-hidden="true">×</div>
+        <span class="pp-eyebrow">Ação definitiva</span>
+        <h2 id="campaign-cancel-title">Cancelar esta campanha?</h2>
+        <p id="campaign-cancel-description">A campanha <strong>{{ detail.name }}</strong> será finalizada e não poderá ser reativada.</p>
+        <div class="campaign-cancel-dialog__notice"><span aria-hidden="true">!</span><p>Todas as mensagens ainda pendentes serão removidas das filas do robô. Mensagens já enviadas permanecerão no histórico para auditoria.</p></div>
+        <footer><button type="button" class="pp-btn pp-btn--ghost" (click)="campaignActionDialog = null" [disabled]="busy">Voltar</button><button type="button" class="pp-btn campaign-cancel-dialog__confirm" (click)="confirmCancelCampaign()" [disabled]="busy">{{ busy ? 'Cancelando…' : 'Cancelar definitivamente' }}</button></footer>
       </section>
     </div>
   }

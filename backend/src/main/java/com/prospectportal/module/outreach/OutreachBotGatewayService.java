@@ -25,6 +25,14 @@ public class OutreachBotGatewayService {
         return requestGet("/v1/status");
     }
 
+    public Map<String, Object> status(String instance) {
+        return requestGetWithInstance("/v1/status", instance);
+    }
+
+    public Map<String, Object> quota(String instance) {
+        return requestGetWithInstance("/v1/quota", instance);
+    }
+
     public Map<String, Object> pause() {
         return requestPost("/v1/pause");
     }
@@ -35,10 +43,19 @@ public class OutreachBotGatewayService {
 
     public Map<String, Object> pauseCampaign(UUID id) { return requestPost("/v1/campaigns/" + id + "/pause"); }
     public Map<String, Object> resumeCampaign(UUID id) { return requestPost("/v1/campaigns/" + id + "/resume"); }
+    public Map<String, Object> cancelCampaign(UUID id) { return requestPost("/v1/campaigns/" + id + "/cancel"); }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> requestGet(String path) {
         return client.get().uri(path).header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceToken)
+            .retrieve().body(Map.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> requestGetWithInstance(String path, String instance) {
+        return client.get()
+            .uri(builder -> builder.path(path).queryParam("instance", instance).build())
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceToken)
             .retrieve().body(Map.class);
     }
 

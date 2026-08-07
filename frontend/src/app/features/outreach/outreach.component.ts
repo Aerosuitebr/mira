@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit, inject, ChangeDetectorRef } from '@angula
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { timeout } from 'rxjs';
-import { ApiService, ApproachVariant, ChannelStatus, Company, DeliveryItem, Template } from '../../core/api.service';
+import { ApiService, ApproachVariant, ChannelStatus, Company, DeliveryItem, OutreachDailyQuota, Template } from '../../core/api.service';
 
 interface AiPreviewCopy {
   subject: string;
@@ -125,6 +125,8 @@ export class OutreachComponent implements OnInit, OnDestroy {
   message = '';
   feedbackError = false;
   channels: ChannelStatus | null = null;
+  dailyQuota: OutreachDailyQuota | null = null;
+  quotaLoading = false;
 
   sendProgress: SendProgressState = this.emptySendProgress();
 
@@ -152,6 +154,32 @@ export class OutreachComponent implements OnInit, OnDestroy {
         this.form.patchValue({ templateId: templates[0].id });
       }
     });
+
+    this.form.controls.channel.valueChanges.subscribe((channel) => {
+      if (channel === 'WHATSAPP') this.loadDailyQuota();
+    });
+  }
+
+  loadDailyQuota(): void {
+    this.quotaLoading = true;
+    this.api.outreachDailyQuota().subscribe({
+      next: (quota) => {
+        this.dailyQuota = quota;
+        this.quotaLoading = false;
+      },
+      error: () => {
+        this.dailyQuota = null;
+        this.quotaLoading = false;
+      }
+    });
+  }
+
+  get messagesAllowedToday(): number {
+    return Math.min(this.companyIds.length, this.dailyQuota?.remainingToday ?? 0);
+  }
+
+  get messagesDeferredByQuota(): number {
+    return Math.max(0, this.companyIds.length - this.messagesAllowedToday);
   }
 
   ngOnDestroy(): void {
@@ -549,6 +577,29 @@ export class OutreachComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (this.form.controls.channel.value === 'WHATSAPP') {
+      this.quotaLoading = true;
+      this.api.outreachDailyQuota().subscribe({
+        next: (quota) => {
+          this.dailyQuota = quota;
+          this.quotaLoading = false;
+          this.queueCampaign();
+        },
+        error: () => {
+          this.dailyQuota = null;
+          this.quotaLoading = false;
+          this.showFeedback(
+            'Envio bloqueado por seguranÃ§a: nÃ£o foi possÃ­vel validar a cota diÃ¡ria desta conexÃ£o do WhatsApp.',
+            true
+          );
+        }
+      });
+      return;
+    }
+    this.queueCampaign();
+  }
+
+  private queueCampaign(): void {
     this.persistCurrentPreview();
     this.loading = true;
     this.message = '';

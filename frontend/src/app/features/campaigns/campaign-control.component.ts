@@ -39,6 +39,7 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
   modalSearch = '';
   modalFilter = 'ALL';
   retryDialog: 'confirm' | 'progress' | null = null;
+  campaignActionDialog: 'cancel' | null = null;
   retrySession: RetryProgressSession | null = null;
   retryProgressDetail: CampaignDetail | null = null;
   private openModalAfterLoad = false;
@@ -95,7 +96,7 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
         (this.modalFilter === 'REPLIED' && (!!message.repliedAt || ['REPLIED', 'AWAITING_APPROVAL'].includes(message.status))) ||
         (this.modalFilter === 'PENDING_2' && message.step === 2 && !message.sentAt) ||
         (this.modalFilter === 'SENT_2' && message.step === 2 && !!message.sentAt) ||
-        (this.modalFilter === 'FAILED' && ['FAILED', 'SKIPPED'].includes(message.status));
+        (this.modalFilter === 'FAILED' && ['FAILED', 'SKIPPED', 'CANCELLED'].includes(message.status));
       return matchesSearch && matchesFilter;
     });
   }
@@ -124,7 +125,7 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
 
   campaignStatusLabel(campaign: Campaign): string {
     if (campaign.id === this.selectedId && (this.hasWhatsAppConnectionIssue || !this.bot?.deliveryEnabled || this.bot?.paused)) return 'PAUSADA';
-    return ({QUEUED:'NA FILA',SENDING:'EM ANDAMENTO',RUNNING:'EM ANDAMENTO',SENT:'CONCLUÍDA',COMPLETED:'CONCLUÍDA',FAILED:'REQUER ATENÇÃO',PAUSED:'PAUSADA'} as Record<string,string>)[campaign.status] || campaign.status;
+    return ({QUEUED:'NA FILA',SENDING:'EM ANDAMENTO',RUNNING:'EM ANDAMENTO',SENT:'CONCLUÍDA',COMPLETED:'CONCLUÍDA',FAILED:'REQUER ATENÇÃO',PAUSED:'PAUSADA',CANCELLED:'CANCELADA'} as Record<string,string>)[campaign.status] || campaign.status;
   }
 
   loadCampaigns(): void {
@@ -157,17 +158,43 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
   openEditFromModal(message: CampaignMessageDetail): void { this.closeDetailModal(); this.openEdit(message); }
   @HostListener('document:keydown.escape')
   closeModalWithEscape(): void {
-    if (this.retryDialog === 'confirm') this.retryDialog = null;
+    if (this.campaignActionDialog) this.campaignActionDialog = null;
+    else if (this.retryDialog === 'confirm') this.retryDialog = null;
     else if (this.retryDialog === 'progress') this.minimizeRetryProgress();
     else if (this.detailModalOpen) this.closeDetailModal();
   }
 
   toggleCampaign(): void {
-    if (!this.detail) return; this.busy = true; this.clearFeedback();
+    if (!this.detail || this.detail.status === 'CANCELLED') return; this.busy = true; this.clearFeedback();
     const paused = this.detail.status === 'PAUSED';
     (paused ? this.api.resumeCampaign(this.detail.id) : this.api.pauseCampaign(this.detail.id)).subscribe({
-      next: d => { this.detail = d; this.busy = false; this.feedback = paused ? 'Campanha retomada. A fila voltará a avançar.' : 'Campanha pausada sem perder sua posição na fila.'; },
+      next: d => { this.detail = d; this.syncCampaignSummary(d); this.busy = false; this.feedback = paused ? 'Campanha reativada. As mensagens pendentes foram realinhadas na fila.' : 'Campanha pausada. Os eventos foram retirados da fila do robô e permanecem preservados.'; },
       error: e => { this.busy = false; this.error = e?.error?.message || 'Não foi possível alterar a campanha.'; }
+    });
+  }
+
+  requestCancelCampaign(): void {
+    if (!this.detail || this.detail.status === 'CANCELLED' || this.busy) return;
+    this.clearFeedback();
+    this.campaignActionDialog = 'cancel';
+  }
+
+  confirmCancelCampaign(): void {
+    if (!this.detail || this.detail.status === 'CANCELLED' || this.busy) return;
+    this.busy = true;
+    this.clearFeedback();
+    this.api.cancelCampaign(this.detail.id).subscribe({
+      next: detail => {
+        this.detail = detail;
+        this.syncCampaignSummary(detail);
+        this.busy = false;
+        this.campaignActionDialog = null;
+        this.feedback = 'Campanha cancelada definitivamente. Todos os eventos pendentes foram removidos da fila do robô.';
+      },
+      error: e => {
+        this.busy = false;
+        this.error = e?.error?.message || 'Não foi possível cancelar a campanha.';
+      }
     });
   }
 
@@ -273,8 +300,11 @@ export class CampaignControlComponent implements OnInit, OnDestroy {
     });
   }
 
-  statusLabel(status: string): string { return ({QUEUED_BOT:'Na fila',WAITING_REPLY:'Aguardando resposta',REPLIED:'Respondeu',AWAITING_APPROVAL:'Aguardando aprovação',SENT:'Enviada',FAILED:'Não enviado',SKIPPED:'Requer contato',THROTTLED:'Pausada por segurança',PENDING:'Pendente'} as Record<string,string>)[status] || status; }
+  statusLabel(status: string): string { return ({QUEUED_BOT:'Na fila',WAITING_REPLY:'Aguardando resposta',REPLIED:'Respondeu',AWAITING_APPROVAL:'Aguardando aprovação',SENT:'Enviada',FAILED:'Não enviado',SKIPPED:'Requer contato',THROTTLED:'Pausada por segurança',PENDING:'Pendente',CANCELLED:'Cancelada'} as Record<string,string>)[status] || status; }
   private isConnectionError(detail: string | null): boolean { return /connection\s*closed|disconnected|conex[aã]o.*fechada|evolution\s*http/i.test(detail || ''); }
   private replaceMessage(updated: CampaignMessageDetail): void { if (this.detail) this.detail = { ...this.detail, messages: this.detail.messages.map(m => m.id === updated.id ? updated : m) }; }
+  private syncCampaignSummary(detail: CampaignDetail): void {
+    this.campaigns = this.campaigns.map(campaign => campaign.id === detail.id ? { ...campaign, status: detail.status } : campaign);
+  }
   private clearFeedback(): void { this.feedback = ''; this.error = ''; }
 }

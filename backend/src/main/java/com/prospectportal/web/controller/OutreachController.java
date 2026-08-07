@@ -3,6 +3,7 @@ package com.prospectportal.web.controller;
 import com.prospectportal.module.outreach.OutreachService;
 import com.prospectportal.module.outreach.OutreachBotGatewayService;
 import com.prospectportal.module.prospect.ProspectAutomationService;
+import com.prospectportal.module.whatsapp.WhatsAppConnectionService;
 import com.prospectportal.web.dto.AiCopyRequest;
 import com.prospectportal.web.dto.AiCopyResponse;
 import com.prospectportal.web.dto.BulkCampaignResponse;
@@ -41,15 +42,18 @@ public class OutreachController {
     private final OutreachService outreachService;
     private final ProspectAutomationService prospectAutomationService;
     private final OutreachBotGatewayService outreachBotGatewayService;
+    private final WhatsAppConnectionService whatsAppConnectionService;
 
     public OutreachController(
         OutreachService outreachService,
         ProspectAutomationService prospectAutomationService,
-        OutreachBotGatewayService outreachBotGatewayService
+        OutreachBotGatewayService outreachBotGatewayService,
+        WhatsAppConnectionService whatsAppConnectionService
     ) {
         this.outreachService = outreachService;
         this.prospectAutomationService = prospectAutomationService;
         this.outreachBotGatewayService = outreachBotGatewayService;
+        this.whatsAppConnectionService = whatsAppConnectionService;
     }
 
     @GetMapping("/templates")
@@ -100,6 +104,13 @@ public class OutreachController {
         return outreachService.campaignDetail(id);
     }
 
+    @PostMapping("/campaigns/{id}/cancel")
+    public CampaignDetailResponse cancelCampaign(@PathVariable UUID id) {
+        outreachBotGatewayService.cancelCampaign(id);
+        outreachService.cancelCampaign(id);
+        return outreachService.campaignDetail(id);
+    }
+
     @GetMapping("/report")
     public OutreachReportResponse report() {
         return outreachService.report();
@@ -137,7 +148,12 @@ public class OutreachController {
 
     @GetMapping("/bot/status")
     public Map<String, Object> botStatus() {
-        return outreachBotGatewayService.status();
+        return outreachBotGatewayService.status(whatsAppConnectionService.resolveSendInstance());
+    }
+
+    @GetMapping("/bot/quota")
+    public Map<String, Object> botQuota() {
+        return outreachBotGatewayService.quota(whatsAppConnectionService.resolveSendInstance());
     }
 
     @PostMapping("/bot/pause")

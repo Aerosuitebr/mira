@@ -258,6 +258,18 @@ export interface OutreachBotStatus {
   cadence: { minSeconds: number; maxSeconds: number; dailyCap: number };
 }
 
+export interface OutreachDailyQuota {
+  day: string;
+  sentToday: number;
+  dailyLimit: number;
+  remainingToday: number;
+  exhausted: boolean;
+  withinBusinessHours: boolean;
+  businessHours: string;
+  nextSendAt: number | null;
+  allowedNow: boolean;
+}
+
 export interface FollowUpReviewItem {
   id: string;
   companyId: string;
@@ -604,6 +616,7 @@ export class ApiService {
   }
   pauseCampaign(id: string) { return this.http.post<CampaignDetail>(`${environment.apiUrl}/outreach/campaigns/${id}/pause`, {}); }
   resumeCampaign(id: string) { return this.http.post<CampaignDetail>(`${environment.apiUrl}/outreach/campaigns/${id}/resume`, {}); }
+  cancelCampaign(id: string) { return this.http.post<CampaignDetail>(`${environment.apiUrl}/outreach/campaigns/${id}/cancel`, {}); }
   updateCampaignMessage(campaignId: string, messageId: string, payload: { subject?: string; body: string }) {
     return this.http.put<CampaignMessageDetail>(`${environment.apiUrl}/outreach/campaigns/${campaignId}/messages/${messageId}`, payload);
   }
@@ -616,6 +629,10 @@ export class ApiService {
 
   outreachBotStatus() {
     return this.http.get<OutreachBotStatus>(`${environment.apiUrl}/outreach/bot/status`);
+  }
+
+  outreachDailyQuota() {
+    return this.http.get<OutreachDailyQuota>(`${environment.apiUrl}/outreach/bot/quota`);
   }
 
   pauseOutreachBot() {

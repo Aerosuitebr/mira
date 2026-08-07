@@ -47,6 +47,34 @@
               <small class="channel-hint">{{ channelStatus.connectHint }}</small>
             }
           }
+          @if (form.controls.channel.value === 'WHATSAPP' && channelStatus.connected) {
+            <div class="daily-quota" [class.daily-quota--blocked]="dailyQuota?.exhausted" [class.daily-quota--limited]="messagesDeferredByQuota > 0 && !dailyQuota?.exhausted">
+              <div class="daily-quota__header">
+                <strong>ProteÃ§Ã£o do nÃºmero conectado</strong>
+                @if (quotaLoading) {
+                  <span>Consultando...</span>
+                } @else if (dailyQuota) {
+                  <span>{{ dailyQuota.sentToday }} / {{ dailyQuota.dailyLimit }} hoje</span>
+                }
+              </div>
+              @if (dailyQuota) {
+                <div class="daily-quota__bar" aria-hidden="true">
+                  <span [style.width.%]="(dailyQuota.sentToday / dailyQuota.dailyLimit) * 100"></span>
+                </div>
+                @if (dailyQuota.exhausted) {
+                  <p>Limite diÃ¡rio atingido. Nenhuma mensagem serÃ¡ enviada hoje; a campanha permanecerÃ¡ protegida na fila para o prÃ³ximo dia.</p>
+                } @else if (!dailyQuota.withinBusinessHours) {
+                  <p>Fora do horÃ¡rio comercial. A campanha ficarÃ¡ na fila e os envios serÃ£o distribuÃ­dos aleatoriamente entre 09:00 e 18:00, respeitando o limite de {{ dailyQuota.dailyLimit }} por dia.</p>
+                } @else if (messagesDeferredByQuota > 0) {
+                  <p>Restam {{ dailyQuota.remainingToday }} envios hoje. AtÃ© {{ messagesAllowedToday }} desta campanha podem sair em intervalos aleatÃ³rios atÃ© 18:00 e {{ messagesDeferredByQuota }} permanecerÃ£o na fila.</p>
+                } @else {
+                  <p>Restam {{ dailyQuota.remainingToday }} envios hoje. Esta campanha estÃ¡ dentro do limite e serÃ¡ distribuÃ­da aleatoriamente atÃ© 18:00.</p>
+                }
+              } @else if (!quotaLoading) {
+                <p>NÃ£o foi possÃ­vel consultar a cota agora. O robÃ´ continuarÃ¡ bloqueando qualquer envio acima de 15 mensagens por dia.</p>
+              }
+            </div>
+          }
         </div>
 
         <div class="pp-field">

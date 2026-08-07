@@ -1,6 +1,6 @@
 import express from 'express';
 import Redis from 'ioredis';
-import { applyTimeGreeting, canOpenColdConversation, jobStep, nextColdAt, normalizePhone, reportDay, selectStep1Text } from './state.js';
+import { applyTimeGreeting, jobStep, nextColdAt, normalizePhone, reportDay, selectStep1Text } from './state.js';
 
 const port = Number(process.env.PORT || 8090);
 const redis = new Redis(process.env.REDIS_URL || 'redis://redis:6379');
@@ -10,9 +10,16 @@ const processingColdKey = `${queueKey}:processing`;
 const processingPriorityKey = `${priorityQueueKey}:processing`;
 const deadLetterKey = process.env.OUTREACH_DEAD_LETTER_KEY || 'mira:outreach:dead';
 const pausedCampaignsKey = 'mira:outreach:paused-campaigns';
+const cancelledCampaignsKey = 'mira:outreach:cancelled-campaigns';
+const parkedCampaignPrefix = 'mira:outreach:parked-campaign:';
 const eventQueueKey = process.env.OUTREACH_EVENT_QUEUE_KEY || 'mira:outreach:events';
 const stateKey = 'mira:outreach:bot:state';
 const conversationPrefix = 'mira:outreach:conversation:';
+const dailyQuotaPrefix = 'mira:outreach:daily-quota:';
+const nextSendPrefix = 'mira:outreach:next-send:';
+const HARD_DAILY_CAP = 15;
+const BUSINESS_START_MINUTE = 9 * 60;
+const BUSINESS_END_MINUTE = 18 * 60;
 const app = express();
 app.use(express.json());
 
@@ -20,7 +27,8 @@ const config = {
   paused: process.env.OUTREACH_BOT_PAUSED !== 'false',
   minIntervalSeconds: Number(process.env.OUTREACH_MIN_INTERVAL_SECONDS || 180),
   maxIntervalSeconds: Number(process.env.OUTREACH_MAX_INTERVAL_SECONDS || 300),
-  dailyCap: Number(process.env.OUTREACH_DAILY_CAP || 40),
+  // Limite de segurança: nenhuma configuração pode elevar a franquia acima de 15.
+  dailyCap: Math.min(HARD_DAILY_CAP, Math.max(1, Number(process.env.OUTREACH_DAILY_CAP || HARD_DAILY_CAP))),
   timeZone: process.env.OUTREACH_TIMEZONE || 'America/Sao_Paulo',
   deliveryEnabled: process.env.OUTREACH_DELIVERY_ENABLED === 'true'
 };
@@ -45,7 +53,96 @@ function evolutionMessageId(payload) {
   return payload?.key?.id || payload?.data?.key?.id || payload?.message?.key?.id || null;
 }
 
-async function state() {
+function quotaKey(instance, day = reportDay(new Date(), config.timeZone)) {
+  return `${dailyQuotaPrefix}${day}:${encodeURIComponent(String(instance || evolution.instance || 'unconfigured').trim())}`;
+}
+
+function connectionKey(instance) {
+  return encodeURIComponent(String(instance || evolution.instance || 'unconfigured').trim());
+}
+
+function businessClock(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: config.timeZone,
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  const minute = Number(values.hour) * 60 + Number(values.minute) + Number(values.second) / 60;
+  return {
+    minute,
+    withinWindow: minute >= BUSINESS_START_MINUTE && minute < BUSINESS_END_MINUTE,
+    millisecondsUntilOpen: minute < BUSINESS_START_MINUTE
+      ? (BUSINESS_START_MINUTE - minute) * 60_000
+      : ((24 * 60 - minute) + BUSINESS_START_MINUTE) * 60_000,
+    millisecondsUntilClose: Math.max(0, (BUSINESS_END_MINUTE - minute) * 60_000)
+  };
+}
+
+async function sendWindow(instance) {
+  const clock = businessClock();
+  const nextSendAt = Number((await redis.get(`${nextSendPrefix}${connectionKey(instance)}`)) || 0);
+  return {
+    withinBusinessHours: clock.withinWindow,
+    businessHours: '09:00-18:00',
+    nextSendAt: nextSendAt || null,
+    allowedNow: clock.withinWindow && Date.now() >= nextSendAt
+  };
+}
+
+async function scheduleNextSend(instance) {
+  const quota = await dailyQuota(instance);
+  const clock = businessClock();
+  const remainingMessages = Math.max(1, quota.remainingToday);
+  let delay;
+  if (!clock.withinWindow) {
+    delay = clock.millisecondsUntilOpen + Math.random() * 20 * 60_000;
+  } else {
+    // Divide o expediente restante em espaÃ§os e adiciona variaÃ§Ã£o de 60% a 140%.
+    const baseGap = clock.millisecondsUntilClose / (remainingMessages + 1);
+    delay = Math.max(3 * 60_000, baseGap * (0.6 + Math.random() * 0.8));
+    delay = Math.min(delay, Math.max(3 * 60_000, clock.millisecondsUntilClose - 60_000));
+  }
+  await redis.set(`${nextSendPrefix}${connectionKey(instance)}`, String(Date.now() + Math.floor(delay)), 'EX', 60 * 60 * 48);
+}
+
+async function dailyQuota(instance) {
+  const day = reportDay(new Date(), config.timeZone);
+  const sentToday = Number((await redis.get(quotaKey(instance, day))) || 0);
+  const window = await sendWindow(instance);
+  return {
+    day,
+    sentToday,
+    dailyLimit: config.dailyCap,
+    remainingToday: Math.max(0, config.dailyCap - sentToday),
+    exhausted: sentToday >= config.dailyCap,
+    ...window
+  };
+}
+
+async function reserveDailySlot(instance) {
+  const key = quotaKey(instance);
+  const result = await redis.eval(
+    `local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+     if current >= tonumber(ARGV[1]) then return 0 end
+     current = redis.call('INCR', KEYS[1])
+     if current == 1 then redis.call('EXPIRE', KEYS[1], ARGV[2]) end
+     if current > tonumber(ARGV[1]) then redis.call('DECR', KEYS[1]); return 0 end
+     return current`,
+    1, key, config.dailyCap, 60 * 60 * 72
+  );
+  return Number(result) > 0;
+}
+
+async function releaseDailySlot(instance) {
+  await redis.eval(
+    `local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+     if current > 0 then return redis.call('DECR', KEYS[1]) end
+     return 0`,
+    1, quotaKey(instance)
+  );
+}
+
+async function state(instance) {
   const saved = await redis.hgetall(stateKey);
   const today = reportDay(new Date(), config.timeZone);
   if (saved.day !== today) {
@@ -71,7 +168,7 @@ async function state() {
   const processing = (await redis.llen(processingColdKey)) + (await redis.llen(processingPriorityKey));
   const deadLetter = await redis.llen(deadLetterKey);
   const pendingEvents = await redis.llen(eventQueueKey);
-  const sentToday = Number(saved.sentToday || 0);
+  const quota = await dailyQuota(instance);
   return {
     connected: true,
     paused: saved.paused == null ? config.paused : saved.paused === 'true',
@@ -81,8 +178,11 @@ async function state() {
     processing,
     deadLetter,
     pendingEvents,
-    sentToday,
-    remainingToday: Math.max(0, config.dailyCap - sentToday),
+    sentToday: quota.sentToday,
+    remainingToday: quota.remainingToday,
+    dailyLimit: quota.dailyLimit,
+    quotaDay: quota.day,
+    quotaExhausted: quota.exhausted,
     restrictionDetected: saved.restrictionDetected === 'true',
     pausedReason: saved.pausedReason || null,
     deliveryEnabled: config.deliveryEnabled,
@@ -193,7 +293,8 @@ async function canOpenNextColdConversation() {
   const today = reportDay(new Date(), config.timeZone);
   const current = await redis.hgetall(stateKey);
   if (current.day !== today) await redis.hset(stateKey, { day: today, sentToday: '0' });
-  return canOpenColdConversation(current.day === today ? current : {}, config);
+  // A franquia Ã© validada por conexÃ£o em reserveDailySlot; aqui fica apenas a cadÃªncia.
+  return Date.now() >= Number(current.nextColdAt || 0);
 }
 
 async function processOne() {
@@ -213,15 +314,29 @@ async function processOne() {
     }
     if (!raw) return;
     const job = JSON.parse(raw);
+    if (await redis.sismember(cancelledCampaignsKey, String(job.campaignId || ''))) {
+      await redis.lrem(processingKey, 1, raw);
+      return;
+    }
+    if (await redis.sismember(pausedCampaignsKey, String(job.campaignId || ''))) {
+      await parkJob(job.campaignId, sourceKey, processingKey, raw);
+      return;
+    }
     const isStep2 = jobStep(job) === 'STEP2';
+    const quotaInstance = String(job.evolutionInstance || evolution.instance || '').trim();
     const text = applyTimeGreeting(isStep2 ? job.step2Text : selectStep1Text(job), config.timeZone);
     if (!normalizePhone(job.phone) || !text) {
       await emit('SKIPPED', { messageId: job.messageId, reason: 'Contato sem WhatsApp ou texto' });
       await redis.lrem(processingKey, 1, raw);
       return;
     }
+    if (!(await reserveDailySlot(quotaInstance))) {
+      await requeueProcessing(processingKey, sourceKey, raw, job);
+      return;
+    }
     try {
       const providerMessageId = await sendText(job.phone, text, job.evolutionInstance);
+      await scheduleNextSend(quotaInstance);
       if (isStep2) {
         await emit('STEP2_SENT', { messageId: job.messageId, phone: normalizePhone(job.phone), providerMessageId, step2Text: job.step2Text });
         await incrementMetric('STEP2_SENT');
@@ -236,6 +351,8 @@ async function processOne() {
       await incrementMetric('STEP1_SENT');
       await redis.lrem(processingKey, 1, raw);
     } catch (error) {
+      // A vaga somente Ã© consumida quando a Evolution confirma o envio.
+      await releaseDailySlot(quotaInstance);
       if (error.rateLimited) {
         await requeueProcessing(processingKey, sourceKey, raw, job);
         await redis.hset(stateKey, 'restrictionDetected', 'true', 'paused', 'true', 'pausedReason', 'RESTRICTION');
@@ -274,6 +391,18 @@ async function takeEligible(sourceKey, processingKey) {
     if (!raw) return null;
     try {
       const job = JSON.parse(raw);
+      if (await redis.sismember(cancelledCampaignsKey, String(job.campaignId || ''))) {
+        await redis.lrem(processingKey, 1, raw);
+        continue;
+      }
+      if ((await dailyQuota(job.evolutionInstance)).exhausted) {
+        await requeueProcessing(processingKey, sourceKey, raw, job);
+        continue;
+      }
+      if (!(await sendWindow(job.evolutionInstance)).allowedNow) {
+        await requeueProcessing(processingKey, sourceKey, raw, job);
+        continue;
+      }
       if (!(await redis.sismember(pausedCampaignsKey, String(job.campaignId || '')))) return raw;
     } catch {
       await redis.lrem(processingKey, 1, raw);
@@ -282,6 +411,67 @@ async function takeEligible(sourceKey, processingKey) {
     await redis.multi().lrem(processingKey, 1, raw).rpush(sourceKey, raw).exec();
   }
   return null;
+}
+
+function parkedCampaignKey(campaignId) {
+  return `${parkedCampaignPrefix}${campaignId}`;
+}
+
+async function parkJob(campaignId, sourceKey, processingKey, raw) {
+  const parked = JSON.stringify({ source: sourceKey === priorityQueueKey ? 'priority' : 'cold', raw });
+  const removed = await redis.lrem(processingKey, 1, raw);
+  if (removed) await redis.rpush(parkedCampaignKey(campaignId), parked);
+}
+
+async function extractCampaignJobs(campaignId) {
+  let parked = 0;
+  const targetKey = parkedCampaignKey(campaignId);
+  for (const [sourceKey, kind] of [
+    [priorityQueueKey, 'priority'], [queueKey, 'cold'],
+    [processingPriorityKey, 'priority'], [processingColdKey, 'cold']
+  ]) {
+    const jobs = await redis.lrange(sourceKey, 0, -1);
+    for (const raw of jobs) {
+      try {
+        const job = JSON.parse(raw);
+        if (String(job.campaignId || '') !== String(campaignId)) continue;
+        const removed = await redis.lrem(sourceKey, 1, raw);
+        if (removed) {
+          await redis.rpush(targetKey, JSON.stringify({ source: kind, raw }));
+          parked += 1;
+        }
+      } catch {
+        // O consumidor tratará itens inválidos que não pertencem à campanha.
+      }
+    }
+  }
+  return parked;
+}
+
+async function restoreCampaignJobs(campaignId) {
+  const targetKey = parkedCampaignKey(campaignId);
+  let restored = 0;
+  for (;;) {
+    const parked = await redis.lpop(targetKey);
+    if (!parked) break;
+    try {
+      const item = JSON.parse(parked);
+      const destination = item.source === 'priority' ? priorityQueueKey : queueKey;
+      await redis.rpush(destination, item.raw);
+      restored += 1;
+    } catch {
+      // Entrada inválida é descartada para não bloquear a retomada.
+    }
+  }
+  await redis.del(targetKey);
+  return restored;
+}
+
+async function discardCampaignJobs(campaignId) {
+  const parked = await extractCampaignJobs(campaignId);
+  const alreadyParked = await redis.llen(parkedCampaignKey(campaignId));
+  await redis.del(parkedCampaignKey(campaignId));
+  return Math.max(parked, Number(alreadyParked || 0));
 }
 
 async function requeueProcessing(processingKey, sourceKey, raw, job) {
@@ -363,11 +553,27 @@ async function ensureQueueWebhook() {
 app.get('/health', async (_req, res) => {
   try { await redis.ping(); res.json({ status: 'ok' }); } catch { res.status(503).json({ status: 'redis-unavailable' }); }
 });
-app.get('/v1/status', authorize, async (_req, res) => res.json(await state()));
+app.get('/v1/status', authorize, async (req, res) => res.json(await state(req.query.instance)));
+app.get('/v1/quota', authorize, async (req, res) => res.json(await dailyQuota(req.query.instance)));
 app.post('/v1/pause', authorize, async (_req, res) => { await redis.hset(stateKey, 'paused', 'true', 'pausedReason', 'MANUAL'); res.json(await state()); });
 app.post('/v1/resume', authorize, async (_req, res) => { await redis.hset(stateKey, 'paused', 'false'); await redis.hdel(stateKey, 'pausedReason'); res.json(await state()); });
-app.post('/v1/campaigns/:id/pause', authorize, async (req, res) => { await redis.sadd(pausedCampaignsKey, req.params.id); res.json({ campaignId: req.params.id, paused: true }); });
-app.post('/v1/campaigns/:id/resume', authorize, async (req, res) => { await redis.srem(pausedCampaignsKey, req.params.id); res.json({ campaignId: req.params.id, paused: false }); });
+app.post('/v1/campaigns/:id/pause', authorize, async (req, res) => {
+  await redis.sadd(pausedCampaignsKey, req.params.id);
+  const parked = await extractCampaignJobs(req.params.id);
+  res.json({ campaignId: req.params.id, paused: true, parked });
+});
+app.post('/v1/campaigns/:id/resume', authorize, async (req, res) => {
+  if (await redis.sismember(cancelledCampaignsKey, req.params.id)) return res.status(409).json({ error: 'campaign-cancelled' });
+  const restored = await restoreCampaignJobs(req.params.id);
+  await redis.srem(pausedCampaignsKey, req.params.id);
+  res.json({ campaignId: req.params.id, paused: false, restored });
+});
+app.post('/v1/campaigns/:id/cancel', authorize, async (req, res) => {
+  await redis.sadd(cancelledCampaignsKey, req.params.id);
+  await redis.srem(pausedCampaignsKey, req.params.id);
+  const removed = await discardCampaignJobs(req.params.id);
+  res.json({ campaignId: req.params.id, cancelled: true, removed });
+});
 app.get('/v1/conversations', authorize, async (req, res) => {
   const number = normalizePhone(req.query.phone);
   const raw = number ? await redis.get(`${conversationPrefix}${number}`) : null;
